@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>About — Golf Scheduler</title>
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f5f7fa;
+  }
+
+  .content {
+    max-width: 800px;
+    margin: 60px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  h1 {
+    margin-top: 0;
+    text-align: center;
+  }
+
+  p {
+    line-height: 1.6;
+    font-size: 16px;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="navContainer"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/partials/login-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+});
+</script>
+
+<div class="content">
+  <h1>About Golf Scheduler</h1>
+
+  <p>
+    Golf Scheduler is a simple, modern tool designed to help leagues organize
+    play months, play days, and player availability with ease. Whether you're
+    managing a small local league or coordinating a larger group, the system
+    keeps everything clear, consistent, and easy to update.  
+  </p>
+
+  <p>
+    Players can log in, view or update their golf schedule, update availability,
+    and stay connected with their league. Administrators have access to
+    powerful tools for managing leagues, users, and schedules — all from a
+    clean, intuitive interface.
+  </p>
+
+  <p>
+    This project is built with Node.js, Express, HTML, Javascript, SQLite, and
+    a focus on clean UI design and maintainable code.
+  </p>
+</div>
+
+</body>
+</html>

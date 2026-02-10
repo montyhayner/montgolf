@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f5f5f5;
+    }
+
+    /* NAV BAR */
+    .admin-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #222;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 25px;
+    }
+    .admin-nav .nav-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .admin-nav a {
+      color: #ddd;
+      text-decoration: none;
+      margin-left: 18px;
+      font-size: 15px;
+      transition: color 0.2s ease;
+    }
+    .admin-nav a:hover {
+      color: #fff;
+    }
+    .admin-nav .logout-link {
+      color: #ff6b6b;
+    }
+    .admin-nav .logout-link:hover {
+      color: #ff9b9b;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 25px;
+      max-width: 700px;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      text-align: center;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+    }
+
+    .card p {
+      margin: 0;
+      color: #555;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAV BAR -->
+<div id="adminNav"></div>
+<script>
+  fetch("/partials/admin-nav")
+    .then(r => r.text())
+    .then(html => {
+      document.getElementById("adminNav").innerHTML = html;
+    });
+</script>
+
+  <h1>Admin Dashboard</h1>
+
+  <div class="grid">
+
+    <div class="card" onclick="location.href='admin-scheduler.html'">
+      <h2>Manage Schedules</h2>
+      <p>Edit any golfer’s monthly schedule</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-play-months.html'">
+      <h2>Manage Play Months</h2>
+      <p>Edit which months golfers are in town</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-play-days.html'">
+      <h2>Manage Play Days</h2>
+      <p>Edit golfers’ preferred weekly play days</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-league-management.html'">
+      <h2>Manage Leagues</h2>
+      <p>Add, rename, or delete leagues</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-league-play-days.html'">
+      <h2>League Play Days</h2>
+      <p>Edit which days each league plays</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-users.html'">
+      <h2>Manage Users</h2>
+      <p>Add, edit, or delete golfers</p>
+    </div>
+
+  </div>
+
+</body>
+</html>

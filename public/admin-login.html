@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Login</title>
+
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+  }
+
+  /* Hide nav links on admin login page */
+  #topNav .nav-link[href="/schedule"],
+  #topNav .nav-link[href="/my-availability"],
+  #topNav .nav-link[href="/logout"] {
+    display: none;
+  }
+
+  .login-box {
+    margin: 60px auto;
+    width: 320px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #f8f9fb;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin: 6px 0 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  .toggle-container {
+    display: flex;
+    align-items: center;
+    margin-top: -8px;
+    margin-bottom: 12px;
+  }
+
+  .toggle-container input {
+    margin-right: 6px;
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    background: #0275d8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  button:hover {
+    background: #025bb5;
+  }
+
+  .error {
+    color: #d9534f;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .forgot-link {
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  .forgot-link a {
+    color: #0275d8;
+    text-decoration: none;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="navContainer"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // Load shared nav bar
+  fetch("/partials/user-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+
+  const params = new URLSearchParams(window.location.search);
+
+  // Restore email
+  const emailField = document.querySelector('input[name="email"]');
+  if (emailField && params.get("email")) {
+    emailField.value = params.get("email");
+  }
+
+  // Show error
+  if (params.get("error")) {
+    document.getElementById("errorMessage").textContent =
+      "Invalid Email or Password";
+  }
+});
+</script>
+
+<div class="login-box">
+  <h1>Admin Login</h1>
+
+  <div id="errorMessage" class="error"></div>
+
+  <form method="POST" action="/auth/admin-login">
+    <input type="text" name="email" placeholder="Admin Email" autocomplete="email" required>
+
+    <input id="passwordField" type="password" name="password"
+           placeholder="Password" autocomplete="current-password" required>
+
+    <div class="toggle-container">
+      <input type="checkbox" id="showPasswordToggle">
+      <label for="showPasswordToggle">Show Password</label>
+    </div>
+
+    <button type="submit">Log In</button>
+  </form>
+
+  <div class="forgot-link">
+    <a href="/admin-forgot-password">Forgot Password?</a>
+  </div>
+</div>
+
+<script>
+// Show/Hide password toggle
+document.getElementById("showPasswordToggle").addEventListener("change", function () {
+  const field = document.getElementById("passwordField");
+  field.type = this.checked ? "text" : "password";
+});
+</script>
+
+</body>
+</html>

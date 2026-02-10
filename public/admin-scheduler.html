@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin: Scheduler</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    /* NAV BAR */
+    .admin-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #222;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 25px;
+    }
+    .admin-nav .nav-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .admin-nav a {
+      color: #ddd;
+      text-decoration: none;
+      margin-left: 18px;
+      font-size: 15px;
+      transition: color 0.2s ease;
+    }
+    .admin-nav a:hover {
+      color: #fff;
+    }
+    .admin-nav .logout-link {
+      color: #ff6b6b;
+    }
+    .admin-nav .logout-link:hover {
+      color: #ff9b9b;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    .top-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      max-width: 900px;
+    }
+
+    .day {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      background: #fafafa;
+      user-select: none;
+    }
+
+    .day.playing {
+      background: #4caf50;
+      color: white;
+      border-color: #3e8e41;
+    }
+
+    .day-header {
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #saveBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #saveBtn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAV BAR -->
+  <div class="admin-nav">
+    <div class="nav-left">
+      <span class="nav-title">Admin Panel</span>
+    </div>
+    <div class="nav-right">
+      <a href="admin-dashboard.html">Dashboard</a>
+      <a href="admin-users.html">Users</a>
+      <a href="admin-scheduler.html">Schedules</a>
+      <a href="admin-play-months.html">Play Months</a>
+      <a href="admin-play-days.html">Play Days</a>
+      <a href="admin-league-management.html">Leagues</a>
+      <a href="admin-league-play-days.html">League Days</a>
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
+  </div>
+
+  <h2>Admin: Scheduler</h2>
+
+  <div class="top-bar">
+    <select id="userSelector"></select>
+    <input type="month" id="monthPicker">
+    <button onclick="loadSchedule()">Load</button>
+    <button onclick="autoPopulate()">Auto-Populate</button>
+  </div>
+
+  <div id="calendarContainer"></div>
+
+  <button id="saveBtn" onclick="saveSchedule()">Save</button>
+
+  <script>
+    let selectedUserId = null;
+    let selectedYear = null;
+    let selectedMonth = null;
+    let schedule = {};
+
+    async function loadUsers() {
+      const res = await fetch("/api/admin/users");
+      const users = await res.json();
+
+      const sel = document.getElementById("userSelector");
+      sel.innerHTML = "";
+
+      users.forEach(u => {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = `${u.last_name}, ${u.first_name}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    loadUsers();
+
+    async function loadSchedule() {
+      selectedUserId = document.getElementById("userSelector").value;
+      const monthVal = document.getElementById("monthPicker").value;
+
+      if (!monthVal) {
+        alert("Please select a month.");
+        return;
+      }
+
+      const [year, month] = monthVal.split("-");
+      selectedYear = parseInt(year);
+      selectedMonth = parseInt(month);
+
+      const res = await fetch(`/api/admin/schedule/${selectedUserId}/${selectedYear}/${selectedMonth}`);
+      schedule = await res.json();
+
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const container = document.getElementById("calendarContainer");
+      container.innerHTML = "";
+
+      const firstDay = new Date(selectedYear, selectedMonth - 1, 1);
+      const lastDay = new Date(selectedYear, selectedMonth, 0);
+      const totalDays = lastDay.getDate();
+
+      const grid = document.createElement("div");
+      grid.className = "calendar";
+
+      const headers = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      headers.forEach(h => {
+        const div = document.createElement("div");
+        div.className = "day-header";
+        div.textContent = h;
+        grid.appendChild(div);
+      });
+
+      for (let i = 0; i < firstDay.getDay(); i++) {
+        const empty = document.createElement("div");
+        grid.appendChild(empty);
+      }
+
+      for (let d = 1; d <= totalDays; d++) {
+        const date = new Date(selectedYear, selectedMonth - 1, d);
+        const key = `${selectedYear}-${selectedMonth}-${d}`;
+
+        const div = document.createElement("div");
+        div.className = "day";
+        div.textContent = d;
+
+        if (schedule[key]) {
+          div.classList.add("playing");
+        }
+
+        div.onclick = () => {
+          div.classList.toggle("playing");
+          if (div.classList.contains("playing")) {
+            schedule[key] = true;
+          } else {
+            delete schedule[key];
+          }
+        };
+
+        grid.appendChild(div);
+      }
+
+      container.appendChild(grid);
+    }
+
+    async function autoPopulate() {
+      if (!selectedUserId || !selectedYear || !selectedMonth) {
+        alert("Load a user and month first.");
+        return;
+      }
+
+      const res = await fetch(`/api/admin/schedule/autopopulate/${selectedUserId}/${selectedYear}/${selectedMonth}`, {
+        method: "POST"
+      });
+
+      schedule = await res.json();
+      renderCalendar();
+    }
+
+    async function saveSchedule() {
+      await fetch(`/api/admin/schedule/${selectedUserId}/${selectedYear}/${selectedMonth}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(schedule)
+      });
+
+      alert("Schedule saved.");
+    }
+  </script>
+
+</body>
+</html>

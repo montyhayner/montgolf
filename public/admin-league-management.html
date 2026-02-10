@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin: League Management</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    /* NAV BAR */
+    .admin-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #222;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 25px;
+    }
+    .admin-nav .nav-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .admin-nav a {
+      color: #ddd;
+      text-decoration: none;
+      margin-left: 18px;
+      font-size: 15px;
+      transition: color 0.2s ease;
+    }
+    .admin-nav a:hover {
+      color: #fff;
+    }
+    .admin-nav .logout-link {
+      color: #ff6b6b;
+    }
+    .admin-nav .logout-link:hover {
+      color: #ff9b9b;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    .league-list {
+      margin-top: 20px;
+      max-width: 500px;
+    }
+
+    .league-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: #fafafa;
+    }
+
+    .league-row input {
+      width: 200px;
+      padding: 6px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      color: white;
+      font-size: 14px;
+    }
+
+    .btn-save {
+      background: #28a745;
+    }
+    .btn-save:hover {
+      background: #1e7e34;
+    }
+
+    .btn-delete {
+      background: #dc3545;
+    }
+    .btn-delete:hover {
+      background: #b02a37;
+    }
+
+    .add-section {
+      margin-top: 30px;
+      max-width: 500px;
+    }
+
+    #addLeagueBtn {
+      margin-top: 10px;
+      background: #007bff;
+    }
+    #addLeagueBtn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAV BAR -->
+  <div class="admin-nav">
+    <div class="nav-left">
+      <span class="nav-title">Admin Panel</span>
+    </div>
+    <div class="nav-right">
+      <a href="admin-dashboard.html">Dashboard</a>
+      <a href="admin-users.html">Users</a>
+      <a href="admin-scheduler.html">Schedules</a>
+      <a href="admin-play-months.html">Play Months</a>
+      <a href="admin-play-days.html">Play Days</a>
+      <a href="admin-league-management.html">Leagues</a>
+      <a href="admin-league-play-days.html">League Days</a>
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
+  </div>
+
+  <h2>Admin: League Management</h2>
+
+  <div class="league-list" id="leagueList"></div>
+
+  <div class="add-section">
+    <h3>Add New League</h3>
+    <input type="text" id="newLeagueName" placeholder="League Name">
+    <button id="addLeagueBtn" class="btn" onclick="addLeague()">Add League</button>
+  </div>
+
+  <script>
+    async function loadLeagues() {
+      const res = await fetch("/api/admin/leagues");
+      const leagues = await res.json();
+
+      const list = document.getElementById("leagueList");
+      list.innerHTML = "";
+
+      leagues.forEach(l => {
+        const row = document.createElement("div");
+        row.className = "league-row";
+
+        const input = document.createElement("input");
+        input.value = l.league_name;
+
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "Save";
+        saveBtn.className = "btn btn-save";
+        saveBtn.onclick = () => updateLeague(l.league_name, input.value);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.className = "btn btn-delete";
+        deleteBtn.onclick = () => deleteLeague(l.league_name);
+
+        row.appendChild(input);
+        row.appendChild(saveBtn);
+        row.appendChild(deleteBtn);
+
+        list.appendChild(row);
+      });
+    }
+
+    loadLeagues();
+
+    async function addLeague() {
+      const name = document.getElementById("newLeagueName").value.trim();
+      if (!name) {
+        alert("Please enter a league name.");
+        return;
+      }
+
+      await fetch("/api/admin/leagues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ league_name: name })
+      });
+
+      document.getElementById("newLeagueName").value = "";
+      loadLeagues();
+    }
+
+    async function updateLeague(oldName, newName) {
+      newName = newName.trim();
+      if (!newName) {
+        alert("League name cannot be empty.");
+        return;
+      }
+
+      await fetch(`/api/admin/league/${oldName}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_league_name: newName })
+      });
+
+      loadLeagues();
+    }
+
+    async function deleteLeague(name) {
+      const ok = confirm(`Delete league "${name}"?`);
+      if (!ok) return;
+
+      await fetch(`/api/admin/league/${name}`, {
+        method: "DELETE"
+      });
+
+      loadLeagues();
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+#topNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0275d8;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+#topNav .nav-title {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+#topNav .nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+#topNav .nav-link {
+  color: white;
+  text-decoration: none;
+  font-size: 15px;
+  transition: opacity 0.15s ease;
+}
+
+#topNav .nav-link:hover {
+  opacity: 0.8;
+}
+
+#topNav .nav-link.active {
+  text-decoration: underline;
+  font-weight: bold;
+}

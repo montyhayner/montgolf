@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Golf Scheduler</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f5f5f5;
+    }
+
+    /* USER NAV BAR */
+    .user-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #004b8d;
+      padding: 14px 24px;
+    }
+    .user-nav .nav-title {
+      color: #fff;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .user-nav a {
+      color: #e6e6e6;
+      text-decoration: none;
+      margin-left: 20px;
+      font-size: 16px;
+      transition: color 0.2s ease;
+    }
+    .user-nav a:hover {
+      color: #ffffff;
+    }
+
+    /* HERO SECTION */
+    .hero {
+      text-align: center;
+      padding: 80px 20px;
+      background: linear-gradient(135deg, #004b8d, #0074d9);
+      color: white;
+    }
+    .hero h1 {
+      font-size: 42px;
+      margin-bottom: 10px;
+    }
+    .hero p {
+      font-size: 20px;
+      opacity: 0.9;
+    }
+
+    /* CARD GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 25px;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      text-align: center;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 22px;
+    }
+
+    .card p {
+      margin: 0;
+      color: #555;
+      font-size: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- USER NAV BAR -->
+  <div class="user-nav">
+    <div class="nav-left">
+      <span class="nav-title">Golf Scheduler</span>
+    </div>
+    <div class="nav-right">
+      <a href="login.html">Golfer Login</a>
+      <a href="admin-login.html">Admin Login</a>
+    </div>
+  </div>
+
+  <!-- HERO SECTION -->
+  <div class="hero">
+    <h1>Welcome to the Golf Scheduler</h1>
+    <p>Manage your play days, play months, and schedule with ease</p>
+  </div>
+
+  <!-- ACTION CARDS -->
+  <div class="grid">
+
+    <div class="card" onclick="location.href='login.html'">
+      <h2>Login</h2>
+      <p>Access your account</p>
+    </div>
+
+    <div class="card" onclick="location.href='admin-login.html'">
+      <h2>Admin Login</h2>
+      <p>Manage golfers, leagues, and schedules</p>
+    </div>
+
+  </div>
+
+</body>
+</html>

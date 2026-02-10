@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>League Calendar</title>
+  <link rel="stylesheet" href="/style.css">
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+
+    h1 { margin-bottom: 20px; }
+
+    .controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fafafa;
+      width: 500px;
+    }
+
+    select, input[type="month"], button {
+      padding: 8px;
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-top: 20px;
+      width: 700px;
+    }
+
+    .day-header {
+      font-weight: bold;
+      text-align: center;
+      padding: 5px;
+    }
+
+    .day-cell {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 80px;
+      background: #f9f9f9;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .day-number {
+      font-weight: bold;
+    }
+
+    .availability {
+      margin-top: 8px;
+      font-size: 0.9em;
+    }
+
+    .playday {
+      border: 2px solid #0275d8;
+    }
+
+    /* Heatmap colors */
+    .heat-0 { background: #f8d7da; } /* red-ish */
+    .heat-1 { background: #fff3cd; } /* yellow-ish */
+    .heat-2 { background: #d4edda; } /* light green */
+    .heat-3 { background: #c3e6cb; } /* medium green */
+    .heat-4 { background: #a1d99b; } /* strong green */
+  </style>
+</head>
+
+<body>
+
+  <!-- ADMIN NAV BAR -->
+  <div id="admin-nav"></div>
+  <script src="/admin-nav.js"></script>
+
+  <h1>League Calendar with Availability</h1>
+
+  <div class="controls">
+    <label for="leagueSelect"><strong>Select League:</strong></label>
+    <select id="leagueSelect"></select>
+
+    <label for="monthinput" style="margin-top:15px;"><strong>Select Month:</strong></label>
+    <input type="month" id="monthInput">
+
+    <button onclick="loadCalendar()">Load Calendar</button>
+  </div>
+
+  <div id="calendarContainer"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      loadLeagues();
+    });
+
+    function loadLeagues() {
+      fetch('/api/leagues')
+        .then(res => res.json())
+        .then(data => {
+          const select = document.getElementById("leagueSelect");
+          select.innerHTML = "";
+
+          data.forEach(l => {
+            const opt = document.createElement("option");
+            opt.value = l.id;
+            opt.textContent = l.name;
+            select.appendChild(opt);
+          });
+        });
+    }
+
+    async function loadCalendar() {
+      const leagueId = document.getElementById("leagueSelect").value;
+      const monthStr = document.getElementById("monthInput").value;
+
+      if (!leagueId || !monthStr) {
+        alert("Please select a league and a month");
+        return;
+      }
+
+      const [year, month] = monthStr.split("-").map(Number);
+
+      // Fetch league play days
+      const playDays = await fetch(`/api/league-play-days/${leagueId}`)
+        .then(res => res.json())
+        .then(rows => rows.filter(r => r.is_play_day === 1).map(r => r.day_of_week));
+
+      renderCalendar(year, month, leagueId, playDays);
+    }
+
+    async function renderCalendar(year, month, leagueId, playDays) {
+      const container = document.getElementById("calendarContainer");
+      container.innerHTML = "";
+
+      const calendar = document.createElement("div");
+      calendar.className = "calendar";
+
+      const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      dayNames.forEach(d => {
+        const div = document.createElement("div");
+        div.className = "day-header";
+        div.textContent = d;
+        calendar.appendChild(div);
+      });
+
+      const firstDay = new Date(year, month - 1, 1);
+      const startDay = firstDay.getDay();
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      // Blank cells before the first day
+      for (let i = 0; i < startDay; i++) {
+        const blank = document.createElement("div");
+        calendar.appendChild(blank);
+      }
+
+      // Fill calendar days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, month - 1, day);
+        const dow = dateObj.getDay();
+        const dateStr = dateObj.toISOString().split("T")[0];
+
+        const cell = document.createElement("div");
+        cell.className = "day-cell";
+
+        if (playDays.includes(dow)) {
+          cell.classList.add("playday");
+        }
+
+        const num = document.createElement("div");
+        num.className = "day-number";
+        num.textContent = day;
+        cell.appendChild(num);
+
+        // Fetch availability for this date
+        fetch(`/api/report/available-date/${leagueId}/${dateStr}`)
+          .then(res => res.json())
+          .then(data => {
+            const count = data.eligible_players.length;
+
+            const heatLevel =
+              count === 0 ? "heat-0" :
+              count <= 2 ? "heat-1" :
+              count <= 4 ? "heat-2" :
+              count <= 6 ? "heat-3" :
+              "heat-4";
+
+            cell.classList.add(heatLevel);
+
+            const avail = document.createElement("div");
+            avail.className = "availability";
+            avail.textContent = `${count} available`;
+            cell.appendChild(avail);
+
+            cell.onclick = () => {
+              alert(
+                `Available on ${dateStr}:\n\n` +
+                data.eligible_players
+                  .map(p => `${p.last_name}, ${p.first_name}`)
+                  .join("\n")
+              );
+            };
+          });
+
+        calendar.appendChild(cell);
+      }
+
+      container.appendChild(calendar);
+    }
+  </script>
+
+</body>
+</html>

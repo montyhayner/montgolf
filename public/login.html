@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+  }
+
+  /* Hide nav links on login page */
+  #topNav .nav-link[href="/schedule"],
+  #topNav .nav-link[href="/my-availability"],
+  #topNav .nav-link[href="/logout"] {
+    display: none;
+  }
+
+  .login-box {
+    margin: 60px auto;
+    width: 320px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #f8f9fb;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin: 6px 0 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    background: #0275d8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  button:hover {
+    background: #025bb5;
+  }
+
+  .error {
+    color: #d9534f;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- Shared Nav Bar -->
+<div id="navContainer"></div>
+
+<script>
+// Load shared nav bar + handle login errors
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/partials/login-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+
+  const params = new URLSearchParams(window.location.search);
+
+  // Restore email
+  const emailField = document.querySelector('input[name="email"]');
+  if (emailField && params.get("email")) {
+    emailField.value = params.get("email");
+  }
+
+  // Show error message
+  if (params.get("error")) {
+    document.getElementById("errorMessage").textContent =
+      "Invalid Email or Password";
+  }
+});
+</script>
+
+<div class="login-box">
+  <h1>Login</h1>
+
+  <div id="errorMessage" class="error"></div>
+
+  <form method="POST" action="/auth/login">
+    <input type="text" name="email" placeholder="Email ID" autocomplete="email" required>
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+    <button type="submit">Log In</button>
+  </form>
+</div>
+
+</body>
+</html>

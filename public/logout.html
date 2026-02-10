@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logged Out</title>
+
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .logout-box {
+    margin-top: 60px;
+    padding: 30px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    display: inline-block;
+    background: #f8f9fb;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  p {
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+
+  a {
+    color: #0275d8;
+    text-decoration: none;
+    font-weight: bold;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- Shared Nav Bar -->
+<div id="navContainer"></div>
+
+<div class="logout-box">
+  <h1>You have been logged out</h1>
+  <p>Thank you for using the Golf Scheduler.</p>
+  <p><a href="/login">Click here to log in again</a></p>
+  <p>You will be redirected shortly…</p>
+</div>
+
+<script>
+// Load shared nav bar
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/partials/user-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+
+  // Auto-redirect after 3 seconds
+  setTimeout(() => {
+    window.location.href = "/login";
+  }, 3000);
+});
+</script>
+
+</body>
+</html>

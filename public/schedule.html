@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Schedule</title>
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+  }
+
+  h1 {
+    margin-bottom: 8px;
+  }
+
+  /* Status Banner */
+  .status-banner {
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    display: none;
+  }
+
+  .status-default { background: #fff3cd; color: #856404; }
+  .status-saved { background: #d4edda; color: #155724; }
+  .status-out { background: #f8d7da; color: #721c24; }
+  .status-cleared { background: #f8d7da; color: #721c24; }
+
+  /* Toolbar */
+  #scheduleToolbar {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 8px 10px;
+    background: #f8f9fb;
+    border: 1px solid #c7c7c7;
+    border-radius: 8px;
+    align-items: center;
+  }
+
+  #scheduleToolbar input[type="month"] {
+    padding: 6px;
+    font-size: 14px;
+  }
+
+  #scheduleToolbar button {
+    padding: 6px 14px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #c7c7c7;
+    background: #ffffff;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  #scheduleToolbar button:hover:not(:disabled) {
+    background: #d5e6ff;
+    border-color: #2b7cff;
+  }
+
+  #scheduleToolbar button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  #unsavedIndicator {
+    color: #d9534f;
+    font-weight: bold;
+    display: none;
+    margin-left: auto;
+  }
+
+  /* Calendar */
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .day-header {
+    font-weight: bold;
+    text-align: center;
+    padding: 6px 0;
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+
+  .day-cell {
+    height: 32px;
+    padding: 4px;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .day-cell.playing {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .day-cell.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="navContainer"></div>
+
+<h1>
+  My Schedule
+  <span id="leagueNameHeader"></span>
+  <span id="userNameHeader"></span>
+</h1>
+
+<div id="statusBanner" class="status-banner"></div>
+
+<!-- Toolbar with Month Picker -->
+<div id="scheduleToolbar">
+  <input type="month" id="monthInput">
+  <button id="defaultBtn">Default</button>
+  <button id="clearBtn">Clear</button>
+  <button id="saveBtn" disabled>Save</button>
+  <button id="revertBtn">Revert</button>
+  <div id="unsavedIndicator">• Unsaved changes</div>
+</div>
+
+<div id="calendarContainer"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/partials/user-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+
+      // Highlight active link
+      const path = window.location.pathname;
+      document.querySelectorAll("#topNav .nav-link").forEach(link => {
+        if (link.getAttribute("href") === path) {
+          link.classList.add("active");
+        }
+      });
+    });
+});
+</script>
+
+<script>
+let savedSchedule = null;
+let currentSchedule = null;
+let unsavedChanges = false;
+
+// ---- Helpers ----
+
+function markUnsaved() {
+  unsavedChanges = true;
+  updateSaveButtonState();
+  updateUnsavedIndicator();
+}
+
+function updateSaveButtonState() {
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.disabled = !unsavedChanges;
+}
+
+function updateUnsavedIndicator() {
+  const ind = document.getElementById("unsavedIndicator");
+  ind.style.display = unsavedChanges ? "block" : "none";
+}
+
+function getMonthParts() {
+  const [year, month] = document.getElementById("monthInput").value.split("-");
+  return { year, month };
+}
+
+function renderCalendar(schedule) {
+  const container = document.getElementById("calendarContainer");
+  container.innerHTML = "";
+
+  const [year, month] = document.getElementById("monthInput").value.split("-").map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const totalDays = lastDay.getDate();
+
+  const calendar = document.createElement("div");
+  calendar.className = "calendar";
+
+  const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  dayNames.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "day-header";
+    div.textContent = d;
+    calendar.appendChild(div);
+  });
+
+  // leading blanks
+  for (let i = 0; i < firstDay.getDay(); i++) {
+    const blank = document.createElement("div");
+    blank.className = "day-cell empty";
+    calendar.appendChild(blank);
+  }
+
+  for (let d = 1; d <= totalDays; d++) {
+    const fullDate =
+      `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    const isPlaying = schedule && schedule[fullDate] === true;
+
+    const cell = document.createElement("div");
+    cell.className = "day-cell";
+    cell.dataset.date = fullDate;
+
+    if (isPlaying) cell.classList.add("playing");
+
+    cell.textContent = d;
+
+    cell.addEventListener("click", () => {
+      cell.classList.toggle("playing");
+      markUnsaved();
+    });
+
+    calendar.appendChild(cell);
+  }
+
+  container.appendChild(calendar);
+}
+
+function updateStatusBanner(status) {
+  const banner = document.getElementById("statusBanner");
+  banner.className = "status-banner";
+
+  if (status === "saved") {
+    banner.classList.add("status-saved");
+    banner.textContent = "Saved schedule.";
+  } else if (status === "default") {
+    banner.classList.add("status-default");
+    banner.textContent = "Default schedule.";
+  } else if (status === "cleared") {
+    banner.classList.add("status-cleared");
+    banner.textContent = "Schedule cleared.";
+  } else if (status === "out_of_town") {
+    banner.classList.add("status-out");
+    banner.textContent = "You are marked out of town this month.";
+  } else {
+    banner.textContent = "";
+    banner.style.display = "none";
+    return;
+  }
+
+  banner.style.display = "block";
+}
+
+// ---- Load initial month (session-aware) ----
+
+async function initSchedulePage() {
+  const res = await fetch("/user/schedule");
+  const data = await res.json();
+
+  const year = data.year;
+  const month = data.month;
+
+  document.getElementById("monthInput").value =
+    `${year}-${String(month).padStart(2,"0")}`;
+
+  await loadScheduleForCurrentMonth();
+}
+
+async function loadScheduleForCurrentMonth() {
+  const { year, month } = getMonthParts();
+
+  fetch("/user/set-last-month", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, month })
+  });
+
+  const res = await fetch(`/user/schedule/${year}/${month}`);
+  const data = await res.json();
+
+  savedSchedule = data.status === "saved" ? data.schedule : null;
+  currentSchedule = data.schedule || {};
+
+  unsavedChanges = false;
+  updateSaveButtonState();
+  updateUnsavedIndicator();
+
+  renderCalendar(currentSchedule);
+  updateStatusBanner(data.status);
+}
+
+// ---- Buttons ----
+
+// SAVE
+function saveSchedule() {
+  const { year, month } = getMonthParts();
+
+  const schedule = {};
+  document.querySelectorAll(".day-cell").forEach(cell => {
+    if (!cell.dataset.date) return;
+    const fullDate = cell.dataset.date;
+    const isPlaying = cell.classList.contains("playing");
+    schedule[fullDate] = isPlaying;
+  });
+
+  fetch(`/user/schedule/${year}/${month}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ schedule })
+  })
+  .then(() => {
+    savedSchedule = schedule;
+    currentSchedule = schedule;
+    unsavedChanges = false;
+    updateSaveButtonState();
+    updateUnsavedIndicator();
+    updateStatusBanner("saved");
+  });
+}
+
+// DEFAULT
+function regenerateDefaultSchedule() {
+  const { year, month } = getMonthParts();
+
+  fetch(`/user/schedule/default/${year}/${month}`, {
+    method: "POST"
+  })
+  .then(res => res.json())
+  .then(data => {
+    currentSchedule = data.schedule || {};
+    renderCalendar(currentSchedule);
+    markUnsaved();
+    updateStatusBanner(data.status);
+  });
+}
+
+// CLEAR
+function clearSchedule() {
+  const { year, month } = getMonthParts();
+
+  fetch(`/user/schedule/clear/${year}/${month}`, {
+    method: "POST"
+  })
+  .then(res => res.json())
+  .then(() => {
+    currentSchedule = {};
+    renderCalendar(currentSchedule);
+    markUnsaved();
+    updateStatusBanner("cleared");
+  });
+}
+
+// REVERT
+function revertToSaved() {
+  if (!savedSchedule) {
+    alert("No saved schedule exists for this month.");
+    return;
+  }
+  currentSchedule = savedSchedule;
+  renderCalendar(savedSchedule);
+  unsavedChanges = false;
+  updateSaveButtonState();
+  updateUnsavedIndicator();
+  updateStatusBanner("saved");
+}
+
+// ---- Navigation warning ----
+
+document.querySelectorAll("#topNav a").forEach(link => {
+  link.addEventListener("click", (e) => {
+    if (!unsavedChanges) return;
+
+    const leave = confirm("You have unsaved changes. Save before leaving?");
+    if (!leave) {
+      e.preventDefault();
+    }
+  });
+});
+
+// ---- Leaving page warning ----
+
+window.addEventListener("beforeunload", (e) => {
+  if (!unsavedChanges) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+// ---- Wire up events ----
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("monthInput").addEventListener("change", () => {
+    loadScheduleForCurrentMonth();
+  });
+
+  document.getElementById("defaultBtn").addEventListener("click", regenerateDefaultSchedule);
+  document.getElementById("clearBtn").addEventListener("click", clearSchedule);
+  document.getElementById("saveBtn").addEventListener("click", saveSchedule);
+  document.getElementById("revertBtn").addEventListener("click", revertToSaved);
+
+  updateSaveButtonState();
+  updateUnsavedIndicator();
+
+  initSchedulePage();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Load nav bar
+  fetch("/partials/user-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+
+  // Load league name for page header
+  fetch("/user/selected-league")
+    .then(r => r.json())
+    .then(data => {
+      if (data.league) {
+        document.getElementById("leagueNameHeader").textContent =
+          "— " + data.league.league_name;
+      }
+    });
+
+  // Load user name for page header
+  fetch("/user/info")
+    .then(r => r.json())
+    .then(data => {
+      if (data.user) {
+        document.getElementById("userNameHeader").textContent =
+          " — " + data.user.first_name + " " + data.user.last_name;
+      }
+    });
+});
+
+</script>
+
+</body>
+</html>

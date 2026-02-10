@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin: Edit Golfer Play Days</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    /* NAV BAR */
+    .admin-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #222;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 25px;
+    }
+    .admin-nav .nav-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .admin-nav a {
+      color: #ddd;
+      text-decoration: none;
+      margin-left: 18px;
+      font-size: 15px;
+      transition: color 0.2s ease;
+    }
+    .admin-nav a:hover {
+      color: #fff;
+    }
+    .admin-nav .logout-link {
+      color: #ff6b6b;
+    }
+    .admin-nav .logout-link:hover {
+      color: #ff9b9b;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    .top-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+      max-width: 700px;
+      margin-top: 20px;
+    }
+
+    .day-box {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8f8f8;
+      transition: background 0.2s ease;
+      user-select: none;
+    }
+
+    .day-box.active {
+      background: #4caf50;
+      color: white;
+      border-color: #3e8e41;
+    }
+
+    #saveBtn {
+      margin-top: 25px;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #saveBtn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAV BAR -->
+  <div class="admin-nav">
+    <div class="nav-left">
+      <span class="nav-title">Admin Panel</span>
+    </div>
+    <div class="nav-right">
+      <a href="admin-dashboard.html">Dashboard</a>
+      <a href="admin-golfers.html">Users</a>
+      <a href="admin-scheduler.html">Schedules</a>
+      <a href="admin-play-months.html">Play Months</a>
+      <a href="admin-play-days.html">Play Days</a>
+      <a href="admin-league-management.html">Leagues</a>
+      <a href="admin-league-play-days.html">League Days</a>
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
+  </div>
+
+  <h2>Admin: Edit Golfer Play Days</h2>
+
+  <div class="top-bar">
+    <select id="userSelector"></select>
+    <button onclick="loadDays()">Load</button>
+  </div>
+
+  <div class="days-grid" id="daysGrid"></div>
+
+  <button id="saveBtn" onclick="saveDays()">Save</button>
+
+  <script>
+    const dayCodes = ["M","T","W","R","F","S","U"];
+    const dayLabels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+    let selectedUserId = null;
+    let userPlayDays = "";
+
+    async function loadUsers() {
+      const res = await fetch("/api/admin/users");
+      const users = await res.json();
+
+      const sel = document.getElementById("userSelector");
+      sel.innerHTML = "";
+
+      users.forEach(u => {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = `${u.last_name}, ${u.first_name}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    loadUsers();
+
+    async function loadDays() {
+      selectedUserId = document.getElementById("userSelector").value;
+
+      const res = await fetch(`/api/admin/user/${selectedUserId}/playdays`);
+      const data = await res.json();
+      userPlayDays = data.play_days || "";
+
+      renderDays();
+    }
+
+    function renderDays() {
+      const grid = document.getElementById("daysGrid");
+      grid.innerHTML = "";
+
+      dayCodes.forEach((code, i) => {
+        const div = document.createElement("div");
+        div.className = "day-box";
+        div.textContent = dayLabels[i];
+
+        if (userPlayDays.includes(code)) {
+          div.classList.add("active");
+        }
+
+        div.onclick = () => {
+          div.classList.toggle("active");
+
+          if (div.classList.contains("active")) {
+            userPlayDays += code;
+          } else {
+            userPlayDays = userPlayDays.replace(code, "");
+          }
+        };
+
+        grid.appendChild(div);
+      });
+    }
+
+    async function saveDays() {
+      if (!selectedUserId) {
+        alert("Please select a golfer first.");
+        return;
+      }
+
+      await fetch(`/api/admin/user/${selectedUserId}/playdays`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ play_days: userPlayDays })
+      });
+
+      alert("Play days updated for golfer.");
+    }
+  </script>
+
+</body>
+</html>

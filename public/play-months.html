@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Play Months</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    /* USER NAV BAR */
+    .user-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #004b8d;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 25px;
+    }
+    .user-nav .nav-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .user-nav a {
+      color: #e6e6e6;
+      text-decoration: none;
+      margin-left: 18px;
+      font-size: 15px;
+      transition: color 0.2s ease;
+    }
+    .user-nav a:hover {
+      color: #ffffff;
+    }
+    .user-nav .logout-link {
+      color: #ff6b6b;
+    }
+    .user-nav .logout-link:hover {
+      color: #ff9b9b;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    .months-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      max-width: 700px;
+      margin-top: 20px;
+    }
+
+    .month-box {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8f8f8;
+      transition: background 0.2s ease;
+      user-select: none;
+    }
+
+    .month-box.active {
+      background: #4caf50;
+      color: white;
+      border-color: #3e8e41;
+    }
+
+    #saveBtn {
+      margin-top: 25px;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #saveBtn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- USER NAV BAR -->
+  <div class="user-nav">
+    <div class="nav-left">
+      <span class="nav-title">Golf Scheduler</span>
+    </div>
+    <div class="nav-right">
+      <a href="schedule.html">My Schedule</a>
+      <a href="play-months.html">Play Months</a>
+      <a href="play-days.html">Play Days</a>
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
+  </div>
+
+  <h2>My Play Months</h2>
+
+  <div class="months-grid" id="monthsGrid"></div>
+
+  <button id="saveBtn" onclick="saveMonths()">Save</button>
+
+  <script>
+    const monthLabels = [
+      "Jan","Feb","Mar","Apr","May","Jun",
+      "Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+
+    let userMonths = {};
+
+    async function loadMonths() {
+      const res = await fetch("/api/user/playmonths");
+      userMonths = await res.json();
+      renderMonths();
+    }
+
+    function renderMonths() {
+      const grid = document.getElementById("monthsGrid");
+      grid.innerHTML = "";
+
+      monthLabels.forEach((label, i) => {
+        const div = document.createElement("div");
+        div.className = "month-box";
+        div.textContent = label;
+
+        const key = (i + 1).toString();
+        if (userMonths[key] === 1) {
+          div.classList.add("active");
+        }
+
+        div.onclick = () => {
+          div.classList.toggle("active");
+          userMonths[key] = div.classList.contains("active") ? 1 : 0;
+        };
+
+        grid.appendChild(div);
+      });
+    }
+
+    async function saveMonths() {
+      await fetch("/api/user/playmonths", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userMonths)
+      });
+
+      alert("Your play months have been updated.");
+    }
+
+    loadMonths();
+  </script>
+
+</body>
+</html>

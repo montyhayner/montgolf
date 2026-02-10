@@ -1,0 +1,100 @@
+drop TABLE users;
+
+CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      last_name TEXT NOT NULL,
+      first_name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
+      league_name TEXT NOT NULL,
+      Play_Days_Of_Week TEXT DEFAULT " ",
+      subgroup TEXT NOT NULL DEFAULT "#",
+      subgroup_number INTEGER
+    )
+
+='"' & C & CStr(Row()) & '"'
+
+ CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      last_name TEXT NOT NULL,
+      first_name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
+      league_name TEXT NOT NULL,
+      Play_Days_Of_Week TEXT DEFAULT " ",
+      subgroup TEXT NOT NULL DEFAULT "#",
+      subgroup_number TEXT
+    )
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+	("Hayner", "Monty", "rlhayner@verizon.net", 1664, 1, ""Renegades",", "MWF", "#", "0")
+"Bischof",	"Bill",		"0000",	0	"Renegades",	MWF	F	5
+"Caruso",	"George", 		"0000",	0	"Renegades",	F	#	0
+"Gilmore",	"George", 		"0000",	0	"Renegades",	M	A	6
+"Harpin",	"Dave", 		"0000",	0	"Renegades",	MWF	#	0
+"Hayner",	"Monty", 		"0000",	1	"Renegades",	MWF	#	0
+"Hill",	"Jay", 		"0000",	0	"Renegades",	WF	F	6
+"Jameson",	"Bob", 		"0000",	0	"Renegades",	WF	#	0
+"Johnson",	"Fred",		"0000",	0	"Renegades",	W	D	5
+"LaPierre",	"Tico",		"0000",	0	"Renegades",	W	D	4
+"LeoFanti",	"Ralph", 		"0000",	0	"Renegades",	W	D	3
+"Lillquist",	"Jeff",		"0000",	0	"Renegades",	WF	A	5
+"Mader",	"Don",		"0000",	0	"Renegades",	WF	#	0
+"Meals",	"Taylor", 		"0000",	0	"Renegades",	MW	#	0
+"Mercer",	"Mike", 		"0000",	0	"Renegades",	MF	A	2
+"Milazzo",	"Tom",		"0000",	0	"Renegades",	MWF	#	0
+"Mills, PGA*	"Ed",		"0000",	0	"Renegades",	MWF	B	3
+"Pearson",	"Kellie", 		"0000",	0	"Renegades",	MW	#	0
+"Quillen",	"Jim", 		"0000",	0	"Renegades",	F	F	7
+"Reiley",	"Dan",		"0000",	0	"Renegades",	W	A	4
+"Rummel",	"Steve",		"0000",	0	"Renegades",	F	#	0
+"Sorgenfrei",	"Jerry",		"0000",	0	"Renegades",	W	F	2
+"Tsolinas",	"Pete",		"0000",	0	"Renegades",	WF	#	0
+"Waligora",	"Roger", 		"0000",	0	"Renegades",	W	A	3
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Barber",	"Tom", 	"tkbarber@comcast.net",	"0000",	0,	"Renegades",	"MWF", "B",	"2")
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Blauman",	"Mike", 	"mikeblauman@yahoo.com",	"0000",	0,	"Renegades",	"MWF",	"#",	"0");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Fabris",	"Denny",	"fabris.dm@gmail.com",	"0000",	0,	"Renegades",	"M",	"C",	"5");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"King",	"Bill", 	"wnking1962@gmail.com",	"0000",	0,	"Renegades",	"MF",	"C",	"1");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Lonergan",	"Paul",	"longerganpg@gmail.com",	"0000",	0,	"Renegades",	"MF",	"C",	"2");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Mason",	"Jerry",	"47oldmasonjar@gmail.com",	"0000",	0,	"Renegades",	"MWF",	"#",	"0");
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Mason",	"Ralph", 	"ralph.mason313@gmail.com",	"0000",	0,	"Renegades",	"MWF",	"C",	"3");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Perilli","Frank", 	"perilli@pga.com",	"0000",	0,	"Renegades",	"MWF",	"F",	"1");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Rose",	"Jack", 	"jtrosejr@outlook.com",	"0000",	0,	"Renegades",	"MF	", "C",	"4");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Spalding",	"Bill", 	"wgspalding@gmail.com",	"0000",	0,	"Renegades",	"MWF",	"F", "3");
+
+INSERT INTO users (last_name, first_name, email, password_hash, is_admin,
+    league_name, Play_Days_Of_Week, subgroup, subgroup_number) VALUES( 
+"Walsh",	"Dave", 	"dwalsh48@aol.com",	"0000",	0,	"Renegades",	"MWF",	"D",	"1");
+

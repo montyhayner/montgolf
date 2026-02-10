@@ -1,0 +1,15 @@
+• 	Add icons to the buttons
+• 	Add tooltips
+• 	Add a mobile‑optimized compact mode
+• 	Add subtle animations
+- Add icons to the toolbar
+- Add hover tooltips
+- Add a compact mobile layout
+- Add a “Reset to Default” button
+
+- Move all CSS into a clean external file
+- Add mobile responsiveness
+- Add hover tooltips
+- Add subtle animations to the calendar
+
+

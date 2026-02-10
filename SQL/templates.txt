@@ -1,0 +1,155 @@
+---------------------------------
+-- SCHEDULES
+--------------------------------
+INSERT INTO schedules (user_id, play_date, tee_time, subgroup, subgroup_number)
+VALUES (?, ?, ?, ?, ?);
+
+UPDATE schedules
+SET user_id = ?,
+    play_date = ?,
+    tee_time = ?,
+    subgroup = ?,
+    subgroup_number = ?
+WHERE id = ?;
+
+DELETE FROM schedules WHERE id = ?;
+
+---------------------------------
+-- USER_PLAY_DAYS
+--------------------------------
+CREATE TABLE user_play_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    is_play_day INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (user_id, day_of_week)
+);
+
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day)
+VALUES (?, ?, ?);
+
+UPDATE user_play_days
+SET user_id = ?,
+    day_of_week = ?,
+    is_play_day = ?
+WHERE id = ?;
+
+DELETE FROM user_play_days WHERE id = ?;
+
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 0, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 1, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 2, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 3, 1);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 4, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 5, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (19, 6, 0);
+
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 0, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 1, 1);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 2, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 3, 1);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 4, 0);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 5, 1);
+INSERT INTO user_play_days (user_id, day_of_week, is_play_day) VALUES (24, 6, 0);
+
+
+--------------------------------------
+-- USER_PLAY_MONTHS
+--------------------------------------
+CREATE TABLE user_play_months (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+    in_town INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (user_id, month)
+);
+INSERT INTO user_play_months (user_id, month, in_town)
+VALUES (?, ?, ?);
+
+UPDATE user_play_months
+SET user_id = ?,
+    month = ?,
+    in_town = ?
+WHERE id = ?;
+
+DELETE FROM user_play_months WHERE id = ?;
+
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 1, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 2, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 3, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 4, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 5, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 6, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 7, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 8, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 9, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 10, 0);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 11, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (19, 12, 1);
+
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 1, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 2, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 3, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 4, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 5, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 6, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 7, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 8, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 9, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 10, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 11, 1);
+INSERT INTO user_play_months (user_id, month, in_town) VALUES (24, 12, 1);
+
+
+-------------------------------------
+-- LEAGUE_PLAY_DAYS
+-------------------------------------
+CREATE TABLE league_play_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    is_play_day INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (league_id, day_of_week)
+);
+
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day)
+VALUES (?, ?, ?);
+
+UPDATE league_play_days
+SET league_id = ?,
+    day_of_week = ?,
+    is_play_day = ?
+WHERE id = ?;
+
+DELETE FROM league_play_days WHERE id = ?;
+
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",0,0);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",1,1);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",2,0);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",3,1);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",4,0);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",5,1);
+INSERT INTO league_play_days (league_id, day_of_week, is_play_day) VALUES ("RENEGADES",6,0);
+
+-------------------------------------
+-- LEAGUES
+-------------------------------------
+CREATE TABLE leagues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_name TEXT NOT NULL UNIQUE,
+    coordinator_last_name,
+    coordinator_first_name
+);
+
+INSERT INTO leagues (league_name, coordinator_last_name, coordinator_first_name)
+VALUES (?, ?, ?);
+
+UPDATE leagues
+SET league_name = ?,
+    coordinator_last_name = ?,
+    coordinator_first_name = ?
+WHERE id = ?;
+
+DELETE FROM leagues WHERE id = ?;
+
+INSERT INTO leagues (league_name, coordinator_last_name, coordinator_first_name) VALUES ("Renegades", "Hayner", "Monty");

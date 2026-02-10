@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin — Manage Play Months</title>
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f5f7fa;
+  }
+
+  .content {
+    max-width: 900px;
+    margin: 60px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+  h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 28px;
+  }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .toolbar button {
+    padding: 10px 16px;
+    background: #0275d8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+
+  .toolbar button:hover {
+    background: #025bb5;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+
+  th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+  }
+
+  th {
+    background: #f0f2f5;
+  }
+
+  tr:hover {
+    background: #f9fbfd;
+  }
+
+  .action-btn {
+    margin-right: 8px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .edit-btn {
+    background: #5cb85c;
+    color: white;
+  }
+
+  .delete-btn {
+    background: #d9534f;
+    color: white;
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 20px;
+    width: 400px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+
+  .modal-content h2 {
+    margin-top: 0;
+  }
+
+  .modal-content input {
+    width: 100%;
+    padding: 8px;
+    margin: 6px 0 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  .modal-content button {
+    width: 100%;
+    padding: 10px;
+    background: #0275d8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .modal-content button:hover {
+    background: #025bb5;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="navContainer"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/partials/admin-nav")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+    });
+
+  loadPlayMonths();
+});
+
+function loadPlayMonths() {
+  fetch("/api/admin/play-months")
+    .then(r => r.json())
+    .then(data => {
+      const tbody = document.getElementById("monthsTableBody");
+      tbody.innerHTML = "";
+
+      data.months.forEach(m => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>${m.month}</td>
+          <td>
+            <button class="action-btn edit-btn" onclick="openEditMonth(${m.id})">Edit</button>
+            <button class="action-btn delete-btn" onclick="openDeleteMonth(${m.id})">Delete</button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    });
+}
+
+function openAddMonth() {
+  document.getElementById("addMonthModal").style.display = "flex";
+}
+
+function openEditMonth(id) {
+  fetch("/api/admin/play-month/" + id)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("editMonthId").value = data.month.id;
+      document.getElementById("editMonthValue").value = data.month.month;
+      document.getElementById("editMonthModal").style.display = "flex";
+    });
+}
+
+function openDeleteMonth(id) {
+  document.getElementById("deleteMonthId").value = id;
+  document.getElementById("deleteMonthModal").style.display = "flex";
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = "none";
+}
+</script>
+
+<div class="content">
+  <h1>Manage Play Months</h1>
+
+  <div class="toolbar">
+    <div></div>
+    <button onclick="openAddMonth()">Add Month</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="monthsTableBody"></tbody>
+  </table>
+</div>
+
+<!-- Add Month Modal -->
+<div id="addMonthModal" class="modal">
+  <div class="modal-content">
+    <h2>Add Play Month</h2>
+    <form method="POST" action="/admin/play-months/add">
+      <input type="month" name="month" required>
+      <button type="submit">Add Month</button>
+    </form>
+    <button onclick="closeModal('addMonthModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
+  </div>
+</div>
+
+<!-- Edit Month Modal -->
+<div id="editMonthModal" class="modal">
+  <div class="modal-content">
+    <h2>Edit Play Month</h2>
+    <form method="POST" action="/admin/play-months/edit">
+      <input type="hidden" id="editMonthId" name="id">
+      <input type="month" id="editMonthValue" name="month" required>
+      <button type="submit">Save Changes</button>
+    </form>
+    <button onclick="closeModal('editMonthModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
+  </div>
+</div>
+
+<!-- Delete Month Modal -->
+<div id="deleteMonthModal" class="modal">
+  <div class="modal-content">
+    <h2>Delete Play Month</h2>
+    <form method="POST" action="/admin/play-months/delete">
+      <input type="hidden" id="deleteMonthId" name="id">
+      <p>Are you sure you want to delete this play month?</p>
+      <button type="submit">Delete</button>
+    </form>
+    <button onclick="closeModal('deleteMonthModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
+  </div>
+</div>
+
+</body>
+</html>

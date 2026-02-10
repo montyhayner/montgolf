@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Play Months</title>
+  <link rel="stylesheet" href="/style.css">
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+
+    h1 { margin-bottom: 20px; }
+
+    .form-section {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fafafa;
+      width: 500px;
+    }
+
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .month-box {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      background: #eee;
+    }
+
+    .month-box.active {
+      background: #4CAF50;
+      color: white;
+      font-weight: bold;
+    }
+
+    select, button {
+      padding: 8px;
+      margin-top: 10px;
+    }
+
+    button.save-btn {
+      background: #0275d8;
+      color: white;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ADMIN NAV BAR -->
+  <div id="admin-nav"></div>
+  <script src="/admin-nav.js"></script>
+
+  <h1>User Play Months</h1>
+
+  <div class="form-section">
+    <label for="userSelect"><strong>Select User:</strong></label><br>
+    <select id="userSelect" onchange="loadUserMonths()">
+      <option value="">-- choose user --</option>
+    </select>
+
+    <div class="month-grid" id="monthGrid">
+      <!-- JS will populate -->
+    </div>
+
+    <button class="save-btn" onclick="saveUserMonths()">Save Play Months</button>
+  </div>
+
+  <script>
+    const monthNames = [
+      "Jan","Feb","Mar","Apr","May","Jun",
+      "Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadUsers();
+      buildMonthGrid();
+    });
+
+    function buildMonthGrid() {
+      const grid = document.getElementById("monthGrid");
+      grid.innerHTML = "";
+
+      for (let i = 1; i <= 12; i++) {
+        const div = document.createElement("div");
+        div.className = "month-box";
+        div.dataset.month = i;
+        div.textContent = monthNames[i - 1];
+
+        div.onclick = () => div.classList.toggle("active");
+
+        grid.appendChild(div);
+      }
+    }
+
+    function loadUsers() {
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          const select = document.getElementById("userSelect");
+          select.innerHTML = `<option value="">-- choose user --</option>`;
+
+          data.forEach(u => {
+            const opt = document.createElement("option");
+            opt.value = u.id;
+            opt.textContent = `${u.last_name}, ${u.first_name}`;
+            select.appendChild(opt);
+          });
+        });
+    }
+
+    function loadUserMonths() {
+      const userId = document.getElementById("userSelect").value;
+      if (!userId) return;
+
+      fetch(`/api/user-play-months/${userId}`)
+        .then(res => res.json())
+        .then(rows => {
+          document.querySelectorAll(".month-box").forEach(box => {
+            box.classList.remove("active");
+          });
+
+          rows.forEach(row => {
+            if (row.in_town === 1) {
+              const box = document.querySelector(`.month-box[data-month="${row.month}"]`);
+              if (box) box.classList.add("active");
+            }
+          });
+        });
+    }
+
+    function saveUserMonths() {
+      const userId = document.getElementById("userSelect").value;
+      if (!userId) {
+        alert("Please select a user first");
+        return;
+      }
+
+      const updates = [];
+      document.querySelectorAll(".month-box").forEach(box => {
+        updates.push({
+          month: parseInt(box.dataset.month),
+          in_town: box.classList.contains("active") ? 1 : 0
+        });
+      });
+
+      fetch(`/api/user-play-months/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ months: updates })
+      })
+      .then(res => res.json())
+      .then(() => {
+        alert("User play months updated");
+      });
+    }
+  </script>
+
+</body>
+</html>

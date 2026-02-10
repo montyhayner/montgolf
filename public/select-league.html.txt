@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Select League</title>
+<link rel="stylesheet" href="/css/navbar.css">
+
+<style>
+  body { font-family: Arial; padding: 20px; }
+  .box { margin: 60px auto; width: 320px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fb; }
+  button { width: 100%; padding: 10px; margin: 8px 0; background: #0275d8; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #025bb5; }
+</style>
+</head>
+
+<body>
+
+<div id="navContainer"></div>
+
+<div class="box">
+  <h2>Select Your League</h2>
+  <div id="leagueButtons"></div>
+</div>
+
+<script>
+// Load nav bar
+fetch("/partials/user-nav")
+  .then(r => r.text())
+  .then(html => document.getElementById("navContainer").innerHTML = html);
+
+// Load leagues
+fetch("/api/pending-leagues")
+  .then(r => r.json())
+  .then(data => {
+    const container = document.getElementById("leagueButtons");
+    data.leagues.forEach(l => {
+      const btn = document.createElement("button");
+      btn.textContent = l.league_name;
+      btn.onclick = () => {
+        fetch("/api/select-league", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ league_id: l.league_id })
+        }).then(() => location.href = "/schedule");
+      };
+      container.appendChild(btn);
+    });
+  });
+</script>
+
+</body>
+</html>

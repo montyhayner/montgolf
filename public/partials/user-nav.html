@@ -1,0 +1,32 @@
+<div id="topNav">
+<div class="nav-title">Golf Scheduler <span id="leagueName"></span> <span id="userName"></span></div>
+  <div class="nav-links">
+    <a href="/schedule" class="nav-link">My Schedule</a>
+    <a href="/my-availability" class="nav-link">My Availability</a>
+    <a href="/logout" class="nav-link">Logout</a>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // Load league name
+  fetch("/api/user/selected-league")
+    .then(r => r.json())
+    .then(data => {
+      if (data.league) {
+        document.getElementById("leagueName").textContent =
+          "— " + data.league.league_name;
+      }
+    });
+
+  // Load user name
+  fetch("/api/user/info")
+    .then(r => r.json())
+    .then(data => {
+      if (data.user) {
+        document.getElementById("userName").textContent =
+          " — " + data.user.first_name + " " + data.user.last_name;
+      }
+    });
+});
+</script>

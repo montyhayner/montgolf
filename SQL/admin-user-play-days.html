@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Play Days</title>
+  <link rel="stylesheet" href="/styles.css">
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+
+    h1 { margin-bottom: 20px; }
+
+    .form-section {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fafafa;
+      width: 420px;
+    }
+
+    .day-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .day-box {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      background: #eee;
+    }
+
+    .day-box.active {
+      background: #4CAF50;
+      color: white;
+      font-weight: bold;
+    }
+
+    select, button {
+      padding: 8px;
+      margin-top: 10px;
+    }
+
+    button.save-btn {
+      background: #0275d8;
+      color: white;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ADMIN NAV BAR -->
+  <div id="admin-nav"></div>
+  <script src="/admin-nav.js"></script>
+
+  <h1>User Play Days</h1>
+
+  <!-- SELECT USER -->
+  <div class="form-section">
+    <label><strong>Select User:</strong></label><br>
+    <select id="userSelect" onchange="loadUserDays()">
+      <option value="">-- choose user --</option>
+    </select>
+
+    <!-- 7-DAY GRID -->
+    <div class="day-grid" id="dayGrid">
+      <!-- JS will populate -->
+    </div>
+
+    <button class="save-btn" onclick="saveUserDays()">Save Play Days</button>
+  </div>
+
+  <script>
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadUsers();
+      buildDayGrid();
+    });
+
+    function buildDayGrid() {
+      const grid = document.getElementById("dayGrid");
+      grid.innerHTML = "";
+
+      for (let i = 0; i < 7; i++) {
+        const div = document.createElement("div");
+        div.className = "day-box";
+        div.dataset.day = i;
+        div.textContent = dayNames[i];
+
+        div.onclick = () => div.classList.toggle("active");
+
+        grid.appendChild(div);
+      }
+    }
+
+    function loadUsers() {
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          const select = document.getElementById("userSelect");
+          select.innerHTML = `<option value="">-- choose user --</option>`;
+
+          data.forEach(u => {
+            const opt = document.createElement("option");
+            opt.value = u.id;
+            opt.textContent = `${u.last_name}, ${u.first_name}`;
+            select.appendChild(opt);
+          });
+        });
+    }
+
+    function loadUserDays() {
+      const userId = document.getElementById("userSelect").value;
+      if (!userId) return;
+
+      fetch(`/api/user-play-days/${userId}`)
+        .then(res => res.json())
+        .then(rows => {
+          // Reset grid
+          document.querySelectorAll(".day-box").forEach(box => {
+            box.classList.remove("active");
+          });
+
+          // Mark active days
+          rows.forEach(row => {
+            if (row.is_play_day === 1) {
+              const box = document.querySelector(`.day-box[data-day="${row.day_of_week}"]`);
+              if (box) box.classList.add("active");
+            }
+          });
+        });
+    }
+
+    function saveUserDays() {
+      const userId = document.getElementById("userSelect").value;
+      if (!userId) {
+        alert("Please select a user first");
+        return;
+      }
+
+      const updates = [];
+      document.querySelectorAll(".day-box").forEach(box => {
+        updates.push({
+          day_of_week: parseInt(box.dataset.day),
+          is_play_day: box.classList.contains("active") ? 1 : 0
+        });
+      });
+
+      fetch(`/api/user-play-days/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days: updates })
+      })
+      .then(res => res.json())
+      .then(() => {
+        alert("User play days updated");
+      });
+    }
+  </script>
+
+</body>
+</html>
