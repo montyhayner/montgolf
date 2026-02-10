@@ -1,8 +1,24 @@
+# Node modules
 node_modules/
+
+# Environment variables
 .env
+
+# SQLite database
 golf.db
+
+# Logs
 logs/
-*.sqbpro
-*.bmp
+
+# VS Code settings
 .vscode/
-SQL/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SQLite browser project files
+*.sqbpro
+
+# Images (optional)
+*.bmp
