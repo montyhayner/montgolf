@@ -1,40 +1,21 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 console.log("LOADING DB.JS FROM:", __filename);
 
-const db = new sqlite3.Database('./golf.db', (err) => {
-  if (err) {
-    console.error("❌ SQLITE OPEN ERROR:", err.message);
-  } else {
-    console.log("✔ SQLITE OPEN SUCCESS:", './golf.db');
-  }
-});
+// Open the database (synchronous, fast, stable)
+const db = new Database('./golf.db');
 
-db.getAsync = function (sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+// Async-like wrappers to match your existing code style
+db.getAsync = (sql, params = []) => {
+  return Promise.resolve(db.prepare(sql).get(params));
 };
 
-db.allAsync = function (sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+db.allAsync = (sql, params = []) => {
+  return Promise.resolve(db.prepare(sql).all(params));
 };
 
-db.runAsync = function (sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
+db.runAsync = (sql, params = []) => {
+  return Promise.resolve(db.prepare(sql).run(params));
 };
 
 module.exports = db;
