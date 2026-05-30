@@ -11,21 +11,15 @@ const transporter = require("../services/mailer");
 // --- DB helpers (async/await wrappers) ---
 
 function dbGet(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
+  return db.getAsync(sql, params);
 }
 
 function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+  return db.allAsync(sql, params);
+}
+
+function dbRun(sql, params = []) {
+  return db.runAsync(sql, params);
 }
 
 // -----------------------------------------------------------------------------
@@ -200,6 +194,11 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
     logger.error(err, "GET /next-play-day/:leagueId");
     res.status(500).json({ error: err.message });
   }
+});
+
+router.get("/download-db", (req, res) => {
+  const file = path.join(__dirname, "..", "golf.db");
+  res.download(file, "golf.db");
 });
 
 // POST - /EMAIL

@@ -2,6 +2,20 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+// --- DB helpers (async/await wrappers) ---
+function dbGet(sql, params = []) {
+  return db.getAsync(sql, params);
+}
+
+function dbAll(sql, params = []) {
+  return db.allAsync(sql, params);
+}
+
+function dbRun(sql, params = []) {
+  return db.runAsync(sql, params);
+}
+
+
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------

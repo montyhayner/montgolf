@@ -4,29 +4,21 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const db = require("../db");
-const dbGet = require("../utils/dbGet");
 const logger = require("../utils/logger");
 const { requireLogin } = require("../middleware/auth");
 const { easternNow } = require("../utils/easternTime");
 
 // --- DB helpers (async/await wrappers) ---
-
-function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+function dbGet(sql, params = []) {
+  return db.getAsync(sql, params);
 }
 
-function dbRun(sql, params) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this); // allows access to changes, lastID if needed
-    });
-  });
+function dbAll(sql, params = []) {
+  return db.allAsync(sql, params);
+}
+
+function dbRun(sql, params = []) {
+  return db.runAsync(sql, params);
 }
 
 // -----------------------------------------------------------------------------

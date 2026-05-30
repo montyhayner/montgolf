@@ -102,22 +102,15 @@ app.use("/api/league-play-days", requireLogin, leaguePlayDaysRouter);
 // SQLite Promise Helpers
 // ------------------------------
 function dbGet(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-    });
+  return db.getAsync(sql, params);
 }
+
 function dbAll(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-    });
+  return db.allAsync(sql, params);
 }
+
 function dbRun(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
+  return db.runAsync(sql, params);
 }
 
 // ------------------------------
