@@ -1746,30 +1746,19 @@ app.post("/admin/allocated-tee-times", requireLeagueAdmin, async (req, res) => {
     // 1. Delete existing rows
     await dbRun(
       `DELETE FROM allocated_tee_times
-       WHERE league_id = ? AND play_date = ?`,
+      WHERE league_id = ? AND play_date = ?`,
       [leagueId, play_date]
     );
 
-    // 2. Insert new rows
-    await new Promise((resolve, reject) => {
-      const stmt = db.prepare(`
-        INSERT INTO allocated_tee_times (play_date, league_id, tee_time_number, tee_time, first_nine)
-        VALUES (?, ?, ?, ?, ?)
-      `);
+    // 2. Insert new rows (better-sqlite3 version)
+    const stmt = db.prepare(`
+      INSERT INTO allocated_tee_times (play_date, league_id, tee_time_number, tee_time, first_nine)
+      VALUES (?, ?, ?, ?, ?)
+    `);
 
-      tee_times.forEach((time, index) => {
-        stmt.run(play_date, leagueId, index + 1, time, first_nine, function (err) {
-          if (err) {
-            console.error("INSERT FAILED:", err);
-          }
-        });
-      });
-
-      stmt.finalize(err => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    for (const [index, time] of tee_times.entries()) {
+      stmt.run(play_date, leagueId, index + 1, time, first_nine);
+    }
 
     // 3. Verify
     const check = await dbAll(`
