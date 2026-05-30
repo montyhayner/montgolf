@@ -362,7 +362,6 @@ router.put("/availability", requireLogin, async (req, res) => {
     for (const [dow, val] of Object.entries(playDays)) {
       stmtDays.run(val ? 1 : 0, userId, dow);
     }
-    stmtDays.finalize();
 
     // 4. Update monthly in-town
     const stmtMonths = db.prepare(`
@@ -376,8 +375,7 @@ router.put("/availability", requireLogin, async (req, res) => {
     for (const [month, val] of Object.entries(playMonths)) {
      stmtMonths.run(val ? 1 : 0, userId, Number(month));
     }
-    stmtMonths.finalize();
-
+    
     // 5. Success
     res.json({ success: true });
 
@@ -450,42 +448,40 @@ router.put("/schedule/:year/:month", requireLogin, async (req, res) => {
       existingMap[row.date] = row.is_playing;
     }
 
-    // -------------------------------------------------------------------------
-    // DETECT CHANGES AND WRITE TO schedule_history
-    // -------------------------------------------------------------------------
-    const ts = easternNow();   // ⭐ unified timestamp
+// -------------------------------------------------------------------------
+// DETECT CHANGES AND WRITE TO schedule_history
+// -------------------------------------------------------------------------
+const ts = easternNow();   // ⭐ unified timestamp
 
-    const historyStmt = db.prepare(`
-      INSERT INTO schedule_history (
-        user_id, league_id, play_date,
-        old_is_playing, new_is_playing,
-        changed_by, changed_at, source,
-        before_state, after_state
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+const historyStmt = db.prepare(`
+  INSERT INTO schedule_history (
+    user_id, league_id, play_date,
+    old_is_playing, new_is_playing,
+    changed_by, changed_at, source,
+    before_state, after_state
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
 
-    for (const [date, newVal] of Object.entries(schedule)) {
-      const oldVal = existingMap[date] ?? 0;
-      const newInt = newVal ? 1 : 0;
+for (const [date, newVal] of Object.entries(schedule)) {
+  const oldVal = existingMap[date] ?? 0;
+  const newInt = newVal ? 1 : 0;
 
-      if (oldVal !== newInt) {
-        historyStmt.run(
-          userId,
-          leagueId,
-          date,
-          oldVal,
-          newInt,
-          userEmail,
-          ts,              // ⭐ Eastern timestamp
-          "user",
-          JSON.stringify({ is_playing: oldVal }),
-          JSON.stringify({ is_playing: newInt })
-        );
-      }
-    }
-
-    historyStmt.finalize();
+  if (oldVal !== newInt) {
+    historyStmt.run(
+      userId,
+      leagueId,
+      date,
+      oldVal,
+      newInt,
+      userEmail,
+      ts,
+      "user",
+      JSON.stringify({ is_playing: oldVal }),
+      JSON.stringify({ is_playing: newInt })
+    );
+  }
+}
 
     // -------------------------------------------------------------------------
     // SAVE LOGIC (clean version)
@@ -500,19 +496,14 @@ router.put("/schedule/:year/:month", requireLogin, async (req, res) => {
     );
 
     // 2. Insert ALL days (true or false)
-    const stmt = db.prepare(`
-      INSERT INTO schedule (user_id, date, is_playing, updated_at)
-      VALUES (?, ?, ?, ?)
-    `);
+      const stmt = db.prepare(`
+        INSERT INTO schedule (user_id, date, is_playing, updated_at)
+        VALUES (?, ?, ?, ?)
+      `);
 
-    await new Promise((resolve, reject) => {
-      db.serialize(() => {
-        Object.entries(schedule).forEach(([date, isPlaying]) => {
-          stmt.run(userId, date, isPlaying ? 1 : 0, ts);  // ⭐ Eastern timestamp
-        });
-        stmt.finalize(err => (err ? reject(err) : resolve()));
-      });
-    });
+      for (const [date, isPlaying] of Object.entries(schedule)) {
+        stmt.run(userId, date, isPlaying ? 1 : 0, ts);
+      }
 
     // 3. Saving a schedule means the user is "in town"
     await db.runAsync(
