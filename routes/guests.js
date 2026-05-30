@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { easternNow } = require("../utils/easternTime");
 
 // --- DB helpers (async/await wrappers) ---
 function dbGet(sql, params = []) {
@@ -33,22 +34,6 @@ function isValidRange(dt) {
   return d >= today && d <= oneYear;
 }
 
-// ----------------------------------------------------------------------------------------------
-// Produce the CURRENT TIMESTAMP in yyyy-mm-dd hh:mn:ss 
-// format and return to calling code.
-// ----------------------------------------------------------------------------------------------
-function formatSqliteTimestamp(d) {
-  const pad = n => n.toString().padStart(2, "0");
-  return (
-    d.getFullYear() + "-" +
-    pad(d.getMonth() + 1) + "-" +
-    pad(d.getDate()) + " " +
-    pad(d.getHours()) + ":" +
-    pad(d.getMinutes()) + ":" +
-    pad(d.getSeconds())
-  );
-}
-
 async function insertHistory({
   user_id,
   league_id,
@@ -62,39 +47,43 @@ async function insertHistory({
   changed_by,
   source = "guest"
 }) {
-console.log("WRITE schedule_history in guests.js:",
-  "user:", user_id,
-  "old:", old_is_playing,
-  "new:", new_is_playing,
-  "changed_at:", formatSqliteTimestamp(new Date())
-);
+  const ts = easternNow();
+
+  console.log("WRITE schedule_history in guests.js:",
+    "user:", user_id,
+    "old:", old_is_playing,
+    "new:", new_is_playing,
+    "changed_at:", ts
+  );
+
   try {
-  await db.runAsync(
-    `INSERT INTO schedule_history (
+    await db.runAsync(
+      `INSERT INTO schedule_history (
         user_id, league_id, play_date,
         old_is_playing, new_is_playing,
         old_guest_email, new_guest_email,
         changed_by, changed_at, source,
         before_state, after_state
-     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)`,
-    [
-      user_id,
-      league_id,
-      play_date,
-      old_is_playing,
-      new_is_playing,
-      old_email,
-      new_email,
-      changed_by,
-      source,
-      JSON.stringify(before_state),
-      JSON.stringify(after_state)
-    ]
-  );
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user_id,
+        league_id,
+        play_date,
+        old_is_playing,
+        new_is_playing,
+        old_email,
+        new_email,
+        changed_by,
+        ts,              // ⭐ correct placement
+        source,
+        JSON.stringify(before_state),
+        JSON.stringify(after_state)
+      ]
+    );
   } catch (err) {
     console.error("insertHistory() function error:", err);
-    res.status(500).json({ error: "Server error in guests.js - INSERTing schedule_history" });
+    // ❌ removed res.status(...) — res is not in scope here
   }
 }
 
