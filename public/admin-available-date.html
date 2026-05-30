@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Available on Date</title>
+  <link rel="stylesheet" href="/css/admin-nav.css">
+  <link rel="stylesheet" href="/css/admin-identity.css">
   <link rel="stylesheet" href="/style.css">
 
   <style>
@@ -53,6 +55,15 @@
 
 <body>
 
+
+    <div id="admin-nav-container"></div>
+    <div id="admin-identity-container"></div>
+
+    <div class="container">
+
+        <!-- Loading message -->
+        <div id="loading">Loading...</div>
+
   <!-- ADMIN NAV BAR -->
 <div id="adminNav"></div>
 <script>
@@ -81,9 +92,6 @@
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      loadLeagues();
-    });
 
     function loadLeagues() {
       fetch('/api/leagues')
@@ -132,6 +140,41 @@
           resultsDiv.style.display = "block";
         });
     }
+
+async function initPage() {
+    try {
+        await loadAdminNav();
+        const session = await loadSession();
+        await loadAdminIdentity(session);
+        loadLeagues();
+    } catch (err) {
+        console.error("Page initialization error:", err);
+    }
+}
+
+    });
+
+ </script>
+
+  <script src="/js/admin-allocated-tee-times.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const current = window.location.pathname;
+  const links = document.querySelectorAll(".nav-links a");
+
+  links.forEach(link => {
+    if (link.getAttribute("href") === current) {
+      link.classList.add("active");
+    }
+  });
+});
+</script>
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initPage();   // loads nav + header
+    });
   </script>
 
 </body>

@@ -1,0 +1,81 @@
+/* FULL-WIDTH IDENTITY BAR */
+
+.admin-identity {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: inherit; /* allows role class to override */
+    border: none;
+    margin: 0;
+}
+
+/* Apply background to each identity piece */
+.admin-identity.super-admin span {
+    background-color: #fff7d6 !important;
+    border: 1px solid #e6c76f !important;
+    color: #8a6d1d !important;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+/* League Admin version */
+.admin-identity.league-admin span {
+    background-color: #e8f8e8 !important;
+    border: 1px solid #b6e2b6 !important;
+    color: #225522 !important;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.admin-identity.super-admin #identity-icon {
+    color: #b8860b; /* gold */
+    font-size: 22px;
+}
+
+.identity-league {
+    margin-left: 12px;
+    padding: 4px 10px;
+    background: #eef4ff;
+    color: #2a4a8a;
+    border: 1px solid #c7d6f7;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    display: none;
+}
+
+.admin-identity.league-admin #identity-icon {
+    color: #2e7d32; /* green */
+    font-size: 22px;
+}
+
+#identity-name {
+    font-weight: bold;
+}
+
+/* FULL-WIDTH IDENTITY BAR */
+.admin-identity {
+    width: 100% !important;
+    padding: 12px 20px;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* FORCE SUPER ADMIN GOLD BACKGROUND */
+.admin-identity.super-admin {
+    background-color: #fff7d6 !important;
+    border: 1px solid #e6c76f !important;
+    color: #8a6d1d !important;
+}
+
+/* FORCE LEAGUE ADMIN GREEN BACKGROUND */
+.admin-identity.league-admin {
+    background-color: #e8f8e8 !important;
+    border: 1px solid #b6e2b6 !important;
+    color: #225522 !important;
+}

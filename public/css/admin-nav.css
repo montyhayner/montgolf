@@ -1,0 +1,38 @@
+/* Admin Navigation Bar */
+.admin-nav {
+    background: #222;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    font-family: Arial, sans-serif;
+}
+
+.admin-nav .nav-left {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.admin-nav .nav-links {
+    margin-left: auto;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+}
+
+.admin-nav .nav-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 16px;
+}
+
+.admin-nav .nav-links a:hover {
+    text-decoration: underline;
+}
+
+.admin-nav .nav-links a.active {
+    background: rgba(255, 255, 255, 0.18);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+}

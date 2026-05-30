@@ -1,0 +1,117 @@
+#pageHeader {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* Two-column layout */
+#reportsLayout {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+/* Left column */
+#reportsLeft {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+/* Right column */
+#reportsRight {
+  flex-grow: 1;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Report box styling */
+.report-box {
+  text-align: left;
+  background: #f8f8f8;
+  border: 1px solid #ccc;
+  margin-top: 20px;
+  border-radius: 6px;
+  padding: 15px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* Buttons & inputs */
+#reportActions button {
+  margin: 0 10px;
+  padding: 8px 16px;
+  font-size: 15px;
+}
+
+.extra-input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+}
+
+/* Print Styles */
+@media print {
+  #user-nav-container,
+  #reportSelector,
+  #reportActions,
+  #pageHeader,
+  #reportsLeft {
+    display: none;
+  }
+
+  .report-box {
+    border: none;
+    padding: 0;
+    font-size: 14px;
+  }
+}
+
+#ccBccContainer {
+  display: none;
+}
+
+#ccBccContainer label {
+  display: block;
+  margin-top: 8px;
+}
+
+#recipientMode label {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#recipientMode input[type="radio"] {
+  margin-right: 4px;
+}
+
+/* Recipient list: smaller, tighter, no wrapping */
+.recipient-list {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.recipient-item {
+  margin-bottom: 4px;
+  white-space: nowrap;   /* Prevents wrapping */
+  overflow: hidden;      /* Optional: hides overflow */
+  text-overflow: ellipsis; /* Optional: adds "..." if too long */
+}
+
+.recipient-item label {
+  cursor: pointer;
+}.recipient-item input[type="checkbox"] {
+  margin-right: 6px;
+  transform: scale(0.9);
+}
+
+.active-recipient-field {
+  border: 2px solid #0077cc;
+  background: #eef7ff;
+}
+
+
+
+

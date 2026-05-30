@@ -1,0 +1,103 @@
+/* ============================
+   GLOBAL TYPOGRAPHY & SPACING
+   ============================ */
+
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+}
+
+h1, h2 {
+  margin-top: 16px;
+  margin-bottom: 10px;
+}
+
+/* ============================
+   GLOBAL BUTTON STYLING
+   ============================ */
+
+button {
+  border: 1px solid #0056b3;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #003f7f;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar button,
+#scheduleToolbar button,
+#availabilityToolbar button {
+  padding: 8px 22px;
+  font-size: 15px;
+}
+
+/* ============================
+   Shared Status Banner Base
+   ============================ */
+.status-banner {
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  display: none;
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* ============================
+   STATUS BANNERS
+   ============================ */
+
+.status-default { background: #fff3cd; color: #856404; }
+.status-saved   { background: #d4edda; color: #155724; }
+.status-out     { background: #f8d7da; color: #721c24; }
+.status-cleared { background: #f8d7da; color: #721c24; }
+
+/* ============================
+   SAVING / UNSAVED INDICATORS
+   ============================ */
+
+#savingIndicator {
+  color: #666;
+  font-style: italic;
+}
+
+#unsavedIndicator {
+  margin-left: 10px;
+  color: #d9534f;
+  font-weight: bold;
+  display: none;
+}
+
+/* ============================
+   CALENDAR SHARED RULES
+   ============================ */
+
+.day-cell {
+  font-weight: bold;
+}
+
+.day-cell.disabled-day {
+  color: #999;
+}
+
+.day-cell:not(.disabled-day) {
+  color: #000;
+}
+
+/* ============================
+   SHARED ANIMATIONS
+   ============================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

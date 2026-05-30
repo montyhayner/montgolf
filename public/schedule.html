@@ -4,182 +4,557 @@
 <meta charset="UTF-8">
 <title>My Schedule</title>
 <link rel="stylesheet" href="/css/navbar.css">
+<link rel="stylesheet" href="/css/common.css">
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
-  }
+/* ------------------------------------------------------------
+   GLOBAL CENTERING FOR SCHEDULE PAGE
+------------------------------------------------------------ */
+#pageHeader,
+#statusBanner,
+#scheduleToolbar,
+#calendarContainer {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+  width: 100%;
+}
 
-  h1 {
-    margin-bottom: 8px;
-  }
+/* ------------------------------------------------------------
+   SPACING POLISH
+------------------------------------------------------------ */
+#pageHeader {
+  margin: 20px 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ddd;
+  font-size: 22px;
+  font-weight: bold;
+  color: #333;
+}
 
-  /* Status Banner */
-  .status-banner {
-    padding: 6px 10px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    display: none;
-  }
+/* Centers the banner wrapper */
+#statusBannerWrapper {
+  text-align: center;
+  width: 100%;
+}
 
-  .status-default { background: #fff3cd; color: #856404; }
-  .status-saved { background: #d4edda; color: #155724; }
-  .status-out { background: #f8d7da; color: #721c24; }
-  .status-cleared { background: #f8d7da; color: #721c24; }
+#statusBanner {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  display: none; /* hidden until used */
+}
 
-  /* Toolbar */
-  #scheduleToolbar {
-    display: flex;
-    gap: 10px;
-    margin: 10px 0;
-    padding: 8px 10px;
-    background: #f8f9fb;
-    border: 1px solid #c7c7c7;
-    border-radius: 8px;
-    align-items: center;
-  }
+/* Banner types */
+.status-saved {
+  background: #d4edda;
+  color: #155724;
+}
 
-  #scheduleToolbar input[type="month"] {
-    padding: 6px;
-    font-size: 14px;
-  }
+.status-cleared {
+  background: #cce5ff;
+  color: #004085;
+}
 
-  #scheduleToolbar button {
-    padding: 6px 14px;
-    font-size: 14px;
-    border-radius: 6px;
-    border: 1px solid #c7c7c7;
-    background: #ffffff;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  }
+.status-out {
+  background: #f8d7da;
+  color: #721c24;
+}
 
-  #scheduleToolbar button:hover:not(:disabled) {
-    background: #d5e6ff;
-    border-color: #2b7cff;
-  }
+.status-error {
+  background: #d9534f;
+  color: white;
+}
 
-  #scheduleToolbar button:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
 
-  #unsavedIndicator {
-    color: #d9534f;
-    font-weight: bold;
-    display: none;
-    margin-left: auto;
-  }
+#statusBannerContainer {
+  text-align: center;
+}
 
-  /* Calendar */
-  .calendar {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    margin-top: 10px;
-  }
+/* ------------------------------------------------------------
+   CALENDAR WIDTH CONTROL
+------------------------------------------------------------ */
+#calendarContainer {
+  max-width: 900px;     /* prevents overly wide calendar */
+  padding: 0 10px;      /* slight breathing room */
+  position: relative;
+}
 
-  .day-header {
-    font-weight: bold;
-    text-align: center;
-    padding: 6px 0;
-    background: #f0f0f0;
-    border-radius: 4px;
-  }
+/* ------------------------------------------------------------
+   CALENDAR GRID
+------------------------------------------------------------ */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  /*  justify-items: center;  */ /* centers each cell inside its column */
+  gap: 0;
+  /* margin-top: 10px; */
+}
 
+/* ------------------------------------------------------------
+   DAY CELL RATIO CONTROL
+   - Desktop/laptop: max 2:1 ratio
+   - Phone: 1:1 ratio
+------------------------------------------------------------ */
+.day-cell {
+  aspect-ratio: 2 / 1;     /* wider but not too wide */
+  max-width: 160px;        /* larger boxes */
+  min-width: 50px;         /* allows shrink */
+  padding: 0;            /* slightly bigger interior */
+  margin: 0;                  /* remove spacing */
+  font-size: 18px;         /* slightly larger text */
+  border: 1px solid #ddd;
+  border-radius: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  align-items: center;                /* vertical center */
+  justify-content: center;         /* horizontal center */
+}
+
+/* Perfect squares on phones */
+@media (max-width: 600px) {
   .day-cell {
-    height: 32px;
-    padding: 4px;
-    text-align: center;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
+    aspect-ratio: 1 / 1;
   }
+}
 
-  .day-cell.playing {
-    background-color: #4caf50;
-    color: white;
-  }
 
-  .day-cell.empty {
-    background: transparent;
-    border: none;
-    cursor: default;
-  }
+/* ------------------------------------------------------------
+   ORIGINAL STYLES (unchanged)
+------------------------------------------------------------ */
+.cleared-banner {
+  background-color: #f0f4ff;
+  color: #2a4a8a;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  border: 1px solid #c7d6f7;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.info-icon {
+  margin-left: 8px;
+  cursor: help;
+  font-weight: bold;
+  font-size: 16px;
+  color: rgba(255,255,255,0.9);
+}
+.info-icon::after { content: "ⓘ"; }
+
+#saveBtn {
+  padding: 8px 22px;
+  background: #007bff;
+  color: white;
+  font-size: 15px;
+}
+#saveBtn:hover:not(:disabled) {
+  background: #0056b3;
+  border-color: #003f7f;
+}
+#saveBtn.pulse {
+  animation: pulse 0.6s ease-in-out 2;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+#scheduleToolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;   /* NEW */
+  margin-bottom: 16px;
+}
+
+#scheduleToolbar input[type="month"] {
+  padding: 6px;
+  font-size: 14px;
+}
+
+#monthPicker {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.toolbar-divider {
+  display: flex;
+  flex-shrink: 0;
+  flex-grow: 0;
+  width: 60px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 6px;
+  position: relative;
+  white-space: nowrap;
+}
+.toolbar-divider::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  width: 1px;
+  height: 22px;
+  background: #c7c7c7;
+}
+
+.day-header {
+  font-weight: bold;
+  text-align: center;
+  padding: 6px 0;
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.day-cell.playing {
+  background-color: #4caf50;
+  color: white;
+}
+
+.day-cell.empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.day-cell:focus {
+  outline: 2px solid #2b7cff;
+  outline-offset: 2px;
+}
+
+.day-cell[data-tooltip] { position: relative; }
+.day-cell[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.day-cell.disabled-day {
+  background: #eee;
+  color: #999;
+  border: 1px solid #ccc;
+  cursor: not-allowed;
+}
+.day-cell.disabled-day:hover {
+  background: #e8e8e8;
+}
+
+.calendar.jump-highlight {
+  animation: jumpFlash 0.6s ease-out;
+}
+@keyframes jumpFlash {
+  0% { background-color: #fff8c6; }
+  100% { background-color: transparent; }
+}
+
+/* Modal (unchanged) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.modal-content {
+  background: white;
+  padding: 20px;
+  width: 360px;
+  border-radius: 10px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+  animation: pop 0.25s ease;
+  text-align: center;
+}
+@keyframes pop {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.modal-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+.modal-buttons button {
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+}
+.modal-buttons .primary { background: #007bff; color: white; }
+.modal-buttons .danger { background: #d9534f; color: white; }
+.modal-buttons .secondary { background: #ccc; }
+
+
+/* ------------------------------------------------------------
+   LEGEND (left-aligned under Sunday)
+------------------------------------------------------------ */
+.calendar-legend {
+  margin-top: 12px;
+  display: flex;
+  /* gap: 20px; */
+  font-size: 16px;
+  color: #444;
+  justify-content: center;
+}
+
+.legend-box {
+  width: 20px;               /* bigger */
+  height: 20px;
+  border: 1px solid #aaa !important;
+  border-radius: 3px; 
+  display: inline-block;
+}
+
+/* Playing */
+.legend-box.playing {
+  background: #4caf50 !important;
+  border-color: #4caf50 !important;
+}
+
+/* Available */
+.legend-box.available {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+/* League does not play */
+.legend-box.disabled-day {
+  background: #eee !important;
+  border-color: #ccc !important;
+}
+
 </style>
+
 </head>
 
 <body>
 
 <div id="navContainer"></div>
 
-<h1>
-  My Schedule
-  <span id="leagueNameHeader"></span>
-  <span id="userNameHeader"></span>
-</h1>
+<h1 id="pageHeader"></h1>
 
-<div id="statusBanner" class="status-banner"></div>
+<div id="statusBannerWrapper">
+  <div id="statusBanner" class="status-banner">
+    <span id="statusText"></span>
+    <span id="statusInfo" class="info-icon" title=""></span>
+  </div>
+</div>
+
+<div id="clearedBanner" class="status-banner cleared-banner" style="display:none;">
+  This month was cleared.
+</div>
 
 <!-- Toolbar with Month Picker -->
 <div id="scheduleToolbar">
-  <input type="month" id="monthInput">
+  <input 
+     type="month" 
+     id="monthPicker"
+     title="You may select the current month or any of the next 12 months."
+   >
+   <a id="jumpToday" style="margin-left:6px; font-size:14px; cursor:pointer; color:#2b7cff;">
+        Today
+  </a>
+
+  <div class="toolbar-divider"></div>
+
+  <button id="saveBtn" disabled>Save</button>
+  <span id="savingIndicator" style="display:none; margin-left:10px; font-size:14px; color:#555;">
+    Saving…
+  </span>
   <button id="defaultBtn">Default</button>
   <button id="clearBtn">Clear</button>
-  <button id="saveBtn" disabled>Save</button>
-  <button id="revertBtn">Revert</button>
   <div id="unsavedIndicator">• Unsaved changes</div>
 </div>
 
 <div id="calendarContainer"></div>
 
+<div id="calendarLegend" class="calendar-legend">
+  <span class="legend-item">
+    <span class="legend-box playing"></span> Playing
+  </span>
+  <span class="legend-item">
+    <span class="legend-box available"></span> Available
+  </span>
+  <span class="legend-item">
+    <span class="legend-box disabled-day"></span> League does not play
+  </span>
+</div>
+
 <script>
+// ==========================
+
 document.addEventListener("DOMContentLoaded", () => {
-  fetch("/partials/user-nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
+  console.log("Schedule JS running");
 
-      // Highlight active link
-      const path = window.location.pathname;
-      document.querySelectorAll("#topNav .nav-link").forEach(link => {
-        if (link.getAttribute("href") === path) {
-          link.classList.add("active");
-        }
-      });
-    });
+  loadNavBar();
+  loadPageHeader()
+  configureMonthPickerLimits();
+  wireUpEventListeners();
+  initSchedulePage();
 });
-</script>
 
-<script>
 let savedSchedule = null;
 let currentSchedule = null;
 let unsavedChanges = false;
 
 // ---- Helpers ----
 
+function showErrorBanner(msg) {
+  const banner = document.getElementById("statusBanner");
+  banner.textContent = msg;
+  banner.style.background = "#d9534f"; // red
+  banner.style.display = "block";
+}
+
+function focusDay(dayNumber) {
+  const selector = `.day-cell[data-date$="-${String(dayNumber).padStart(2,"0")}"]`;
+  const target = document.querySelector(selector);
+  if (target) target.focus();
+}
+
+function showSaving() {
+  document.getElementById("savingIndicator").style.display = "inline";
+}
+
+function hideSaving() {
+  document.getElementById("savingIndicator").style.display = "none";
+}
+
 function markUnsaved() {
   unsavedChanges = true;
-  updateSaveButtonState();
-  updateUnsavedIndicator();
+  refreshSaveUI()
 }
 
-function updateSaveButtonState() {
+function highlightInvalidDates(dates) {
+  dates.forEach(date => {
+    const cell = document.querySelector(`[data-date="${date}"]`);
+    if (cell) {
+      cell.classList.add("invalid-date");
+    }
+  });
+}
+
+function refreshSaveUI() {
   const saveBtn = document.getElementById("saveBtn");
-  saveBtn.disabled = !unsavedChanges;
+  const ind = document.getElementById("unsavedIndicator");
+
+  if (unsavedChanges) {
+    saveBtn.disabled = false;
+    ind.style.display = "block";
+
+    // Pulse only when unsavedChanges transitions from false → true
+    if (!saveBtn.classList.contains("pulse")) {
+      saveBtn.classList.add("pulse");
+      setTimeout(() => saveBtn.classList.remove("pulse"), 700);
+    }
+
+  } else {
+    saveBtn.disabled = true;
+    ind.style.display = "none";
+  }
 }
 
-function updateUnsavedIndicator() {
-  const ind = document.getElementById("unsavedIndicator");
-  ind.style.display = unsavedChanges ? "block" : "none";
+function loadNavBar() {
+  fetch("/partials/user-nav.html")
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById("navContainer").innerHTML = html;
+
+      // highlight active link
+      const path = window.location.pathname;
+      document.querySelectorAll("#topNav .nav-link").forEach(link => {
+        if (link.getAttribute("href") === path) {
+          link.classList.add("active");
+        }
+      });
+
+      // ⭐ Attach unsaved-changes navigation warning
+      document.querySelectorAll("#topNav a").forEach(link => {
+        link.addEventListener("click", (e) => {
+          if (!unsavedChanges) return;
+
+          const leave = confirm("You have unsaved changes. Save before leaving?");
+          if (!leave) {
+            e.preventDefault();
+          }
+        });
+      });
+    });
+}
+
+function updateStatusBanner(status) {
+  const banner = document.getElementById("statusBanner");
+  const text = document.getElementById("statusText");
+  const infoIcon = document.getElementById("statusInfo");
+
+  // Reset classes
+  banner.className = "status-banner";
+
+  // 1. OUT OF TOWN always overrides everything
+  if (status === "out_of_town") {
+    banner.classList.add("status-out");
+    banner.style.display = "inline-block";
+    text.textContent = "This month is marked as Out of Town";
+    infoIcon.style.display = "inline-block";
+    infoIcon.title = "You are marked Out of Town for this month. Play days cannot be saved.";
+    return;
+  }
+
+  // 2. UNSAVED CHANGES overrides saved/cleared/default
+  if (unsavedChanges) {
+    banner.classList.add("status-unsaved");
+    banner.style.display = "inline-block";
+    text.textContent = "You have unsaved changes";
+    infoIcon.style.display = "none";
+    return;
+  }
+
+  // 3. SAVED
+  if (status === "saved") {
+    banner.classList.add("status-saved");
+    banner.style.display = "inline-block";
+    text.textContent = "Saved schedule";
+    infoIcon.style.display = "none";
+    return;
+  }
+
+  // 4. CLEARED or DEFAULT (but no unsaved changes)
+  if (status === "cleared" || status === "default") {
+    banner.classList.add("status-cleared");
+    banner.style.display = "inline-block";
+    text.textContent = "No schedule saved for this month";
+    infoIcon.style.display = "none";
+    return;
+  }
+
+  // 5. Fallback: hide banner
+  banner.style.display = "none";
 }
 
 function getMonthParts() {
-  const [year, month] = document.getElementById("monthInput").value.split("-");
+  const [year, month] = document.getElementById("monthPicker").value.split("-");
   return { year, month };
 }
 
@@ -187,7 +562,7 @@ function renderCalendar(schedule) {
   const container = document.getElementById("calendarContainer");
   container.innerHTML = "";
 
-  const [year, month] = document.getElementById("monthInput").value.split("-").map(Number);
+  const [year, month] =  document.getElementById("monthPicker").value.split("-").map(Number);
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
   const totalDays = lastDay.getDate();
@@ -195,6 +570,7 @@ function renderCalendar(schedule) {
   const calendar = document.createElement("div");
   calendar.className = "calendar";
 
+  // ---- Day headers ----
   const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   dayNames.forEach(d => {
     const div = document.createElement("div");
@@ -203,106 +579,101 @@ function renderCalendar(schedule) {
     calendar.appendChild(div);
   });
 
-  // leading blanks
+  // ---- Leading blanks ----
   for (let i = 0; i < firstDay.getDay(); i++) {
     const blank = document.createElement("div");
     blank.className = "day-cell empty";
     calendar.appendChild(blank);
   }
 
-  for (let d = 1; d <= totalDays; d++) {
-    const fullDate =
-      `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+// ---- Day cells ----
+for (let d = 1; d <= totalDays; d++) {
+  const fullDate =
+    `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
-    const isPlaying = schedule && schedule[fullDate] === true;
+  const isPlaying = schedule && schedule[fullDate] === true;
 
-    const cell = document.createElement("div");
-    cell.className = "day-cell";
-    cell.dataset.date = fullDate;
+  const cell = document.createElement("div");
+  cell.className = "day-cell";
+  cell.dataset.date = fullDate;
+  cell.textContent = d;
 
-    if (isPlaying) cell.classList.add("playing");
+  if (isPlaying) cell.classList.add("playing");
 
-    cell.textContent = d;
-
-    cell.addEventListener("click", () => {
-      cell.classList.toggle("playing");
-      markUnsaved();
-    });
-
-    calendar.appendChild(cell);
+  // ⭐ Disable invalid league days
+  const dow = new Date(year, month - 1, d).getDay();
+  if (!leaguePlayDays.includes(dow)) {
+    cell.classList.add("disabled-day");
+    cell.setAttribute("data-tooltip", "League does not play on this day");
   }
 
-  container.appendChild(calendar);
-}
+  // Make cell focusable
+  cell.tabIndex = 0;
 
-function updateStatusBanner(status) {
-  const banner = document.getElementById("statusBanner");
-  banner.className = "status-banner";
+  // ---- Keyboard navigation ----
+  cell.addEventListener("keydown", (e) => {
+    const day = d;
 
-  if (status === "saved") {
-    banner.classList.add("status-saved");
-    banner.textContent = "Saved schedule.";
-  } else if (status === "default") {
-    banner.classList.add("status-default");
-    banner.textContent = "Default schedule.";
-  } else if (status === "cleared") {
-    banner.classList.add("status-cleared");
-    banner.textContent = "Schedule cleared.";
-  } else if (status === "out_of_town") {
-    banner.classList.add("status-out");
-    banner.textContent = "You are marked out of town this month.";
-  } else {
-    banner.textContent = "";
-    banner.style.display = "none";
-    return;
-  }
+    switch (e.key) {
+      case "ArrowLeft":
+        if (day > 1) focusDay(day - 1);
+        break;
+      case "ArrowRight":
+        if (day < totalDays) focusDay(day + 1);
+        break;
+      case "ArrowUp":
+        if (day - 7 >= 1) focusDay(day - 7);
+        break;
+      case "ArrowDown":
+        if (day + 7 <= totalDays) focusDay(day + 7);
+        break;
+      case " ":
+      case "Enter":
+        // Prevent toggling invalid days
+        if (cell.classList.contains("disabled-day")) {
+           cell.classList.add("shake");
+          setTimeout(() => cell.classList.remove("shake"), 250);
+          break;
+        }
 
-  banner.style.display = "block";
-}
-
-// ---- Load initial month (session-aware) ----
-
-async function initSchedulePage() {
-  const res = await fetch("/user/schedule");
-  const data = await res.json();
-
-  const year = data.year;
-  const month = data.month;
-
-  document.getElementById("monthInput").value =
-    `${year}-${String(month).padStart(2,"0")}`;
-
-  await loadScheduleForCurrentMonth();
-}
-
-async function loadScheduleForCurrentMonth() {
-  const { year, month } = getMonthParts();
-
-  fetch("/user/set-last-month", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ year, month })
+        cell.classList.toggle("playing");
+        markUnsaved();
+        break;
+      }
   });
 
-  const res = await fetch(`/user/schedule/${year}/${month}`);
-  const data = await res.json();
+  // ---- Mouse click toggle ----
+  cell.addEventListener("click", () => {
 
-  savedSchedule = data.status === "saved" ? data.schedule : null;
-  currentSchedule = data.schedule || {};
+    // Always remove invalid border on click
+    cell.classList.remove("invalid-date");
 
-  unsavedChanges = false;
-  updateSaveButtonState();
-  updateUnsavedIndicator();
+    // If this date is NOT allowed by league rules
+    if (cell.classList.contains("disabled-day")) {
+      cell.classList.add("shake");
+      setTimeout(() => cell.classList.remove("shake"), 250);
+      return; // do NOT toggle selection
+    }
 
-  renderCalendar(currentSchedule);
-  updateStatusBanner(data.status);
+    // Normal toggle logic
+    cell.classList.toggle("playing");
+    markUnsaved();
+  });
+
+  calendar.appendChild(cell);
+}
+
+  container.appendChild(calendar);
 }
 
 // ---- Buttons ----
 
 // SAVE
-function saveSchedule() {
+// ----------------------
+async function saveSchedule() {
   const { year, month } = getMonthParts();
+
+  console.log("saveSchedule() fired");
 
   const schedule = {};
   document.querySelectorAll(".day-cell").forEach(cell => {
@@ -312,26 +683,109 @@ function saveSchedule() {
     schedule[fullDate] = isPlaying;
   });
 
-  fetch(`/user/schedule/${year}/${month}`, {
+  showSaving();
+
+  // ⭐ Force browser to repaint BEFORE fetch begins
+  await new Promise(requestAnimationFrame);
+
+  const res = await fetch(`/user/schedule/${year}/${month}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ schedule })
-  })
-  .then(() => {
-    savedSchedule = schedule;
-    currentSchedule = schedule;
-    unsavedChanges = false;
-    updateSaveButtonState();
-    updateUnsavedIndicator();
-    updateStatusBanner("saved");
   });
+
+  // ❌ If backend returns 400, stop here
+  if (!res.ok) {
+    const data = await res.json();
+    showErrorBanner(data.error);
+
+    if (data.invalidDates) {
+      highlightInvalidDates(data.invalidDates);
+    }
+
+    hideSaving();
+    return;
+  }
+
+  // ✔ Success path
+  const data = await res.json();
+  savedSchedule = data.schedule;
+  currentSchedule = data.schedule;
+  unsavedChanges = false;
+  refreshSaveUI()
+  updateStatusBanner("saved");
+
+  hideSaving();
 }
 
 // DEFAULT
+// ----------------------
 function regenerateDefaultSchedule() {
   const { year, month } = getMonthParts();
 
   fetch(`/user/schedule/default/${year}/${month}`, {
+    method: "POST"
+  })
+  .then(res => res.json())
+  .then(data => {
+
+    // --- CASE 1: User is OUT OF TOWN ---
+    if (data.status === "out_of_town") {
+      showOutOfTownPrompt(year, month);
+      updateStatusBanner("out_of_town");
+      return;
+    }
+
+    // --- CASE 2: Normal default behavior ---
+    currentSchedule = data.schedule || {};
+    renderCalendar(currentSchedule);
+    markUnsaved();
+    updateStatusBanner(data.status);
+  });
+}
+
+// DEFAULT helper logic - Prompt for action when current month shows user is OUT OF TOWN -
+function showOutOfTownPrompt(year, month) {
+  const modal = document.getElementById("outOfTownModal");
+  modal.style.display = "flex";
+
+  // Button handlers
+  document.getElementById("clearMonthBtn").onclick = () => {
+    modal.style.display = "none";
+    clearMonthSchedule(year, month);
+  };
+
+  document.getElementById("markInTownBtn").onclick = () => {
+    modal.style.display = "none";
+    regenerateDefaultScheduleForceInTown(year, month);
+  };
+
+  document.getElementById("cancelOutOfTownBtn").onclick = () => {
+    modal.style.display = "none";
+  };
+}
+
+// DEFAULT helper logic - clear the monthly schedule for user
+function clearMonthSchedule(year, month) {
+  fetch(`/user/schedule/clear/${year}/${month}`, {
+    method: "POST"
+  })
+  .then(res => res.json())
+  .then(data => {
+    currentSchedule = data.schedule || {};
+    renderCalendar(currentSchedule);
+    markUnsaved();
+    updateStatusBanner("cleared");
+    unsavedChanges = false;
+  });
+}
+
+// DEFAULT helper logic - change in_town column from 0 to 1
+//                                              (making current month an in-town month)
+//                                              ... then populate month based user's 
+//                                                  day-of-week play days.
+function regenerateDefaultScheduleForceInTown(year, month) {
+  fetch(`/user/schedule/default/${year}/${month}?forceInTown=1`, {
     method: "POST"
   })
   .then(res => res.json())
@@ -344,9 +798,9 @@ function regenerateDefaultSchedule() {
 }
 
 // CLEAR
+// ----------------------
 function clearSchedule() {
   const { year, month } = getMonthParts();
-
   fetch(`/user/schedule/clear/${year}/${month}`, {
     method: "POST"
   })
@@ -359,34 +813,208 @@ function clearSchedule() {
   });
 }
 
-// REVERT
-function revertToSaved() {
-  if (!savedSchedule) {
-    alert("No saved schedule exists for this month.");
-    return;
-  }
-  currentSchedule = savedSchedule;
-  renderCalendar(savedSchedule);
-  unsavedChanges = false;
-  updateSaveButtonState();
-  updateUnsavedIndicator();
-  updateStatusBanner("saved");
-}
+function wireUpEventListeners() {
+  const picker = document.getElementById("monthPicker");
+  picker.addEventListener("change", loadScheduleForCurrentMonth);
 
-// ---- Navigation warning ----
-
-document.querySelectorAll("#topNav a").forEach(link => {
-  link.addEventListener("click", (e) => {
-    if (!unsavedChanges) return;
-
-    const leave = confirm("You have unsaved changes. Save before leaving?");
-    if (!leave) {
-      e.preventDefault();
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    if (!currentMonthInTown && userHasSelectedPlayDays()) {
+      showOutOfTownSaveModal();
+    } else {
+      saveSchedule();
     }
   });
-});
 
-// ---- Leaving page warning ----
+  document.getElementById("defaultBtn").addEventListener("click", regenerateDefaultSchedule);
+  document.getElementById("clearBtn").addEventListener("click", clearSchedule);
+
+ wireUpJumpToday();
+}
+
+
+// ESTABLISH THAT USER HAS SELECTED PLAY DAYS OR NOT
+function userHasSelectedPlayDays() {
+  return document.querySelectorAll(".day-cell.playing").length > 0;
+}
+
+async function loadPageHeader() {
+  try {
+  // Load user + league info and build header
+   const [userInfo, leagueInfo] = await Promise.all([
+     fetch("/user/info").then(r => r.json()),
+     fetch("/user/selected-league").then(r => r.json())
+  ]);
+  const user = userInfo.user;
+  const league = leagueInfo.league;
+  const userName = `${user.first_name} ${user.last_name}`;
+  const leagueName = league.league_name;
+  document.getElementById("pageHeader").textContent =
+  `My Schedule – ${userName} – ${leagueName}`;
+  } catch (err) {
+    console.error("Error loading schedule page header:", err);
+  }
+}
+
+// ---- Load initial month (session-aware) ----
+
+async function initSchedulePage() {
+  const res = await fetch("/user/schedule");
+  const data = await res.json();
+
+  document.getElementById("monthPicker").value =
+    `${data.year}-${String(data.month).padStart(2, "0")}`;
+
+  await loadScheduleForCurrentMonth();
+}
+
+async function loadScheduleForCurrentMonth() {
+  const { year, month } = getMonthParts();
+
+  // Persist last viewed month
+  await fetch("/user/set-last-month", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, month })
+  });
+
+  const res = await fetch(`/user/schedule/${year}/${month}`);
+  const data = await res.json();
+
+  console.log(">>> DEBUG: schedule load response =", data);
+
+  // ⭐ NEW: store league play days for disabling invalid dates
+  leaguePlayDays = data.leaguePlayDays || [];
+
+  // Always update in-town state
+  currentMonthInTown = data.in_town === 1;
+  // Reset unsaved state FIRST
+  unsavedChanges = false;
+  refreshSaveUI();
+
+  // THEN update banner
+  updateStatusBanner(data.status);
+
+  // Interpret backend status cleanly
+  switch (data.status) {
+
+    case "out_of_town":
+      savedSchedule = null;
+      currentSchedule = {};
+      renderCalendar({});
+      return;
+
+    case "default":
+      savedSchedule = null;
+      currentSchedule = data.schedule;
+      renderCalendar(data.schedule);
+      // ⭐ Treat default-generated schedule as UNSAVED
+      unsavedChanges = true;
+      refreshSaveUI()
+      return;
+
+    case "cleared":
+      savedSchedule = null;
+      currentSchedule = {};
+      renderCalendar({});
+      return;
+
+    case "saved":
+      savedSchedule = data.schedule;
+      currentSchedule = data.schedule;
+      renderCalendar(data.schedule);
+      return;
+
+    default:
+      console.warn("Unknown schedule status:", data.status);
+      savedSchedule = null;
+      currentSchedule = {};
+      renderCalendar({});
+  }
+}
+
+function configureMonthPickerLimits() {
+  const monthPicker = document.getElementById("monthPicker");
+  const now = new Date();
+
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const maxDate = new Date(now);
+  maxDate.setMonth(maxDate.getMonth() + 12);
+
+  const maxYear = maxDate.getFullYear();
+  const maxMonth = maxDate.getMonth() + 1;
+
+  const pad = n => String(n).padStart(2, "0");
+
+  const minValue = `${currentYear}-${pad(currentMonth)}`;
+  const maxValue = `${maxYear}-${pad(maxMonth)}`;
+
+  monthPicker.min = minValue;
+  monthPicker.max = maxValue;
+
+  if (monthPicker.value < minValue) {
+    monthPicker.value = minValue;
+  }
+  if (monthPicker.value > maxValue) {
+    monthPicker.value = maxValue;
+  }
+}
+
+function showOutOfTownSaveModal() {
+  showModal({
+    title: "This month is marked as Out of Town",
+    message: "You selected play days. What would you like to do?",
+    buttons: [
+      {
+        label: "Clear Month",
+        class: "danger",
+        action: () => clearMonthAndReload()
+      },
+      {
+        label: "Mark In Town + Save",
+        class: "primary",
+        action: () => {
+          markMonthInTown().then(() => saveSchedule());
+        }
+      },
+      {
+        label: "Cancel",
+        class: "secondary",
+        action: hideModal
+      }
+    ]
+  });
+}
+
+
+function wireUpJumpToday() {
+  const btn = document.getElementById("jumpToday");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = now.getDate();
+
+    const picker = document.getElementById("monthPicker");
+    picker.value = `${year}-${month}`;
+
+    // Reload schedule
+    await loadScheduleForCurrentMonth();
+
+    // Focus today's cell
+    focusDay(day);
+
+    // Highlight animation
+    const container = document.querySelector(".calendar");
+    if (container) {
+      container.classList.add("jump-highlight");
+      setTimeout(() => container.classList.remove("jump-highlight"), 700);
+    }
+  });
+}
 
 window.addEventListener("beforeunload", (e) => {
   if (!unsavedChanges) return;
@@ -394,54 +1022,21 @@ window.addEventListener("beforeunload", (e) => {
   e.returnValue = "";
 });
 
-// ---- Wire up events ----
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("monthInput").addEventListener("change", () => {
-    loadScheduleForCurrentMonth();
-  });
-
-  document.getElementById("defaultBtn").addEventListener("click", regenerateDefaultSchedule);
-  document.getElementById("clearBtn").addEventListener("click", clearSchedule);
-  document.getElementById("saveBtn").addEventListener("click", saveSchedule);
-  document.getElementById("revertBtn").addEventListener("click", revertToSaved);
-
-  updateSaveButtonState();
-  updateUnsavedIndicator();
-
-  initSchedulePage();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Load nav bar
-  fetch("/partials/user-nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
-    });
-
-  // Load league name for page header
-  fetch("/user/selected-league")
-    .then(r => r.json())
-    .then(data => {
-      if (data.league) {
-        document.getElementById("leagueNameHeader").textContent =
-          "— " + data.league.league_name;
-      }
-    });
-
-  // Load user name for page header
-  fetch("/user/info")
-    .then(r => r.json())
-    .then(data => {
-      if (data.user) {
-        document.getElementById("userNameHeader").textContent =
-          " — " + data.user.first_name + " " + data.user.last_name;
-      }
-    });
-});
-
 </script>
+
+<!-- Out-of-Town Modal -->
+<div id="outOfTownModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2>Out of Town</h2>
+    <p>You are marked out of town for this month. What would you like to do?</p>
+
+    <div class="modal-buttons">
+      <button id="clearMonthBtn" class="danger">Clear Schedule</button>
+      <button id="markInTownBtn" class="primary">Mark In Town + Default</button>
+      <button id="cancelOutOfTownBtn" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

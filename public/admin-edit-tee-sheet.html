@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tee Sheet Editor</title>
+   <link rel="stylesheet" href="/css/admin-nav.css">
+   <link rel="stylesheet" href="/css/admin-identity.css">
+</head>
+<style>
+/* -------------------------------------------------------
+   BASE PAGE LAYOUT
+------------------------------------------------------- */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 16px 20px 40px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.tee-sheet-container {
+  width: 72%;
+  margin: 0 auto;
+}
+
+/* -------------------------------------------------------
+   HEADER
+------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ccc;
+}
+
+.header-left,
+.header-center,
+.meta {
+  flex: 1;
+}
+
+.header-center {
+  text-align: center;
+}
+
+#page-title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.page-date {
+  margin-top: 4px;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.meta {
+  text-align: right;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+/* -------------------------------------------------------
+   BUTTONS
+------------------------------------------------------- */
+.primary-action-btn {
+  background-color: #0078d4;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.primary-action-btn:hover {
+  background-color: #2f6fc2;  
+}
+
+.primary-action-btn:disabled {
+  background-color: #e6e6e6;
+  cursor: not-allowed;
+}
+
+.secondary-action-btn {
+  background-color: #e0e0e0;
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.secondary-action-btn:hover {
+  background-color: #d5d5d5;
+}
+
+.has-changes::after {
+  content: "●";
+  color: #d00;
+  margin-left: 6px;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+/* Centered button row */
+.button-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.change-add-row {
+  background: #e8f7e8;
+  border-left: 4px solid #0a7a0a;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.change-drop-row {
+  background: #fde8e8;
+  border-left: 4px solid #b00020;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.jump-btn {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.jump-btn:hover {
+  background: #e5e7eb;
+}
+
+.highlight-jump {
+  animation: jumpHighlight 1.5s ease-out;
+}
+
+@keyframes jumpHighlight {
+  from { background: #fff3cd; }
+  to   { background: transparent; }
+}
+
+/* -------------------------------------------------------
+   TABLE
+------------------------------------------------------- */
+table.tee-sheet {
+  width: 75%;
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+
+table.tee-sheet th,
+table.tee-sheet td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  font-size: 13px;
+  vertical-align: top;
+}
+
+table.tee-sheet th {
+  background: #f3f4f6;
+  text-align: left;
+}
+
+.tee-time-cell {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.slot {
+  min-height: 32px;
+  border-radius: 4px;
+  background: #f9fafb;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.slot.empty {
+  color: #9ca3af;
+  font-style: italic;
+  justify-content: center;
+}
+
+.golfer-pill {
+  flex: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #e5f0ff;
+  border: 1px solid #bfdbfe;
+  cursor: grab;
+  font-size: 0.85rem;
+  line-height: 1.1;
+}
+
+.golfer-pill.dragging {
+  opacity: 0.6;
+}
+
+.slot.drop-target {
+  outline: 2px dashed #2563eb;
+  outline-offset: 2px;
+}
+
+.subgroup-tag {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* -------------------------------------------------------
+   STATUS BAR
+------------------------------------------------------- */
+.header .status-bar {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+  text-align: center;
+  color: #4b5563;
+}
+
+.header .status-bar span {
+  margin-right: 12px;
+}
+
+.header .status-bar .dirty {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------
+   SYSTEM MESSAGE
+------------------------------------------------------- */
+#system-message {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  display: none;
+}
+
+#system-message.success {
+  display: block;
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+#system-message.error {
+  display: block;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* -------------------------------------------------------
+   BUSY OVERLAY
+------------------------------------------------------- */
+#pageBusyOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+#pageBusyOverlay .spinner {
+  width: 48px;
+  height: 48px;
+  border: 6px solid #ccc;
+  border-top-color: #2a7ae2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -------------------------------------------------------
+   PLACEMENT HIGHLIGHTS
+------------------------------------------------------- */
+.placed {
+  background-color: #d4edda !important;
+}
+
+.unplaced {
+  background-color: #f8d7da !important;
+}
+
+.changes-section-header {
+  font-weight: bold;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-size: 1.1em;
+}
+
+.changes-section-header.added {
+  color: #0a7c0a;
+}
+
+.changes-section-header.removed {
+  color: #b30000;
+}
+
+.change-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.change-icon {
+  font-size: 1.2em;
+  margin-right: 10px;
+}
+
+.change-icon.added {
+  color: #0a7c0a;
+}
+
+.change-icon.removed {
+  color: #b30000;
+}
+
+.change-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.change-detail {
+  color: #666;
+  font-size: 0.9em;
+}
+
+/* -------------------------------------------------------
+   MODALS
+------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+  font-size: 14px;
+}
+
+.modal h2 {
+  margin-top: 0;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #111827;
+}
+
+.modal p {
+  font-size: 15px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.modal pre {
+  font-size: 13px;
+  font-weight: 600;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.modal-footer button {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.modal-footer .primary {
+  background: #2563eb;
+  color: white;
+  border-color: #1d4ed8;
+}
+
+.modal-footer .primary:hover {
+  background: #1d4ed8;
+}
+
+/* Unified modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease-out;
+  backdrop-filter: blur(3px);
+}
+
+/* Base hidden overlay */
+.notify-overlay,
+.leave-warning-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  display: none;                 /* HIDDEN BY DEFAULT */
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* When JS wants to show it */
+.notify-overlay.show,
+.leave-warning-overlay.show {
+  display: flex;
+}
+
+
+.notify-modal-window {
+  background: linear-gradient(#ffffff, #f7faff);
+  width: 72%;
+  max-width: 600px;
+  min-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 28px;
+  border-radius: 10px;
+  margin: 0 auto;                /* ensures horizontal centering */
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  animation: popIn 0.18s ease-out;
+}
+
+/* Optional: make form sections look clean */
+.notify-modal-window h2, 
+.preview-modal-window h2 {
+  margin-top: 0;
+  margin-bottom: 18px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  padding-bottom: 10px;
+  color: white;
+  background: #4a90e2;      /* soft professional blue */ 
+  border-radius: 6px; color: black; 
+}
+
+.notify-modal-window label,
+.notify-modal-window .section-title {
+  font-weight: 600;
+  margin-top: 18px;
+  display: block;
+  color: #333;
+}
+
+.notify-modal-window textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  font-size: 14px;
+}
+
+.modal-overlay.hide {
+  animation: fadeOut 0.15s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.modal-content {
+  background: #fff;
+  padding: 24px 28px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  max-width: 480px;
+  width: 90%;
+  animation: popIn 0.18s ease-out;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ------------------------------
+   LEAVE WARNING MODAL
+------------------------------ */
+
+.modal-overlay.leave-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.leave-warning-window {
+  background: #ffffff;
+  width: 420px;
+  padding: 24px 28px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  animation: popIn 0.18s ease-out;
+}
+
+.modal-title {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #222;
+}
+
+.modal-text {
+  font-size: 15px;
+  color: #444;
+  margin-bottom: 22px;
+  line-height: 1.45;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Smooth fade + pop animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+#changesList li {
+  margin-bottom: 8px;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.change-add {
+  color: #0a7a0a;
+  font-weight: 600;
+}
+
+.change-drop {
+  color: #b00020;
+  font-weight: 600;
+}
+
+.notify-modal {
+  width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+#notifyRecipientList {
+  border: 1px solid #ccc;
+  padding: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.notify-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.notify-row input {
+  margin-right: 10px;
+}
+
+.notify-row .notify-name {
+  flex: 1;
+}
+
+#notifyMessage {
+  width: 100%;
+  height: 120px;
+  resize: vertical;
+}
+
+#notifyPreviewBody h3 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.notify-sections-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.notify-section {
+  padding: 4px 6px;
+  background: #f7faff;
+  border-radius: 4px;
+  border: 1px solid #e0e6ef;
+  flex: 1;
+  margin-bottom: 20px;
+}
+
+.notify-checkbox-group label {
+  display: block;
+  margin: 6px;
+}
+
+.notify-preview {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 15px;
+  max-height: 60vh;
+  overflow-y: auto;
+  white-space: normal;
+}
+
+.modal-content .modal-footer,
+.modal-content .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* Cancel button */
+#modal-cancel {
+  background: #e5e7eb;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+#modal-cancel:hover {
+  background: #d1d5db;
+}
+</style>
+
+<body>
+  <div id="admin-nav-container"></div>
+  <div id="admin-identity-container"></div>
+
+  <div class="page">
+
+    <div class="header">
+      <div class="header-left"></div>
+
+      <div class="header-center">
+        <h1 id="page-title">Tee Sheet Editor</h1>
+        <div class="status-bar">
+          <span id="status-dirty"></span>
+          <span id="status-message"></span>
+        </div>
+        <div id="page-date" class="page-date"></div>
+      </div>
+
+
+      <div class="meta">
+        <div id="meta-league"></div>
+        <div id="meta-permissions"></div>
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button id="btn-save" title="Save all edits made to the tee sheet."
+           class="primary-action-btn" disabled>Save Changes</button>
+      <button id="btn-revert" title="Undo all unsaved edits and restore the live tee sheet."
+           class="secondary-action-btn">Revert</button>
+      <button id="btn-rebuild" title="Rebuild the tee sheet using current league golfer schedules and guests."
+           class="primary-action-btn">Rebuild Tee Sheet</button>
+      <button id="btn-lateChanges" title="View golfers who requested to play or who dropped out."
+           class="secondary-action-btn">Show Changes</button>
+      <button id="btn-applyChanges" title="Apply Adds/Drops to the tee sheet before arranging players."
+           class="primary-action-btn">Apply Changes</button>
+      <button id="btn-sendNotifications" title="Email golfers and staff about the updated tee sheet."
+           class="primary-action-btn">Send Notifications</button>
+    </div>
+
+    <table class="tee-sheet">
+      <thead>
+        <tr>
+          <th style="width: 90px;">Tee Time</th>
+          <th style="width: 80px;">Nine</th>
+          <th>Slot 1</th>
+          <th>Slot 2</th>
+          <th>Slot 3</th>
+          <th>Slot 4</th>
+        </tr>
+      </thead>
+      <tbody id="tee-sheet-body"></tbody>
+    </table>
+
+  </div> <!-- END .page -->
+
+  <div id="modal-backdrop" class="modal-backdrop">
+    <div class="modal">
+      <h2>Confirm Changes</h2>
+      <p>The following changes will be applied to the tee sheet:</p>
+      <pre id="modal-diff"></pre>
+      <div class="modal-footer">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-confirm" class="primary">Confirm Save</button>
+      </div>
+    </div>
+  </div>
+
+
+<div id="changesModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content">
+    <h2>Changes Since Last Update</h2>
+
+    <div id="changesSummary"
+         style="text-align:center; margin-bottom:12px; font-weight:600;"></div>
+
+    <div id="changesList"></div>
+
+    <div style="margin-top:16px; font-size:0.9rem; color:#555; text-align:center;">
+      These changes will be applied when you click <strong>Apply Changes</strong>.
+    </div>
+
+    <div class="modal-actions">
+      <button id="closeChangesModal" class="btn btn-secondary">Close</button>
+      <button id="applyChangesFromModal" class="primary-action-btn">Apply Changes</button>
+    </div>
+  </div>
+</div>
+
+  <div id="notifyModal" class="notify-overlay" style="display:none;">
+  <div class="notify-modal-window">
+
+    <!-- STEP 1 -->
+    <div id="notifyStep1">
+      <h2>Send Notifications</h2>
+
+      <div class="notify-sections-row">
+
+        <div class="notify-section">
+          <label><strong>Recipients:</strong></label>
+          <div class="notify-checkbox-group">
+            <label><input type="checkbox" id="recTeeSheetPlayers"> Tee sheet players</label>
+            <label><input type="checkbox" id="recUnplacedGolfers"> Unplaced golfers</label>
+            <label><input type="checkbox" id="recLeagueAdmins"> League admins</label>
+            <label><input type="checkbox" id="recClubStaff"> Club staff</label>
+          </div>
+        </div>
+
+        <div class="notify-section">
+          <label><strong>Email Body:</strong></label>
+          <div class="notify-checkbox-group">
+            <label><input type="checkbox" id="bodyIncludeTeeSheet"> Include full tee sheet</label>
+            <label><input type="checkbox" id="bodyIncludeUnplaced"> Include unplaced golfers</label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="notify-section">
+        <label><strong>Optional message:</strong></label>
+        <textarea id="notifyMessage" placeholder="Enter an optional message..."></textarea>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnPreviewEmail" class="primary-btn" type="button">Preview Email</button>
+        <button type="button" onclick="closeNotifyModal()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="notifyStep2" style="display:none;">
+      <h2>Preview Email</h2>
+
+      <div id="notifyPreviewBody" class="notify-preview"></div>
+
+      <div class="modal-buttons">
+        <button id="btnSendEmail" class="primary-btn">Send Email</button>
+        <button id="btnBackToOptions">Back</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+  <div id="unsavedModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:420px;">
+      <h2>Unsaved Changes</h2>
+
+      <p style="margin-top:10px;">
+        You have unsaved changes. If you continue, those changes will be lost.
+      </p>
+
+      <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+        <button id="unsavedSave" class="btn btn-primary">Save & Continue</button>
+        <button id="unsavedContinue" class="btn btn-warning">Continue Without Saving</button>
+        <button id="unsavedCancel" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pageBusyOverlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Leave Warning Modal -->
+  <div id="leaveWarningModal" class="leave-warning-overlay" style="display:none;">
+    <div class="leave-warning-window">
+      <h3 class="modal-title">Unsaved Notifications</h3>
+
+      <p class="modal-text">
+        You applied changes to the tee sheet but have not sent notifications to the affected golfers.
+      </p>
+
+      <div class="modal-buttons">
+        <button id="leaveSendNotifications" class="primary-action-btn">
+          Send Notifications
+        </button>
+
+        <button id="leaveWithoutSending" class="secondary-action-btn">
+          Leave Without Sending
+        </button>
+
+        <button id="leaveCancel" class="secondary-action-btn">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// -------------------------------------------------------
+// GLOBAL CONFIG & STATE
+// -------------------------------------------------------
+const leagueId = window.LEAGUE_ID || 1;
+if (!window.TEE_DATE) {
+  console.error("TEE_DATE missing — page cannot function correctly.");
+}
+const teeDate = window.TEE_DATE;
+
+window.notificationsSent = true; // true on page load
+
+let teeRows = [];
+let originalRows = [];
+let unsavedChanges = false;
+let currentPermissions = "Coordinator only";
+
+let unsavedModalCallbacks = {
+  onSave: null,
+  onContinue: null,
+  onCancel: null
+};
+
+// -------------------------------------------------------
+// DATE INITIALIZATION
+// -------------------------------------------------------
+function parseLocalDate(dateStr) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+const dateObj = parseLocalDate(teeDate);
+document.getElementById("page-date").textContent =
+  `${dateObj.toLocaleDateString("en-US", { weekday: "long" })}, ` +
+  dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+document.getElementById("meta-league").textContent = "League ID: " + leagueId;
+document.getElementById("meta-permissions").textContent = "Permissions: " + currentPermissions;
+
+// -------------------------------------------------------
+// ADMIN NAVIGATION
+// -------------------------------------------------------
+async function initAdminNav() {
+  const navContainer = document.getElementById("admin-nav-container");
+  const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+  const html = await res.text();
+  navContainer.innerHTML = html;
+
+  const path = window.location.pathname;
+
+  document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+    const href = link.getAttribute("href");
+    if (href === path || (href !== "/" && path.startsWith(href))) {
+      link.classList.add("active");
+    }
+  });
+}
+
+function attachNavGuard() {
+  document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+    link.addEventListener("click", (e) => {
+      const url = link.getAttribute("href");
+
+      // FIX: ignore clicks to the current page
+      if (url === window.location.pathname) return;
+
+      guardNavigation(e, url);
+    });
+  });
+}
+
+function highlightPlacementResults(data) {
+  document.querySelectorAll(".placed, .unplaced").forEach(el => {
+    el.classList.remove("placed", "unplaced");
+  });
+
+  if (data.placed) {
+    data.placed.forEach(p => {
+      const cell = document.querySelector(`[data-user-id="${p.user_id}"]`);
+      if (cell) cell.classList.add("placed");
+    });
+  }
+
+  if (data.unplaced) {
+    data.unplaced.forEach(p => {
+      const row = document.querySelector(`[data-user-id="${p.user_id}"]`);
+      if (row) row.classList.add("unplaced");
+    });
+  }
+}
+
+// GLOBAL DOM references
+const statusDirty = document.getElementById("status-dirty");
+const statusMessage = document.getElementById("status-message");
+const tbody = document.getElementById("tee-sheet-body");
+
+// -------------------------------------------------------
+// SESSION & IDENTITY
+// -------------------------------------------------------
+async function fetchSessionInfo() {
+  const res = await fetch("/admin/session-info", { credentials: "include" });
+  const session = await res.json();
+
+  const leaguesLink = document.getElementById("nav-leagues-link");
+  if (leaguesLink) {
+    leaguesLink.style.display = session.is_super_admin ? "inline-block" : "none";
+  }
+
+  return session;
+}
+
+async function initAdminIdentity(session) {
+  const container = document.getElementById("admin-identity-container");
+  if (!container) return;
+
+  const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+  container.innerHTML = html;
+
+  const bar = container.querySelector(".admin-identity");
+  const icon = container.querySelector("#identity-icon");
+  const role = container.querySelector("#identity-role");
+  const name = container.querySelector("#identity-name");
+  const leagueBadge = container.querySelector("#identity-league");
+
+  name.innerText = `${session.first_name} ${session.last_name}`;
+
+  if (session.is_super_admin) {
+    bar.classList.add("super-admin");
+    icon.innerText = "⭐";
+    role.innerText = "Super Admin";
+
+    if (session.league_name) {
+      leagueBadge.innerText = `Current League: ${session.league_name}`;
+      leagueBadge.style.display = "inline-block";
+    }
+  } else {
+    bar.classList.add("league-admin");
+    icon.innerText = "🏌️";
+    role.innerText = "League Admin";
+
+    if (session.league_name) {
+      leagueBadge.innerText = session.league_name;
+      leagueBadge.style.display = "inline-block";
+    }
+  }
+}
+
+function showBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "flex";
+}
+
+function hideBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "none";
+}
+
+async function runWithBusy(asyncFn) {
+  showBusy();
+  try {
+    await asyncFn();
+  } finally {
+    hideBusy();
+  }
+}
+
+function showLeaveWarning(targetUrl) {
+  const modal = document.getElementById("leaveWarningModal");
+  modal.style.display = "flex";
+
+  // Leave Without Sending → navigate away
+  document.getElementById("leaveWithoutSending").onclick = () => {
+    window.location.href = targetUrl;
+  };
+
+  // Send Notifications → open the Send Notifications modal
+  document.getElementById("leaveSendNotifications").onclick = () => {
+    modal.style.display = "none";         // close leave warning
+    openNotifyModal();                    // open send notifications modal
+  };
+
+  // Cancel → close leave warning only
+  document.getElementById("leaveCancel").onclick = () => {
+    modal.style.display = "none";
+  };
+}
+
+function clearChangesBadge() {
+  const btn = document.getElementById("btn-lateChanges");
+  if (btn) {
+    btn.classList.remove("has-changes");
+    btn.title = "Show Changes";
+  }
+}
+
+function showSystemMessage(text, type = "info") {
+  const msg = document.getElementById("system-message");
+  msg.textContent = text;
+
+  msg.className = type === "error" ? "error" : "success";
+  msg.style.display = "block";
+
+  setTimeout(() => {
+    msg.style.display = "none";
+  }, 6000);
+}
+
+async function checkForPendingChangesOnLoad() {
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/changes`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const added = data.added || [];
+    const removed = data.removed || [];
+    const total = added.length + removed.length;
+
+    if (total === 0) return;
+
+    // Add badge to Show Changes button
+    const btnLateChanges = document.getElementById("btn-lateChanges");
+    if (btnLateChanges) {
+      btnLateChanges.classList.add("has-changes");
+      btnLateChanges.title = `There are ${total} pending changes`;
+    }
+
+    // Auto-open modal if more than 5 changes
+    if (total > 5) {
+      window.latestChanges = data;
+      renderChangesModal(data);
+      updateStatus("Loaded pending changes.", "info");
+      return;
+    }
+
+    // Otherwise show a friendly banner
+    showSystemMessage(
+      `${total} change${total !== 1 ? "s" : ""} pending. Click "Show Changes" to review.`,
+      "info"
+    );
+
+  } catch (err) {
+    console.error("Error checking pending changes:", err);
+  }
+}
+
+function buildTeeSheetHTML(rows) {
+  let html = `
+    <table border="1" cellpadding="6" cellspacing="0">
+      <tr>
+        <th>Tee Time</th>
+        <th>Starting Nine</th>
+        <th>Players</th>
+      </tr>
+  `;
+
+  rows.forEach(row => {
+    const players = [
+      row.first_name1 && `${row.first_name1} ${row.last_name1}`,
+      row.first_name2 && `${row.first_name2} ${row.last_name2}`,
+      row.first_name3 && `${row.first_name3} ${row.last_name3}`,
+      row.first_name4 && `${row.first_name4} ${row.last_name4}`
+    ].filter(Boolean).join(", ");
+
+    html += `
+      <tr>
+        <td>${row.tee_time}</td>
+        <td>${row.starting_nine}</td>
+        <td>${players}</td>
+      </tr>
+    `;
+  });
+
+  html += `</table>`;
+  return html;
+}
+
+
+// -------------------------------------------------------
+// UNSAVED CHANGES MODAL & NOTIFY MODAL
+// -------------------------------------------------------
+function openUnsavedChangesModal(callbacks) {
+  unsavedModalCallbacks = callbacks;
+  document.getElementById("unsavedModal").style.display = "flex";
+}
+
+function closeUnsavedChangesModal() {
+  document.getElementById("unsavedModal").style.display = "none";
+}
+
+function openNotifyModal() {
+  console.log("openNotifyModal CALLED");
+  document.getElementById("notifyModal").style.display = "block";
+}
+
+window.closeNotifyModal = function closeNotifyModal() {
+  const modal = document.getElementById("notifyModal");
+  if (modal) modal.style.display = "none";
+
+  const step1 = document.getElementById("notifyStep1");
+  const step2 = document.getElementById("notifyStep2");
+
+  if (step1) step1.style.display = "block";
+  if (step2) step2.style.display = "none";
+};
+
+function guardUnsavedChanges(actionName, callbacks) {
+  if (!unsavedChanges) {
+    callbacks.onContinue();
+    return;
+  }
+  openUnsavedChangesModal(callbacks);
+}
+
+function setupUnsavedModalHandlers() {
+  document.getElementById("unsavedSave").addEventListener("click", async () => {
+    closeUnsavedChangesModal();
+    if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
+  });
+
+  document.getElementById("unsavedContinue").addEventListener("click", () => {
+    closeUnsavedChangesModal();
+    if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
+  });
+
+  document.getElementById("unsavedCancel").addEventListener("click", () => {
+    closeUnsavedChangesModal();
+    if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
+  });
+}
+
+// -------------------------------------------------------
+// STATUS & DIRTY STATE
+// -------------------------------------------------------
+function markDirty(isDirty = true) {
+  unsavedChanges = !!isDirty;
+
+  const btnSave = document.getElementById("btn-save");
+  if (!btnSave) return;
+
+  if (isDirty) {
+    btnSave.disabled = false;
+    btnSave.classList.add("dirty");
+    if (statusDirty) statusDirty.style.display = "inline";
+  } else {
+    btnSave.disabled = true;
+    btnSave.classList.remove("dirty");
+    if (statusDirty) statusDirty.style.display = "none";
+  }
+}
+
+function updateStatus(message, type = "info") {
+  statusMessage.textContent = message;
+  statusMessage.className = "status-msg";
+
+  if (type === "success") statusMessage.classList.add("status-success");
+  else if (type === "error") statusMessage.classList.add("status-error");
+  else statusMessage.classList.add("status-info");
+}
+
+// -------------------------------------------------------
+// TEE SHEET LOADING & RENDERING
+// -------------------------------------------------------
+async function fetchTeeSheet() {
+  updateStatus("Loading tee sheet...", "info");
+
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}`);
+    if (!res.ok) throw new Error("Failed to load tee sheet");
+
+    const data = await res.json();
+    teeRows = data;
+    originalRows = JSON.parse(JSON.stringify(data));
+
+    renderTeeSheetGrid();
+    markDirty(false);
+    updateStatus("Loaded tee sheet.", "info");
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error loading tee sheet.", "error");
+  }
+}
+
+function renderTeeSheetGrid() {
+  tbody.innerHTML = "";
+
+  teeRows.forEach((row, rowIndex) => {
+    const tr = document.createElement("tr");
+
+    tr.dataset.teeTime = row.tee_time;
+    tr.dataset.startingNine = row.starting_nine;
+
+    const tdTime = document.createElement("td");
+    tdTime.className = "tee-time-cell";
+    tdTime.textContent = row.tee_time;
+    tr.appendChild(tdTime);
+
+    const tdNine = document.createElement("td");
+    tdNine.textContent = row.starting_nine;
+    tr.appendChild(tdNine);
+
+    for (let slot = 1; slot <= 4; slot++) {
+      const tdSlot = document.createElement("td");
+      const slotDiv = document.createElement("div");
+      slotDiv.className = "slot";
+      slotDiv.dataset.rowIndex = rowIndex;
+      slotDiv.dataset.slot = slot;
+
+      const lnKey = "last_name" + slot;
+      const fnKey = "first_name" + slot;
+
+      if (row[lnKey] && row[fnKey]) {
+        const pill = document.createElement("div");
+        pill.className = "golfer-pill";
+        pill.draggable = true;
+        pill.dataset.rowIndex = rowIndex;
+        pill.dataset.slot = slot;
+        pill.dataset.userId = row[`user_id${slot}`];
+        pill.textContent = `${row[fnKey]} ${row[lnKey]}`;
+
+        pill.addEventListener("dragstart", handleDragStart);
+        pill.addEventListener("dragend", handleDragEnd);
+
+        slotDiv.appendChild(pill);
+      } else {
+        slotDiv.classList.add("empty");
+        slotDiv.textContent = "Empty";
+      }
+
+      slotDiv.addEventListener("dragover", handleDragOver);
+      slotDiv.addEventListener("dragleave", handleDragLeave);
+      slotDiv.addEventListener("drop", handleDrop);
+
+      tdSlot.appendChild(slotDiv);
+      tr.appendChild(tdSlot);
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+// -------------------------------------------------------
+// DRAG & DROP
+// -------------------------------------------------------
+let dragSource = null;
+
+function handleDragStart(e) {
+  dragSource = {
+    rowIndex: parseInt(e.target.dataset.rowIndex, 10),
+    slot: parseInt(e.target.dataset.slot, 10)
+  };
+  e.dataTransfer.effectAllowed = "move";
+  e.target.classList.add("dragging");
+}
+
+function handleDragEnd(e) {
+  e.target.classList.remove("dragging");
+  dragSource = null;
+  document.querySelectorAll(".slot.drop-target").forEach(el => {
+    el.classList.remove("drop-target");
+  });
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  if (!dragSource) return;
+  e.dataTransfer.dropEffect = "move";
+  e.currentTarget.classList.add("drop-target");
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove("drop-target");
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("drop-target");
+  if (!dragSource) return;
+
+  const targetRowIndex = parseInt(e.currentTarget.dataset.rowIndex, 10);
+  const targetSlot = parseInt(e.currentTarget.dataset.slot, 10);
+
+  swapGolferSlots(dragSource.rowIndex, dragSource.slot, targetRowIndex, targetSlot);
+  renderTeeSheetGrid();
+  markDirty(true);
+}
+
+function swapGolferSlots(fromRow, fromSlot, toRow, toSlot) {
+  if (fromRow === toRow && fromSlot === toSlot) return;
+
+  const fromRowObj = teeRows[fromRow];
+  const toRowObj = teeRows[toRow];
+
+  const fromLnKey = "last_name" + fromSlot;
+  const fromFnKey = "first_name" + fromSlot;
+  const toLnKey = "last_name" + toSlot;
+  const toFnKey = "first_name" + toSlot;
+
+  const movingLast = fromRowObj[fromLnKey];
+  const movingFirst = fromRowObj[fromFnKey];
+
+  const targetLast = toRowObj[toLnKey];
+  const targetFirst = toRowObj[toFnKey];
+
+  fromRowObj[fromLnKey] = targetLast || "";
+  fromRowObj[fromFnKey] = targetFirst || "";
+  toRowObj[toLnKey] = movingLast || "";
+  toRowObj[toFnKey] = movingFirst || "";
+}
+
+function setupDragAndDrop() {
+  // Handlers are attached in renderTeeSheetGrid()
+}
+
+// -------------------------------------------------------
+// SAVE / REVERT / REBUILD
+// -------------------------------------------------------
+function computeTeeSheetDiff(oldRows, newRows) {
+  const changes = [];
+  const key = r => `${r.tee_time}|${r.starting_nine}|${r.league_id || ""}`;
+
+  const oldMap = new Map(oldRows.map(r => [key(r), r]));
+  const newMap = new Map(newRows.map(r => [key(r), r]));
+
+  for (const [k, oldRow] of oldMap.entries()) {
+    const newRow = newMap.get(k);
+    if (!newRow) {
+      changes.push(`- Removed tee time ${oldRow.tee_time} ${oldRow.starting_nine}`);
+      continue;
+    }
+    for (let slot = 1; slot <= 4; slot++) {
+      const ln = "last_name" + slot;
+      const fn = "first_name" + slot;
+      const oldName = `${oldRow[fn]} ${oldRow[ln]}`.trim();
+      const newName = `${newRow[fn]} ${newRow[ln]}`.trim();
+      if (oldName !== newName) {
+        changes.push(`~ ${oldRow.tee_time} slot ${slot}: "${oldName}" → "${newName}"`);
+      }
+    }
+  }
+
+  for (const [k, newRow] of newMap.entries()) {
+    if (!oldMap.has(k)) {
+      changes.push(`+ Added tee time ${newRow.tee_time} ${newRow.starting_nine}`);
+    }
+  }
+
+  return changes.join("\n");
+}
+
+async function saveChanges() {
+  updateStatus("Saving changes...", "info");
+
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: teeRows })
+    });
+
+    if (!res.ok) throw new Error("Save failed");
+
+    originalRows = JSON.parse(JSON.stringify(teeRows));
+    markDirty(false);
+    updateStatus("Changes saved.", "success");
+    clearChangesBadge();
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error saving changes.", "error");
+  }
+}
+
+async function revertTeeSheet() {
+  updateStatus("Reverting...", "info");
+
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/revert`, {
+      method: "POST"
+    });
+
+    if (!res.ok) throw new Error("Revert failed");
+
+    const data = await res.json();
+    teeRows = data;
+    originalRows = JSON.parse(JSON.stringify(data));
+
+    renderTeeSheetGrid();
+    markDirty(false);
+    updateStatus("Reverted to live tee sheet.", "info");
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error reverting.", "error");
+  }
+}
+
+async function rebuildTeeSheet() {
+  updateStatus("Rebuilding tee sheet...", "info");
+
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/rebuild`, {
+      method: "POST"
+    });
+
+    if (!res.ok) throw new Error("Rebuild failed");
+
+    const data = await res.json();
+    if (data.status !== "SUCCESS") throw new Error(data.message || "Rebuild failed");
+
+    await fetchTeeSheet();
+    markDirty(false);
+    updateStatus("Rebuild complete and saved.", "success");
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error rebuilding tee sheet.", "error");
+  }
+}
+
+// -------------------------------------------------------
+// SHOW CHANGES MODAL
+// -------------------------------------------------------
+function renderChangesModal(data) {
+  const modal = document.getElementById("changesModal");
+  const summary = document.getElementById("changesSummary");
+  const list = document.getElementById("changesList");
+
+  const added = data.added || [];
+  const removed = data.removed || [];
+
+  const total = added.length + removed.length;
+  summary.textContent = `${total} change${total !== 1 ? "s" : ""} pending`;
+
+  list.innerHTML = "";
+
+  if (removed.length > 0) {
+    const header = document.createElement("div");
+    header.className = "changes-section-header removed";
+    header.textContent = "No Longer Playing";
+    list.appendChild(header);
+
+    removed.forEach(r => {
+      const row = document.createElement("div");
+      row.className = "change-row removed-row";
+      row.innerHTML = `
+        <span class="change-icon removed">✕</span>
+        <span class="change-name">${r.first_name} ${r.last_name}</span>
+        <span class="change-detail">no longer playing</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  if (added.length > 0) {
+    const header = document.createElement("div");
+    header.className = "changes-section-header added";
+    header.textContent = "Wants to Play";
+    list.appendChild(header);
+
+    added.forEach(a => {
+      const row = document.createElement("div");
+      row.className = "change-row added-row";
+      row.innerHTML = `
+        <span class="change-icon added">✓</span>
+        <span class="change-name">${a.first_name} ${a.last_name}</span>
+        <span class="change-detail">requested at ${formatTimestamp(a.requested_at)}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  modal.style.display = "flex";
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return "";
+  const d = new Date(ts.replace(" ", "T"));
+  return d.toLocaleString();
+}
+
+// -------------------------------------------------------
+// APPLY CHANGES (frontend → backend)
+// -------------------------------------------------------
+async function applyChangesToTeeSheet(removed, added) {
+  if (!Array.isArray(removed) || !Array.isArray(added)) {
+    console.error("applyChangesToTeeSheet called without valid arrays:", removed, added);
+    alert("Internal error: missing added/removed arrays.");
+    return;
+  }
+
+  updateStatus("Applying changes...", "info");
+
+  try {
+    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/apply-changes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ removed, added })
+    });
+
+    if (!res.ok) throw new Error("Apply changes failed");
+
+    const data = await res.json();
+
+    teeRows = data.rows;
+    originalRows = JSON.parse(JSON.stringify(teeRows));
+
+    renderTeeSheetGrid();
+    markDirty(true);
+    clearChangesBadge();
+
+    updateStatus("Changes applied.", "success");
+    window.notificationsSent = false;
+
+    window.latestApplyResult = {
+      placed: data.placed || [],
+      unplaced: data.unplaced || []
+    };
+
+    console.log("Placed:", data.placed);
+    console.log("Unplaced:", data.unplaced);
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error applying changes.", "error");
+  }
+}
+
+// -------------------------------------------------------
+// BUTTON HANDLERS
+// -------------------------------------------------------
+function setupButtonHandlers() {
+  console.log("setupButtonHandlers() START");
+
+  const btnSave = document.getElementById("btn-save");
+  const btnRevert = document.getElementById("btn-revert");
+  const btnRebuild = document.getElementById("btn-rebuild");
+  const btnLateChanges = document.getElementById("btn-lateChanges");
+  const btnApplyChanges = document.getElementById("btn-applyChanges");
+  const btnSendNotifications = document.getElementById("btn-sendNotifications");
+
+  const modalBackdrop = document.getElementById("modal-backdrop");
+  const modalDiff = document.getElementById("modal-diff");
+  const modalCancel = document.getElementById("modal-cancel");
+  const modalConfirm = document.getElementById("modal-confirm");
+
+  console.log("btnSave:", btnSave);
+  console.log("btnRevert:", btnRevert);
+  console.log("btnRebuild:", btnRebuild);
+  console.log("btnLateChanges:", btnLateChanges);
+  console.log("btnApplyChanges:", btnApplyChanges);
+  console.log("btnSendNotifications:", btnSendNotifications);
+
+  console.log("Attaching handler: btnSave");
+  btnSave.addEventListener("click", () => {
+    const diff = computeTeeSheetDiff(originalRows, teeRows);
+    modalDiff.textContent = diff || "No changes detected.";
+    modalBackdrop.style.display = "flex";
+  });
+
+  console.log("Attaching handler: modalCancel");
+  modalCancel.addEventListener("click", () => {
+    modalBackdrop.style.display = "none";
+  });
+
+  console.log("Attaching handler: modalConfirm");
+  modalConfirm.addEventListener("click", () => {
+    modalBackdrop.style.display = "none";
+    runWithBusy(async () => {
+      await saveChanges();
+    });
+  });
+
+  console.log("Attaching handler: changesModal close");
+  document.getElementById("closeChangesModal").addEventListener("click", () => {
+    const modal = document.getElementById("changesModal");
+    modal.classList.add("hide");
+    setTimeout(() => {
+      modal.style.display = "none";
+      modal.classList.remove("hide");
+    }, 150);
+  });
+
+  console.log("Attaching handler: btnRevert");
+  btnRevert.addEventListener("click", () => {
+    guardUnsavedChanges("revert", {
+      onSave: async () => {
+        await saveChanges();
+        runWithBusy(async () => {
+          await revertTeeSheet();
+        });
+      },
+      onContinue: () => {
+        runWithBusy(async () => {
+          await revertTeeSheet();
+        });
+      },
+      onCancel: () => {}
+    });
+  });
+
+  console.log("Attaching handler: btnRebuild");
+  btnRebuild.addEventListener("click", () => {
+    guardUnsavedChanges("rebuild", {
+      onSave: async () => {
+        await saveChanges();
+        runWithBusy(async () => {
+          await rebuildTeeSheet();
+          clearChangesBadge();
+        });
+      },
+      onContinue: () => {
+        runWithBusy(async () => {
+          await rebuildTeeSheet();
+          clearChangesBadge();
+        });
+      },
+      onCancel: () => {}
+    });
+  });
+
+  console.log("Attaching handler: btnLateChanges");
+  btnLateChanges.addEventListener("click", async () => {
+    updateStatus("Checking for schedule changes...", "info");
+
+    try {
+      const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/changes`);
+      if (!res.ok) throw new Error("Failed to fetch changes");
+
+      const data = await res.json();
+
+      window.latestChanges = data;
+      renderChangesModal(data);
+
+      updateStatus("Changes loaded.", "success");
+    } catch (err) {
+      console.error(err);
+      updateStatus("Error loading changes.", "error");
+    }
+  });
+
+  document.getElementById("applyChangesFromModal").addEventListener("click", () => {
+    document.getElementById("changesModal").style.display = "none";
+
+    guardUnsavedChanges("apply-changes", {
+      onSave: async () => {
+        await saveChanges();
+        runWithBusy(async () => {
+          await applyChangesToTeeSheet(
+            window.latestChanges.removed,
+            window.latestChanges.added
+          );
+        });
+      },
+      onContinue: () => {
+        runWithBusy(async () => {
+          await applyChangesToTeeSheet(
+            window.latestChanges.removed,
+            window.latestChanges.added
+          );
+        });
+      },
+      onCancel: () => {}
+    });
+  });
+
+  console.log("Attaching handler: btnApplyChanges");
+  btnApplyChanges.addEventListener("click", () => {
+    guardUnsavedChanges("apply-changes", {
+      onSave: async () => {
+        await saveChanges();
+        runWithBusy(async () => {
+          await applyChangesToTeeSheet(
+            window.latestChanges?.removed || [],
+            window.latestChanges?.added || []
+          );
+        });
+      },
+      onContinue: () => {
+        runWithBusy(async () => {
+          await applyChangesToTeeSheet(
+            window.latestChanges?.removed || [],
+            window.latestChanges?.added || []
+          );
+        });
+      },
+      onCancel: () => {}
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("jump-btn")) return;
+
+    const teeTime = e.target.dataset.teeTime;
+    const nine = e.target.dataset.nine;
+
+    const row = [...document.querySelectorAll("#tee-sheet-body tr")]
+      .find(r =>
+        r.dataset.teeTime === teeTime &&
+        r.dataset.startingNine === nine
+      );
+
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("highlight-jump");
+      setTimeout(() => row.classList.remove("highlight-jump"), 1500);
+    }
+  });
+
+  console.log("Attaching handler: btnPreviewEmail");
+  document.getElementById("btnPreviewEmail").addEventListener("click", async () => {
+    const includeTeeSheet = document.getElementById("bodyIncludeTeeSheet").checked;
+    const includeUnplaced = document.getElementById("bodyIncludeUnplaced").checked;
+    const message = document.getElementById("notifyMessage").value;
+
+    const placed = (window.latestApplyResult && window.latestApplyResult.placed) || [];
+    const unplaced = (window.latestApplyResult && window.latestApplyResult.unplaced) || [];
+
+    let html = "";
+
+    if (message.trim()) {
+      html += `<p>${message}</p>`;
+    }
+
+    if (includeTeeSheet) {
+      html += `<h3>Tee Sheet for ${teeDate}</h3>`;
+      html += buildTeeSheetHTML(teeRows);
+    }
+
+    if (includeUnplaced && unplaced.length > 0) {
+      html += `<h3>Unplaced Golfers</h3><ul>`;
+      unplaced.forEach(g => {
+        html += `<li>${g.first_name} ${g.last_name}</li>`;
+      });
+      html += `</ul>`;
+    }
+
+    document.getElementById("notifyPreviewBody").innerHTML = html;
+
+    document.getElementById("notifyStep1").style.display = "none";
+    document.getElementById("notifyStep2").style.display = "block";
+  });
+
+  document.getElementById("btnBackToOptions").addEventListener("click", () => {
+    document.getElementById("notifyStep1").style.display = "block";
+    document.getElementById("notifyStep2").style.display = "none";
+  });
+
+  if (btnSendNotifications) {
+    btnSendNotifications.addEventListener("click", () => {
+      openNotifyModal();
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.matches("a[data-nav]")) return;
+
+    const hasAppliedChanges = !!window.latestApplyResult;
+    const unsent = hasAppliedChanges && !window.notificationsSent;
+
+
+    if (hasAppliedChanges && unsent) {
+      e.preventDefault();
+      showLeaveWarning(e.target.href);
+    }
+  });
+
+  console.log("Attaching handler: btnSendEmail");
+  document.getElementById("btnSendEmail").addEventListener("click", async () => {
+    const recipientGroups = {
+      teeSheetPlayers: document.getElementById("recTeeSheetPlayers").checked,
+      unplacedGolfers: document.getElementById("recUnplacedGolfers").checked,
+      leagueAdmins: document.getElementById("recLeagueAdmins").checked,
+      clubStaff: document.getElementById("recClubStaff").checked
+    };
+
+    const includeTeeSheet = document.getElementById("bodyIncludeTeeSheet").checked;
+    const includeUnplaced = document.getElementById("bodyIncludeUnplaced").checked;
+    const message = document.getElementById("notifyMessage").value;
+
+    updateStatus("Sending notifications...", "info");
+
+    try {
+      const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/send-notifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientGroups,
+          includeTeeSheet,
+          includeUnplaced,
+          message
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to send notifications");
+
+      updateStatus("Notifications sent.", "success");
+      window.notificationsSent = true;
+      closeNotifyModal();
+
+    } catch (err) {
+      console.error(err);
+      updateStatus("Error sending notifications.", "error");
+    }
+  });
+}
+
+// -------------------------------------------------------
+// NAVIGATION GUARD
+// -------------------------------------------------------
+function guardNavigation(e, url) {
+  const hasAppliedChanges = !!window.latestApplyResult;
+  const unsent = hasAppliedChanges && !window.notificationsSent;
+
+  if (!unsavedChanges && !unsent) {
+    window.location.href = url;
+    return;
+  }
+
+  e.preventDefault();
+
+  if (unsent) {
+    showLeaveWarning(url);
+    return;
+  }
+
+  openUnsavedChangesModal({
+    onSave: async () => {
+      await saveChanges();
+      window.location.href = url;
+    },
+    onContinue: () => {
+      window.location.href = url;
+    },
+    onCancel: () => {}
+  });
+}
+
+// -------------------------------------------------------
+// BEFOREUNLOAD GUARD
+// -------------------------------------------------------
+function attachBeforeUnloadGuard() {
+  window.addEventListener("beforeunload", (e) => {
+    const hasAppliedChanges = !!window.latestApplyResult;
+    const unsent = hasAppliedChanges && !window.notificationsSent;
+
+    if (!unsavedChanges && !(hasAppliedChanges && unsent)) return;
+
+    e.preventDefault();
+    e.returnValue = "";
+  });
+}
+
+// -------------------------------------------------------
+// PAGE INITIALIZATION
+// -------------------------------------------------------
+document.addEventListener("DOMContentLoaded", async () => {
+  await initAdminNav();
+  const session = await fetchSessionInfo();
+  await initAdminIdentity(session);
+
+  attachNavGuard();
+  attachBeforeUnloadGuard();
+  setupUnsavedModalHandlers();
+  setupDragAndDrop();
+  setupButtonHandlers();
+
+  await fetchTeeSheet();
+  await checkForPendingChangesOnLoad();
+
+  console.log("Tee Sheet Editor initialized.");
+});
+
+</script>
+</body>
+</html>

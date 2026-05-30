@@ -1,0 +1,256 @@
+Load Tee_Sheet table narrative....
+
+ WITH next_play_date AS (
+        SELECT MIN(schedule.date) AS play_date
+        FROM schedule
+        JOIN users ON users.id = schedule.user_id
+        WHERE schedule.is_playing = 1
+          AND schedule.date = date(datetime('now', '+44 hours'))
+      ),
+
+      member_players AS (
+        SELECT 
+	           np.play_date
+	         , users.league_id
+             , email
+             , subgroup 
+             , subgroup_number
+             , users.last_name
+             , users.first_name
+             , CASE WHEN users.is_member = 0 THEN ' *' ELSE '' END AS asterisk_suffix
+	         , users.id as sponsor_id
+        FROM schedule
+        JOIN users ON users.id = schedule.user_id
+        JOIN next_play_date np ON schedule.date = np.play_date
+        WHERE schedule.is_playing = 1
+      ),
+
+      guest_players AS (
+        SELECT
+            np.play_date
+          , users.league_id
+	      , CASE WHEN guest_email IS NULL THEN users.email ELSE guest_email END AS email
+          , subgroup 
+          , subgroup_number
+          , guest_last_name  as last_name
+          , guest_first_name as first_name
+	      , ' **' as asterisk_suffix
+	      , sponsor_user_id as sponsor_id
+        FROM guests
+        JOIN users ON users.id = guests.sponsor_user_id
+        JOIN next_play_date np
+        WHERE (
+	           guests.date1 = np.play_date OR
+               guests.date2 = np.play_date OR
+               guests.date3 = np.play_date OR
+               guests.date4 = np.play_date OR
+               guests.date5 = np.play_date 
+              )
+      )
+INSERT INTO work_tee_sheet (
+            play_date
+          , league_id
+	      , email
+          , subgroup 
+          , subgroup_number
+          , last_name
+          , first_name
+          , asterisk_suffix
+ 	      , sponsor_id
+)
+
+SELECT
+            play_date
+          , league_id
+	      , email
+          , subgroup 
+          , subgroup_number
+          , last_name
+          , first_name
+          , asterisk_suffix
+ 	      , sponsor_id
+FROM member_players
+UNION ALL
+SELECT
+            play_date
+          , league_id
+	      , email
+          , subgroup 
+          , subgroup_number
+          , last_name
+          , first_name
+          , asterisk_suffix
+ 	      , sponsor_id
+FROM guest_players;
+
+select count(*) from work_tee_sheet
+select * from work_tee_sheet
+
+select * from allocated_tee_times;
+delete from allocated_tee_times;
+
+select W1.first_name || ' ' || W1.last_name || " " || W1.asterisk_suffix
+          , W2.first_name || ' ' || W2.last_name || " " || W2.asterisk_suffix
+		  
+from work_tee_sheet W1 
+       , work_tee_sheet W2
+where W1.asterisk_suffix = "**"
+     and W2.play_date = W1.play_date
+     and W2.league_id = W1.league_id
+     and W2.sponsor_id = W1.sponsor_id
+	 
+select W1.first_name || ' ' || W1.last_name || " " || W1.asterisk_suffix as guest_name
+     , W2.first_name || ' ' || W2.1ast_name || " " || W2.asterisk_suffix as sponsor_name
+	 , W2.last_name
+	 , W2.first_name
+	 , W1.last_name
+	 , W1.first_name
+from work_tee_sheet W1 
+       , work_tee_sheet W2
+where W1.asterisk_suffix like "%**%"
+     and W2.sponsor_id = W1.sponsor_id
+	 and W2.play_date = W1.play_date
+	 and W1.first_name || ' ' || W1.last_name || " " || W1.asterisk_suffix <>
+	     W2.first_name || ' ' || W2.last_name || " " || W2.asterisk_suffix
+order by sponsor_id;
+-- 2 weeks ago a league admin signs up for tee times for the league and enters the info into league_tee_count table.
+-- 8pm a daily cron jub runs.  It populates table work_tee_sheet for two days hence ... or it is kicked off by
+-- a league admin for a specific non-past date and for the current league.
+-- Using queries below, load tee_sheet table (i.e. load a js array, then, when full, upsert each row of tee_sheet table)...
+-- D1 Delete/Clear Leagues-row array.
+-- Q1 query - result into "leagues-row" js array - select all distinct league_ids from the work_tee_sheet table for
+--    the selected play_date. Using queries below, bump through each league_id to populate the tee_sheet table for
+--    the league...  Of course, if the job is being run adhoc (league_id and play_date are passed on the route call),
+--    then skip this query.
+--FOR each leagues-row returned from Q1 query, do the following...
+-- Q1-js tee times count query - get total number of players for tee_date and league_id.  Divide by 4 and keep remainder.
+--    If remainder is zero, then tee count = quotient else tee_count = quotient + 1.  If total players = 5,
+--    then slot-count(1) = 2  and slot-count(2) = 3.  If total players > 5, then if remainder = 1
+--    then slot-count(1 2 3)= (3 3 3). if remainder = 2, then slot-count (1 2) = (3 3).
+--    if remainder = 3, then slot-count(1) = 3. All other slot-count values should be 4.
+-- Q2 tee times query - get tee_times - query the league_tee_count table returning tee-times for the
+--    current league and the selected play_date ordered by tee_time DESC (oldest tee time first).  
+--    If max tee_time_number > the number of tee times found in Q2, set a flag to indicate that the last tee time(s)
+--    are to be freed up (and/or simultaneously delete last row(s) of tee_time_count table for the league and play_date)
+--    Else if tee_time_number < the number of tee times found in Q2, display error indicating that league allocated 
+--    too few tee times for the play_date.  The number allocated = ? and the number of number of players for league_id
+--    and play_date is ?  Send an email to the league coordinator and all league admins with error.  move on to the 
+--    next league. 
+-- U1 Update work_tee_sheet table to reset subgroup to empty value when a player is the only player to have that subgroup
+--    for the selected play_date and current league .
+-- D1 Delete/clear independents js array.
+-- Q5 independents query - select all players from work_tee_sheet where subgroup =  "" for selected play_date AND
+--    for current league order by random() results to be auto stored into a js independents array.
+-- D2 Delete/clear guests js array.
+-- Q6 query - select guests from work_tee_sheet rows for selected play_date and current league_id 
+--    order by sponsor_id.  Populate guests array - put first sponsor_name into player1 column of last_row of tee_sheet.
+--    if next row of Q3 has same sponsor_id, add guest name data to last_name3 etc.
+--    if next row of Q2 has same aponsor_id, add guest name data to last_name4 etc.
+--    if 4th row of Q2 has same sponsor_id, move sponsor_id to last_name_1 of next-to-last row and guest_last_name
+--         to last_name1 of last_row.
+--  Q7 invoke only if sponsor plus guests count is less than the slots-count of the tee-time
+--    If sponsor plus guest count take up less than all player slots of a tee time, fill empty slots with members of 
+--    the same subgroup (or, if no subgroup, fill with independents (from the independents js array)
+--    query - select * from work_tee_sheet where play_date = selected play_date and league_id = current league id
+--    and subgroup = (sponsor's subgroup) 
+--   repeat Q5 and Q6 until no more guests.
+--  U2 - see update sql below that changes work_tee_sheet.subgroup = "" where subgroup > "" and where more than 4
+--       players for the current league and play_date have the same nonblank subgroup.  If 5 players have subgroup = "B",
+--       then the player with the highest subgroup_number will get his subgroup changed from "B" to "".  Because there
+--       can be 6 or more players with the same subgroup, this update sql should be run until no rows are updated.
+--  Q8 - select subgroup, count(*) from work_tee_sheet where play_date = selected play_date and league_id = 
+--       current league_id AND subgroup > "" group by subgroup having count(*) > 4.  load results into a subgroup array.
+--  Q8 - select * from work_tee_sheet where subgroup in 
+--  Q7 - select * from work_tee_sheet where play_date = selected play_date and league_id = current league_id AND
+--    subgroup > "" order by subgroup
+
+-- Q1 ------------------------------------------------------
+-- const league-rows = await dbAll(`
+ select league_id, count(*) as player_count
+   from work_tee_sheet
+  where play_date = "2026-04-29" --?` [date] 
+-- Q1-js ------------------------------------------------------
+-- Bump thru league-rows array one league at a time.
+--    If remainder is zero, then tee count = quotient else tee_count = quotient + 1.  If total players = 5,
+--    then slot-count(1) = 2  and slot-count(2) = 3.  If total players > 5, then if remainder = 1
+--    then slot-count(1 2 3)= (3 3 3). if remainder = 2, then slot-count (1 2) = (3 3)  
+   quotient = player_count / 4;
+   remainder = player_count % 4;
+   if (player_count < 5) {
+       tee-times-count = 1;
+	   slot-count (1) = player_count;
+	} else if (player_count < 5) {
+	   tee-times-count = 2;
+	   slot-count (1) = 2;
+	   slot-count (1) = 3;
+	} else if (remainder === 0) {
+       tee-times-count = quotient;
+	   for (let i = 1; i <= tee-times-count; i++) {
+           slot-count(i) = 4;
+       }
+	} else if (remainder === 1) {
+       tee-times-count = quotient + 1;
+       slot-count(1) = 3;
+	   slot-count(2) = 3;
+	   slot-count(3) = 3;
+	   if (tee-times-count > 3) {
+	      for (let i = 4; i < tee-times-count; i++) {
+		      slot-count(i) = 4;
+		  }
+	   }
+	} else if (remainder === 2) {
+       tee-times-count = quotient + 1;
+       slot-count(1) = 3;
+	   slot-count(2) = 3;
+	   if (tee-times-count > 2) {
+	      for (let i = 3; i < tee-times-count; i++) {
+		      slot-count(i) = 4;
+		  }
+	   }
+	} else if (remainder === 3) {
+       tee-times-count = quotient + 1;
+       slot-count(1) = 3;
+	   for (let i = 2; i < tee-times-count; i++) {
+		   slot-count(i) = 4;
+	   }
+	};
+-- Q1-js ------------------------------------------------------ 
+-- Q2 ------------------------------------------------------
+ select *
+   from allocated_tee_times
+  WHERE league_id = 1 -- ?
+    AND play_date = "2026-04-27" -- ?
+  order by tee_time_number desc
+-- Q2 js ------------------------------------------------------ 
+-- Q2 js ------------------------------------------------------ 
+-- U1 ------------------------------------------------------
+update work_tee_sheet
+   set subgroup = ""
+ where exists (select subgroup b
+                 from (select subgroup, count(*)
+				         from work_tee_sheet c
+						where league_id = 1 -- ?
+						  and play_date = "2026-04-24" -- ?
+						group by subgroup
+					   having count(*) = 1))
+-- U1 --------------------------------------------------------
+-- U2 ------------------------------------------------------
+update work_tee_sheet
+   set subgroup = ""
+ where (subgroup || cast (subgroup_number as TEXT) in
+           (select b.subgroup || cast (max(b.subgroup_number) as TEXT)
+		      from work_tee_sheet b
+			 where b.league_id = 1 -- ?
+			   and b.play_date = "2026-04-24" -- ?
+			   and b.subgroup in
+			       (select subgroup c
+				      from (select d.subgroup, count(*)   
+			                  from work_tee_sheet d
+			                 where d.league_id = 1 -- ?
+			                   and d.play_date = "2026-04-24" -- ?
+		                  group by d.subgroup
+			                having count(*) > 4)
+					) 
+				group by b.subgroup
+			)					   
+-- U2 --------------------------------------------------------

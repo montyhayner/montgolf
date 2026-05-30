@@ -5,72 +5,73 @@
 <title>My Availability</title>
 
 <link rel="stylesheet" href="/css/navbar.css">
+<link rel="stylesheet" href="/css/common.css">
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
-  }
-
-  h1 {
-    margin-bottom: 8px;
-  }
-
-  /* Status Banner */
-  .status-banner {
-    padding: 6px 10px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    font-size: 14px;
+  /* Page Header */
+  #pageHeader {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 22px;
     font-weight: bold;
-    display: none;
+    color: #333;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
   }
 
-  .status-saved { background: #d4edda; color: #155724; }
+  /* Status Banner (colors only — base lives in common.css) */
+  .status-saved   { background: #d4edda; color: #155724; }
   .status-default { background: #fff3cd; color: #856404; }
 
   /* Toolbar */
+  #availabilityToolbarWrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 32px;
+    margin-bottom: 36px;
+  }
+
+  #weeklyHeader {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 12px
+  }
+
+  #monthlyHeader {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 12px
+  }
+
   #availabilityToolbar {
     display: flex;
-    gap: 10px;
-    margin: 10px 0;
-    padding: 8px 10px;
-    background: #f8f9fb;
-    border: 1px solid #c7c7c7;
-    border-radius: 8px;
+    gap: 12px;
     align-items: center;
   }
 
-  #availabilityToolbar button {
-    padding: 6px 14px;
-    font-size: 14px;
-    border-radius: 6px;
-    border: 1px solid #c7c7c7;
-    background: #ffffff;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  /* Save button (unique blue background) */
+  #saveAvailabilityBtn {
+    padding: 8px 22px;
+    background: #007bff;
+    color: white;
+    font-size: 15px;
   }
 
-  #availabilityToolbar button:hover:not(:disabled) {
-    background: #d5e6ff;
-    border-color: #2b7cff;
+  #saveAvailabilityBtn:hover:not(:disabled) {
+    background: #0056b3;
+    border-color: #003f7f;
   }
 
-  #availabilityToolbar button:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  #unsavedIndicator {
-    color: #d9534f;
-    font-weight: bold;
-    display: none;
-    margin-left: auto;
-  }
-
-  /* Play Days */
+  /* Weekly Play Days */
   #playDaysContainer {
     margin-top: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: center;   /* centers the row */
+    gap: 10px;  
   }
 
   .day-toggle {
@@ -90,103 +91,150 @@
     border-color: #4caf50;
   }
 
-  /* Play Months */
-  #playMonthsContainer {
-    margin-top: 20px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+  .day-toggle.disabled-dow {
+    background: #eee;
+    color: #999;
+    border: 1px solid #ccc;
+    cursor: not-allowed;
   }
 
-  .month-toggle {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    cursor: pointer;
-    text-align: center;
-    background: #f8f8f8;
+  .day-toggle.disabled-dow:hover {
+    background: #e8e8e8;
   }
+
+  /* Monthly Play Months */
+#playMonthsContainer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;   /* center the whole row */
+  gap: 10px;                 /* spacing between buttons */
+  flex-wrap: nowrap;         /* keep all 12 on one line */
+}
+
+.month-toggle {
+  padding: 10px 16px;        /* same as day-of-week buttons */
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  min-width: 55px;           /* keeps them consistent */
+}
 
   .month-toggle.out {
-  background: #D21F3C;   /* Indian Red */
-  color: white;
-  border-color: #cc00cc;
+    background: #D21F3C;
+    color: white;
+    border-color: #cc00cc;
   }
 
   .month-toggle.in {
-  background: #228b22;   /*Bright Green */
-  color: white;
-  border-color: #28a428;
-
+    background: #228b22;
+    color: white;
+    border-color: #28a428;
   }
-</style>
-</head>
+
+.month-toggle:hover {
+  filter: brightness(1.1);
+}
+
+
+@media (max-width: 600px) {
+  .month-toggle {
+    aspect-ratio: 1 / 1;      /* perfect squares on phones */
+  }
+}
+
+</style></head>
 
 <body>
 
 <!-- Shared Nav Bar -->
-<div id="navContainer"></div>
+<div id="user-nav-container"></div>
 
-<h1>
-  My Schedule
-  <span id="leagueNameHeader"></span>
-  <span id="userNameHeader"></span>
-</h1>
+<h1 id="pageHeader"></h1>
 
 <div id="statusBanner" class="status-banner"></div>
 
 <!-- Toolbar -->
-
-<div id="availabilityToolbar">
-  <h1>My Availability <span id="leagueNameHeader"></span></h1>
-  <button id="defaultBtn">Default</button>
-  <button id="saveBtn" disabled>Save</button>
-  <button id="revertBtn">Revert</button>
-  <div id="unsavedIndicator">• Unsaved changes</div>
+<div id="availabilityToolbarWrapper">
+  <div id="availabilityToolbar">
+    <button id="saveAvailabilityBtn" disabled>Save</button>
+     <span id="savingIndicator" style="display:none; margin-left:10px; font-size:14px; color:#555;">
+       Saving…
+     </span>
+    <button id="defaultAvailabilityBtn">Default</button>
+    <button id="revertAvailabilityBtn">Revert</button>
+    <div id="unsavedIndicator">• Unsaved changes</div>
+  </div>
 </div>
 
-<h2>Weekly Play Days</h2>
+<h2 id="weeklyHeader">Weekly Play Days</h2>
 <div id="playDaysContainer"></div>
 
-<h2>Monthly In-Town Status</h2>
+<h2 id="monthlyHeader">Monthly In-Town Status</h2>
 <div id="playMonthsContainer"></div>
 
 <script>
+
 let playDays = {};
 let playMonths = {};
 let savedPlayDays = {};
 let savedPlayMonths = {};
+let leaguePlayDays = [];
+let leaguePlayMonths = [];
 let unsavedChanges = false;
 
-// ---- Shared Nav Loader ----
-document.addEventListener("DOMContentLoaded", () => {
-  fetch("/partials/user-nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
+// ---- Shared Nav Loader + Highlight + Navigation Warning ----
+document.addEventListener("DOMContentLoaded", async () => {
 
-      // Highlight active link
-      const path = window.location.pathname;
-      document.querySelectorAll("#topNav .nav-link").forEach(link => {
-        if (link.getAttribute("href") === path) {
-          link.classList.add("active");
-        }
-      });
+  // Load user nav
+  const html = await fetch("/partials/user-nav.html").then(r => r.text());
+  document.getElementById("user-nav-container").innerHTML = html;
 
-      // Navigation warning
-      document.querySelectorAll("#topNav a").forEach(link => {
-        link.addEventListener("click", (e) => {
-          if (!unsavedChanges) return;
-          const leave = confirm("You have unsaved changes. Save before leaving?");
-          if (!leave) e.preventDefault();
-        });
-      });
+  // Highlight active link
+  const path = window.location.pathname;
+  document.querySelectorAll("#topNav .nav-link").forEach(link => {
+    if (link.getAttribute("href") === path) {
+      link.classList.add("active");
+    }
+  });
+
+  // Load user + league info and build header
+   const [userInfo, leagueInfo] = await Promise.all([
+     fetch("/user/info").then(r => r.json()),
+     fetch("/user/selected-league").then(r => r.json())
+  ]);
+  const user = userInfo.user;
+  const league = leagueInfo.league;
+  const userName = `${user.first_name} ${user.last_name}`;
+  const leagueName = league.league_name;
+  document.getElementById("pageHeader").textContent =
+  `My Availability – ${userName} – ${leagueName}`;
+
+  // Navigation warning for unsaved changes
+  document.querySelectorAll("#topNav a").forEach(link => {
+    link.addEventListener("click", (e) => {
+      if (!unsavedChanges) return;
+      const leave = confirm("You have unsaved changes. Save before leaving?");
+      if (!leave) e.preventDefault();
     });
+  });
 
+  // Initialize availability page AFTER nav loads
   initAvailabilityPage();
 });
 
 // ---- Helpers ----
+
+    function showSaving() {
+      document.getElementById("savingIndicator").style.display = "inline";
+    }
+
+    function hideSaving() {
+      document.getElementById("savingIndicator").style.display = "none";
+    }
 
 function markUnsaved() {
   unsavedChanges = true;
@@ -195,12 +243,20 @@ function markUnsaved() {
 }
 
 function updateSaveButtonState() {
-  document.getElementById("saveBtn").disabled = !unsavedChanges;
+  document.getElementById("saveAvailabilityBtn").disabled = !unsavedChanges;
 }
 
 function updateUnsavedIndicator() {
   document.getElementById("unsavedIndicator").style.display =
     unsavedChanges ? "block" : "none";
+}
+
+function normalizePlayMonths(obj) {
+  const normalized = {};
+  for (let m = 1; m <= 12; m++) {
+    normalized[m] = !!obj[m];
+  }
+  return normalized;
 }
 
 function updateStatusBanner(type) {
@@ -222,13 +278,15 @@ function updateStatusBanner(type) {
 }
 
 // ---- Load Availability ----
-
 async function initAvailabilityPage() {
   const res = await fetch("/user/availability");
   const data = await res.json();
 
+  leaguePlayDays = data.leaguePlayDays;     // <-- ADD THIS
+  leaguePlayMonths = data.leaguePlayMonths; // <-- ADD THIS
+
   playDays = data.playDays;
-  playMonths = data.playMonths;
+  playMonths = normalizePlayMonths(data.playMonths);
 
   savedPlayDays = JSON.parse(JSON.stringify(playDays));
   savedPlayMonths = JSON.parse(JSON.stringify(playMonths));
@@ -252,11 +310,30 @@ function renderPlayDays() {
   names.forEach((name, dow) => {
     const div = document.createElement("div");
     div.className = "day-toggle";
+
     if (playDays[dow]) div.classList.add("active");
+
+    // If this DOW is invalid for the league
+    if (!leaguePlayDays.includes(dow)) {
+      div.classList.add("disabled-dow");
+      div.setAttribute("data-tooltip", "League does not play on this day");
+    }
 
     div.textContent = name;
 
     div.addEventListener("click", () => {
+
+      // Always remove invalid red border on click
+      div.classList.remove("invalid-dow");
+
+      // If disabled, shake and exit
+      if (div.classList.contains("disabled-dow")) {
+        div.classList.add("shake");
+        setTimeout(() => div.classList.remove("shake"), 250);
+        return;
+      }
+
+      // Normal toggle logic
       playDays[dow] = !playDays[dow];
       div.classList.toggle("active");
       markUnsaved();
@@ -295,26 +372,46 @@ function renderPlayMonths() {
 }
 
 // ---- Buttons ----
+// --- SAVE ---
+document.getElementById("saveAvailabilityBtn").addEventListener("click", async () => {
+  showSaving();
 
-// SAVE
-document.getElementById("saveBtn").addEventListener("click", () => {
-  fetch("/user/availability", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playDays, playMonths })
-  })
-  .then(() => {
+  // ⭐ Force browser to repaint before fetch begins
+  await new Promise(requestAnimationFrame);
+
+  try {
+    const res = await fetch("/user/availability", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playDays, playMonths })
+    });
+
+    const data = await res.json();
+
+    // ❗ Backend rejected invalid DOW
+    if (!res.ok || data.error) {
+      updateStatusBanner("error", data.error || "Unable to save availability.");
+      return;
+    }
+
+    // ✔ SUCCESS
     savedPlayDays = JSON.parse(JSON.stringify(playDays));
     savedPlayMonths = JSON.parse(JSON.stringify(playMonths));
     unsavedChanges = false;
     updateSaveButtonState();
     updateUnsavedIndicator();
     updateStatusBanner("saved");
-  });
+
+  } catch (err) {
+    console.error("Save availability failed:", err);
+    updateStatusBanner("error", "Network or server error.");
+  } finally {
+    hideSaving();
+  }
 });
 
 // DEFAULT
-document.getElementById("defaultBtn").addEventListener("click", () => {
+document.getElementById("defaultAvailabilityBtn").addEventListener("click", () => {
   fetch("/user/availability/default", { method: "POST" })
     .then(res => res.json())
     .then(data => {
@@ -328,7 +425,7 @@ document.getElementById("defaultBtn").addEventListener("click", () => {
 });
 
 // REVERT
-document.getElementById("revertBtn").addEventListener("click", () => {
+document.getElementById("revertAvailabilityBtn").addEventListener("click", () => {
   playDays = JSON.parse(JSON.stringify(savedPlayDays));
   playMonths = JSON.parse(JSON.stringify(savedPlayMonths));
   renderPlayDays();
@@ -337,35 +434,6 @@ document.getElementById("revertBtn").addEventListener("click", () => {
   updateSaveButtonState();
   updateUnsavedIndicator();
   updateStatusBanner("saved");
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Load nav bar
-  fetch("/partials/user-nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
-    });
-
-  // Load league name for page header
-  fetch("/user/selected-league")
-    .then(r => r.json())
-    .then(data => {
-      if (data.league) {
-        document.getElementById("leagueNameHeader").textContent =
-          "— " + data.league.league_name;
-      }
-    });
-
-  // Load user name for page header
-  fetch("/user/info")
-    .then(r => r.json())
-    .then(data => {
-      if (data.user) {
-        document.getElementById("userNameHeader").textContent =
-          " — " + data.user.first_name + " " + data.user.last_name;
-      }
-    });
 });
 
 // ---- Leave Page Warning ----

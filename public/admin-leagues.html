@@ -1,262 +1,685 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Admin — Manage Leagues</title>
-<link rel="stylesheet" href="/css/navbar.css">
+    <meta charset="UTF-8">
+    <title>Manage Leagues</title>
+    <link rel="stylesheet" href="/css/admin-nav.css">
+    <link rel="stylesheet" href="/css/admin-identity.css">
 
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background: #f5f7fa;
-  }
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
 
-  .content {
-    max-width: 900px;
-    margin: 60px auto;
-    padding: 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  }
+        .container h1 {
+            text-align: center;
+        }
 
-  h1 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 28px;
-  }
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
 
-  .toolbar {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
+        .create-league-container {
+            text-align: center;
+            margin: 20px 0;   /* optional but looks cleaner */
+        }
 
-  .toolbar button {
-    padding: 10px 16px;
-    background: #0275d8;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 15px;
-  }
+        #league-table tbody tr:hover {
+            background: #f2f7ff;
+            cursor: pointer;
+        }
 
-  .toolbar button:hover {
-    background: #025bb5;
-  }
+       #league-table td button {
+           display: inline-block;
+           margin-right: 6px;
+           vertical-align: middle;
+       }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-  }
+       #league-table td:last-child {
+           white-space: nowrap;
+       }
 
-  th, td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-    text-align: left;
-  }
+       .field-error {
+           color: red;
+           font-size: 12px;
+           margin-top: -6px;
+           margin-bottom: 8px;
+           display: none; /* hidden until JS shows it */
+       }
 
-  th {
-    background: #f0f2f5;
-  }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
 
-  tr:hover {
-    background: #f9fbfd;
-  }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
 
-  .action-btn {
-    margin-right: 8px;
-    padding: 6px 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-  }
+        th {
+            background: #f0f0f0;
+        }
 
-  .edit-btn {
-    background: #5cb85c;
-    color: white;
-  }
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            cursor: pointer;
+        }
 
-  .delete-btn {
-    background: #d9534f;
-    color: white;
-  }
+        .btn-danger {
+            background: #e74c3c;
+        }
 
-  /* Modal */
-  .modal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.4);
-    justify-content: center;
-    align-items: center;
-  }
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
 
-  .modal-content {
-    background: white;
-    padding: 20px;
-    width: 400px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  }
+        .modal {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 400px;
+        }
 
-  .modal-content h2 {
-    margin-top: 0;
-  }
-
-  .modal-content input {
-    width: 100%;
-    padding: 8px;
-    margin: 6px 0 12px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-  }
-
-  .modal-content button {
-    width: 100%;
-    padding: 10px;
-    background: #0275d8;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-
-  .modal-content button:hover {
-    background: #025bb5;
-  }
-</style>
+        .modal input, .modal textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+    </style>
 </head>
 
 <body>
 
-<div id="navContainer"></div>
+    <link rel="stylesheet" href="/css/admin-nav.css">
+    <link rel="stylesheet" href="/css/admin-identity.css">
 
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  fetch("/admin/partials/nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
-    });
+    <div id="admin-nav-container"></div>
+    <div id="admin-identity-container"></div>
 
-  loadLeagues();
-});
+    <div class="container">
+        <h1>Manage Leagues</h1>
+        <div class="create-league-container">
+            <button class="btn" onclick="openCreateModal()">+ Create League</button>
+        </div>
+        <table id="league-table">
+            <thead>
+                <tr>
+                    <th>League Name</th>
+                    <th>Coordinator</th>
+                    <th>Email</th>
+                    <th>Description</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 
-function loadLeagues() {
-  fetch("/api/admin/leagues")
-    .then(r => r.json())
-    .then(data => {
-      const tbody = document.getElementById("leaguesTableBody");
-      tbody.innerHTML = "";
+<!-- Create League Modal -->
+<div class="modal-bg" id="create-modal">
+    <div class="modal">
+        <h2>Create League</h2>
 
-      data.leagues.forEach(l => {
-        const tr = document.createElement("tr");
+        <input id="league-league-name" placeholder="League Name">
+        <div id="league-league-name-error" class="field-error">League name is required.</div>
 
-        tr.innerHTML = `
-          <td>${l.league_name}</td>
-          <td>${l.description || ""}</td>
-          <td>
-            <button class="action-btn edit-btn" onclick="openEditLeague(${l.id})">Edit</button>
-            <button class="action-btn delete-btn" onclick="openDeleteLeague(${l.id})">Delete</button>
-          </td>
-        `;
+        <input id="league-first-name" placeholder="Coordinator First Name">
+        <div id="league-first-name-error" class="field-error">First name is required.</div>
 
-        tbody.appendChild(tr);
-      });
-    });
-}
+        <input id="league-last-name" placeholder="Coordinator Last Name">
+        <div id="league-last-name-error" class="field-error">Last name is required.</div>
 
-function openAddLeague() {
-  document.getElementById("addLeagueModal").style.display = "flex";
-}
+        <input id="league-email" placeholder="Coordinator Email">
+        <div id="league-email-error" class="field-error">Valid email is required.</div>
 
-function openEditLeague(id) {
-  fetch("/api/admin/league/" + id)
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById("editLeagueId").value = data.league.id;
-      document.getElementById("editLeagueName").value = data.league.league_name;
-      document.getElementById("editLeagueDescription").value = data.league.description || "";
-      document.getElementById("editLeagueModal").style.display = "flex";
-    });
-}
+        <textarea id="league-description" placeholder="Description"></textarea>
 
-function openDeleteLeague(id) {
-  document.getElementById("deleteLeagueId").value = id;
-  document.getElementById("deleteLeagueModal").style.display = "flex";
-}
-
-function closeModal(modalId) {
-  document.getElementById(modalId).style.display = "none";
-}
-</script>
-
-<div class="content">
-  <h1>Manage Leagues</h1>
-
-  <div class="toolbar">
-    <div></div>
-    <button onclick="openAddLeague()">Add League</button>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>League Name</th>
-        <th>Description</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody id="leaguesTableBody"></tbody>
-  </table>
-</div>
-
-<!-- Add League Modal -->
-<div id="addLeagueModal" class="modal">
-  <div class="modal-content">
-    <h2>Add League</h2>
-    <form method="POST" action="/admin/leagues/add">
-      <input type="text" name="league_name" placeholder="League Name" required>
-      <input type="text" name="description" placeholder="Description (optional)">
-      <button type="submit">Add League</button>
-    </form>
-    <button onclick="closeModal('addLeagueModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
-  </div>
+        <div class="modal-buttons">
+            <button class="btn" onclick="createLeague()">Create</button>
+            <button class="btn btn-danger" onclick="closeCreateModal()">Cancel</button>
+        </div>
+        <div id="league-debug" style="margin-top:10px; font-size:12px; color:#444;"></div>
+    </div>
 </div>
 
 <!-- Edit League Modal -->
-<div id="editLeagueModal" class="modal">
-  <div class="modal-content">
-    <h2>Edit League</h2>
-    <form method="POST" action="/admin/leagues/edit">
-      <input type="hidden" id="editLeagueId" name="id">
-      <input type="text" id="editLeagueName" name="league_name" required>
-      <input type="text" id="editLeagueDescription" name="description">
-      <button type="submit">Save Changes</button>
-    </form>
-    <button onclick="closeModal('editLeagueModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
-  </div>
+<div class="modal-bg" id="edit-modal">
+    <div class="modal">
+        <h2>Edit League</h2>
+
+        <input id="edit-league-name">
+        <div id="edit-league-name-error" class="field-error">League name is required.</div>
+
+        <input id="edit-first-name">
+        <div id="edit-first-name-error" class="field-error">First name is required.</div>
+
+        <input id="edit-last-name">
+        <div id="edit-last-name-error" class="field-error">Last name is required.</div>
+
+        <input id="edit-email">
+        <div id="edit-email-error" class="field-error">Valid email is required.</div>
+
+        <textarea id="edit-description" placeholder="Description"></textarea>
+
+        <div class="modal-buttons">
+            <button class="btn" onclick="saveLeagueEdits()">Save</button>
+            <button class="btn btn-danger" onclick="closeEditModal()">Cancel</button>
+        </div>
+
+        <div id="edit-saving-msg" style="margin-top:10px; display:none; color:#2a4a8a;">
+            Saving...
+        </div>
+        <div id="edit-debug" style="margin-top:10px; font-size:12px; color:#444;"></div>
+    </div>
 </div>
 
-<!-- Delete League Modal -->
-<div id="deleteLeagueModal" class="modal">
-  <div class="modal-content">
-    <h2>Delete League</h2>
-    <form method="POST" action="/admin/leagues/delete">
-      <input type="hidden" id="deleteLeagueId" name="id">
-      <p>Are you sure you want to delete this league?</p>
-      <button type="submit">Delete</button>
-    </form>
-    <button onclick="closeModal('deleteLeagueModal')" style="margin-top:10px;background:#ccc;color:black;">Cancel</button>
-  </div>
-</div>
+<script>
+async function loadAdminNav() {
+    const navContainer = document.getElementById("admin-nav-container");
+    const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+    const html = await res.text();
+
+    navContainer.innerHTML = html;   // ⭐ DOM is now updated
+
+    // Highlight current page
+    const path = window.location.pathname;
+
+    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href === path || (href !== "/" && path.startsWith(href))) {
+            link.classList.add("active");
+        }
+    });
+
+    return true;  // now safe
+}
+
+async function loadSession() {
+    const res = await fetch("/admin/session-info", { credentials: "include" });
+    const session = await res.json();
+
+    const navUser = document.getElementById("nav-user");
+    if (navUser) {
+        navUser.innerText = `${session.first_name} ${session.last_name}`;
+    }
+
+    if (session.is_super_admin) {
+        const leaguesLink = document.getElementById("nav-leagues-link");
+        if (leaguesLink) leaguesLink.style.display = "inline";
+
+        const changeLeague = document.getElementById("change-league");
+        if (changeLeague) changeLeague.style.display = "inline";
+    }
+
+    return session;
+}
+
+// --------------------------------------------------------------------------
+//   Populate Identity bar (icon + role + name + color)
+// --------------------------------------------------------------------------
+async function loadAdminIdentity(session) {
+    const container = document.getElementById("admin-identity-container");
+    if (!container) return;
+
+    const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+    container.innerHTML = html;
+
+    const bar = container.querySelector(".admin-identity");
+    const icon = container.querySelector("#identity-icon");
+    const role = container.querySelector("#identity-role");
+    const name = container.querySelector("#identity-name");
+    const leagueBadge = container.querySelector("#identity-league");
+
+    // Always show admin's name
+    name.innerText = `${session.first_name} ${session.last_name}`;
+
+    if (session.is_super_admin) {
+        // Super Admin styling
+        bar.classList.add("super-admin");
+        icon.innerText = "⭐";
+        role.innerText = "Super Admin";
+
+        // Show league with prefix
+        if (session.league_name) {
+            leagueBadge.innerText = `Current League: ${session.league_name}`;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+
+    } else {
+        // League Admin styling
+        bar.classList.add("league-admin");
+        icon.innerText = "🏌️";
+        role.innerText = "League Admin";
+
+        // Show league name without prefix
+        if (session.league_name) {
+            leagueBadge.innerText = session.league_name;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+    }
+}
+
+async function loadLeagues() {
+    const res = await fetch("/admin/leagues/api", { credentials: "include" });
+    const leagues = await res.json();
+
+    const tbody = document.querySelector("#league-table tbody");
+    tbody.innerHTML = "";
+
+    leagues.forEach(l => {
+        const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+        <td>${l.league_name}</td>
+        <td>${l.first_name} ${l.last_name}</td>
+        <td>${l.email}</td>
+        <td>${l.description}</td>
+        <td>
+            <button class="btn" onclick="openEditLeague(${l.id})">✏️ Edit</button>
+            <button class="btn btn-danger" onclick="confirmDeleteLeague(${l.id})">🗑️ Delete</button>
+        </td>
+`;
+
+        tbody.appendChild(tr);
+    });
+}
+
+function autoCapitalize(id) {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+        el.value = el.value.replace(/\b\w/g, c => c.toUpperCase());
+    });
+}
+
+function disableButton(btn, disabled) {
+    btn.disabled = disabled;
+    btn.style.opacity = disabled ? "0.6" : "1";
+    btn.style.pointerEvents = disabled ? "none" : "auto";
+}
+
+function attachLiveEmailValidation(id) {
+    const el = document.getElementById(id);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    el.addEventListener("input", () => {
+        if (emailRegex.test(el.value.trim())) {
+            el.style.borderColor = "#ccc";
+        } else {
+            el.style.borderColor = "red";
+        }
+    });
+}
+
+function debug(prefix, msg) {
+    const box = document.getElementById(`${prefix}-debug`);
+    if (box) {
+        box.innerHTML += msg + "<br>";
+    }
+}
+
+function showError(id, show, message) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (message !== undefined) {
+        el.textContent = message;
+    }
+
+    el.style.display = show ? "block" : "none";
+}
+
+function validateLeagueFields(prefix) {
+    const fields = [
+        { id: `${prefix}-league-name`, error: `${prefix}-league-name-error` },
+        { id: `${prefix}-first-name`, error: `${prefix}-first-name-error` },
+        { id: `${prefix}-last-name`, error: `${prefix}-last-name-error` },
+        { id: `${prefix}-email`, error: `${prefix}-email-error`, email: true }
+    ];
+
+    let valid = true;
+    let firstInvalid = null;
+
+    fields.forEach(f => {
+        const el = document.getElementById(f.id);
+        const errElId = f.error;
+
+        if (!el) return;
+
+        const val = el.value.trim();
+        let isValid = true;
+        let message = "";
+
+        // Required check
+        if (!val) {
+            isValid = false;
+            message = "This field is required.";
+        }
+
+        // Email format check
+        if (isValid && f.email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(val)) {
+                isValid = false;
+                message = "Invalid email address.";
+            }
+        }
+
+        // Show/hide error
+        showError(errElId, !isValid, message);
+
+        // Border styling
+        el.style.borderColor = isValid ? "#ccc" : "red";
+
+        if (!isValid) {
+            valid = false;
+            if (!firstInvalid) firstInvalid = el;
+        }
+    });
+
+    if (firstInvalid) firstInvalid.focus();
+
+    return valid;
+}
+
+function openCreateModal() {
+    // Reset field borders from any previous validation
+    ["league-league-name", "league-first-name", "league-last-name", "league-email", "league-description"]
+        .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.borderColor = "#ccc";
+        });
+
+    // Clear any previous values
+    document.getElementById("league-league-name").value = "";
+    document.getElementById("league-first-name").value = "";
+    document.getElementById("league-last-name").value = "";
+    document.getElementById("league-email").value = "";
+    document.getElementById("league-description").value = "";
+
+    // Show modal
+    document.getElementById("create-modal").style.display = "flex";
+
+    // Attach listeners so red borders clear when typing
+    attachFieldListeners("league");
+    attachLiveEmailValidation("league-email");
+    autoCapitalize("league-first-name");
+    autoCapitalize("league-last-name");
+
+    // Auto-focus the first field
+    document.getElementById("league-league-name").focus();
+}
+
+function closeCreateModal() {
+    document.getElementById("create-modal").style.display = "none";
+}
+
+function attachFieldListeners(prefix) {
+    ["league-name", "first-name", "last-name", "email"].forEach(id => {
+        const el = document.getElementById(`${prefix}-${id}`);
+        if (el) {
+            el.addEventListener("input", () => {
+                el.style.borderColor = "#ccc";
+            });
+        }
+    });
+}
+
+async function createLeague() {
+    if (!validateLeagueFields("league")) return;
+    const btn = document.querySelector("#create-modal .btn");
+    disableButton(btn, true);
+
+    // Validate first
+    if (!validateLeagueFields("league")) {
+        alert("Please correct the highlighted fields.");
+        disableButton(btn, false);   // ⭐ FIXED
+        return;
+    }
+
+    const league_name = document.getElementById("league-league-name").value.trim();
+    const first_name = document.getElementById("league-first-name").value.trim();
+    const last_name = document.getElementById("league-last-name").value.trim();
+    const email = document.getElementById("league-email").value.trim();
+    const description = document.getElementById("league-description").value.trim();
+
+    const res = await fetch("/admin/leagues/api", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            league_name,
+            first_name,
+            last_name,
+            email,
+            description
+        })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+        alert(data.error);
+        disableButton(btn, false); 
+        return;
+    }
+
+    closeCreateModal();
+    loadLeagues();
+
+    if (confirm("League created. Create coordinator as an admin user now?")) {
+        window.location.href = "/admin/golfers";
+    }
+
+    disableButton(btn, false);   // ⭐ Correct final re-enable
+}
+
+function resetEditModalErrors() {
+    const prefix = "edit";
+
+    const fields = [
+        `${prefix}-league-name`,
+        `${prefix}-first-name`,
+        `${prefix}-last-name`,
+        `${prefix}-email`
+    ];
+
+    const errors = [
+        `${prefix}-league-name-error`,
+        `${prefix}-first-name-error`,
+        `${prefix}-last-name-error`,
+        `${prefix}-email-error`
+    ];
+
+    // Reset borders
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.borderColor = "#ccc";   // default border
+            el.classList.remove("error");    // if you ever use .error
+        }
+    });
+
+    // Hide error messages
+    errors.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = "none";
+        }
+    });
+
+    // Clear debug box if present
+    const dbg = document.getElementById("edit-debug");
+    if (dbg) dbg.innerHTML = "";
+}
+
+function openEditLeague(id) {
+    resetEditModalErrors(); 
+    fetch(`/admin/leagues/api/${id}`, { credentials: "include" })
+        .then(r => r.json())
+        .then(l => {
+            document.getElementById("edit-league-name").value = l.league_name;
+            document.getElementById("edit-first-name").value = l.first_name;
+            document.getElementById("edit-last-name").value = l.last_name;
+            document.getElementById("edit-email").value = l.email;
+            document.getElementById("edit-description").value = l.description || "";
+            document.getElementById("edit-modal").dataset.id = id;
+
+            // ✔ Show modal
+            document.getElementById("edit-modal").style.display = "flex";
+
+            // ✔ Attach listeners AFTER the modal is visible and fields exist
+            attachFieldListeners("edit");
+            attachLiveEmailValidation("edit-email");
+            autoCapitalize("edit-first-name");
+            autoCapitalize("edit-last-name");
+
+            // ✔ Focus first field
+            document.getElementById("edit-league-name").focus();
+        });
+}
+
+function closeEditModal() {
+    document.getElementById("edit-modal").style.display = "none";
+}
+
+async function saveLeagueEdits() {
+    if (!validateLeagueFields("edit")) return;
+    const btn = document.querySelector("#edit-modal .btn");
+    disableButton(btn, true);
+
+    if (!validateLeagueFields("edit")) {
+        disableButton(btn, false);
+        return;
+    }
+
+    const id = document.getElementById("edit-modal").dataset.id;
+    const league_name = document.getElementById("edit-league-name").value.trim();
+    const first_name = document.getElementById("edit-first-name").value.trim();
+    const last_name = document.getElementById("edit-last-name").value.trim();
+    const email = document.getElementById("edit-email").value.trim();
+    const description = document.getElementById("edit-description").value.trim();
+
+    // Show "Saving..."
+    document.getElementById("edit-saving-msg").style.display = "block";
+
+    const res = await fetch(`/admin/leagues/api/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ league_name, first_name, last_name, email, description })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("edit-saving-msg").style.display = "none";
+
+    if (data.error) {
+        alert(data.error);
+        disableButton(btn, false); 
+        return;
+    }
+
+    closeEditModal();
+    loadLeagues();
+
+    disableButton(btn, false);    
+}
+
+async function deleteLeague(id) {
+    if (!confirm("Are you sure you want to delete this league?")) return;
+
+    const res = await fetch(`/admin/leagues/api/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+        alert(data.error);
+        return;
+    }
+
+    loadLeagues();
+}
+
+function confirmDeleteLeague(id) {
+    if (!confirm("Are you sure you want to delete this league? This cannot be undone.")) {
+        return;
+    }
+    deleteLeague(id);
+}
+
+async function initPage() {
+    try {
+        await loadAdminNav();          // nav loads first
+        const session = await loadSession();  // nav-user now exists
+        await loadAdminIdentity(session);
+        await loadLeagues();
+    } catch (err) {
+        console.error("Page initialization error:", err);
+    }
+}
+
+initPage();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const current = window.location.pathname;
+  const links = document.querySelectorAll(".nav-links a");
+
+  links.forEach(link => {
+    if (link.getAttribute("href") === current) {
+      link.classList.add("active");
+    }
+  });
+});
+
+// Global listener for ESC (triggers Cancel) and ENTER (triggers Save)
+// Must run after initPage()
+document.addEventListener("keydown", function (e) {
+    const createModal = document.getElementById("create-modal");
+    const editModal = document.getElementById("edit-modal");
+
+    // ESC closes whichever modal is open
+    if (e.key === "Escape") {
+        if (createModal.style.display === "flex") closeCreateModal();
+        if (editModal.style.display === "flex") closeEditModal();
+    }
+
+    // ENTER triggers save
+    if (e.key === "Enter") {
+        if (createModal.style.display === "flex") createLeague();
+        if (editModal.style.display === "flex") saveLeagueEdits();
+    }
+});
+
+</script>
 
 </body>
 </html>

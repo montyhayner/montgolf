@@ -4,19 +4,12 @@
 <meta charset="UTF-8">
 <title>Admin Login</title>
 
-<link rel="stylesheet" href="/css/navbar.css">
+<link rel="stylesheet" href="/css/admin.css">
 
 <style>
   body {
     font-family: Arial, sans-serif;
     padding: 20px;
-  }
-
-  /* Hide nav links on admin login page */
-  #topNav .nav-link[href="/schedule"],
-  #topNav .nav-link[href="/my-availability"],
-  #topNav .nav-link[href="/logout"] {
-    display: none;
   }
 
   .login-box {
@@ -42,17 +35,6 @@
     border-radius: 6px;
   }
 
-  .toggle-container {
-    display: flex;
-    align-items: center;
-    margin-top: -8px;
-    margin-bottom: 12px;
-  }
-
-  .toggle-container input {
-    margin-right: 6px;
-  }
-
   button {
     width: 100%;
     padding: 10px;
@@ -68,10 +50,11 @@
     background: #025bb5;
   }
 
-  .error {
+  .error-box {
     color: #d9534f;
     margin-bottom: 10px;
     text-align: center;
+    display: none; /* hidden by default */
   }
 
   .forgot-link {
@@ -88,48 +71,30 @@
 
 <body>
 
-<div id="navContainer"></div>
+<!-- CORRECT NAV BAR CONTAINER -->
+<div id="admin-login-nav"></div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  // Load shared nav bar
-  fetch("/partials/user-nav")
+  fetch("partials/admin-login-nav.html")
     .then(res => res.text())
     .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
+      document.getElementById("admin-login-nav").innerHTML = html;
     });
-
-  const params = new URLSearchParams(window.location.search);
-
-  // Restore email
-  const emailField = document.querySelector('input[name="email"]');
-  if (emailField && params.get("email")) {
-    emailField.value = params.get("email");
-  }
-
-  // Show error
-  if (params.get("error")) {
-    document.getElementById("errorMessage").textContent =
-      "Invalid Email or Password";
-  }
-});
 </script>
 
 <div class="login-box">
   <h1>Admin Login</h1>
 
-  <div id="errorMessage" class="error"></div>
+  <!-- ERROR BOX -->
+  <div id="errorBox" class="error-box">
+    Invalid Email or Password.
+  </div>
 
-  <form method="POST" action="/auth/admin-login">
+  <form method="POST" action="/admin-login">
     <input type="text" name="email" placeholder="Admin Email" autocomplete="email" required>
 
     <input id="passwordField" type="password" name="password"
            placeholder="Password" autocomplete="current-password" required>
-
-    <div class="toggle-container">
-      <input type="checkbox" id="showPasswordToggle">
-      <label for="showPasswordToggle">Show Password</label>
-    </div>
 
     <button type="submit">Log In</button>
   </form>
@@ -140,11 +105,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </div>
 
 <script>
-// Show/Hide password toggle
-document.getElementById("showPasswordToggle").addEventListener("change", function () {
-  const field = document.getElementById("passwordField");
-  field.type = this.checked ? "text" : "password";
-});
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("error") === "1") {
+      document.getElementById("errorBox").style.display = "block";
+  }
 </script>
 
 </body>

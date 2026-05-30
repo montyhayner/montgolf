@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Guests</title>
+  <link rel="stylesheet" href="/css/navbar.css">
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/guests.css" />
+</head>
+
+<body>
+
+  <!-- USER NAV -->
+  <div id="userNav"></div>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const nav = await fetch("/partials/user-nav.html");
+      document.getElementById("userNav").innerHTML = await nav.text();
+    });
+  </script>
+
+  <div class="page-container">
+
+    <h1>My Guests</h1>
+
+    <button class="primary-btn" onclick="openGuestModal()">Add Guest</button>
+
+    <table id="guestTable" class="data-table">
+      <thead>
+        <tr>
+          <th>Last</th>
+          <th>First</th>
+          <th>Email</th>
+          <th>Date 1</th>
+          <th>Date 2</th>
+          <th>Date 3</th>
+          <th>Date 4</th>
+          <th>Date 5</th>
+          <th style="width: 120px;"></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+  </div>
+
+  <!-- MODAL -->
+  <div id="guestModal" class="modal">
+    <div class="modal-content">
+
+      <h2 id="guestModalTitle">Add Guest</h2>
+
+      <div class="form-row">
+        <label for="guest_first_name">First Name:</label>
+        <input id="guest_first_name" type="text">
+      </div>
+
+      <div class="form-row">
+        <label for="guest_last_name">Last Name:</label>
+        <input id="guest_last_name" type="text">
+     </div>
+
+      <div class="form-row">
+        <label for="guest_email">Email:</label>
+        <input id="guest_email" type="email">
+      </div>
+
+      <div class="form-row">
+        <label for="date1">Date 1:</label>
+        <input id="date1" type="date">
+      </div>
+
+      <div class="form-row">
+        <label for="date2">Date 2:</label>
+        <input id="date2" type="date">
+      </div>
+
+      <div class="form-row">
+        <label for="date3">Date 3:</label>
+        <input id="date3" type="date">
+      </div>
+
+      <div class="form-row">
+        <label for="date4">Date 4:</label>
+        <input id="date4" type="date">
+      </div>
+
+      <div class="form-row">
+        <label for="date5">Date 5:</label>
+        <input id="date5" type="date">
+      </div>
+
+      <div class="modal-buttons">
+        <button class="primary-btn" onclick="saveGuest()">Save</button>
+        <button class="secondary-btn" onclick="closeGuestModal()">Cancel</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/js/guestsjs.js"></script>
+
+</body>
+</html>

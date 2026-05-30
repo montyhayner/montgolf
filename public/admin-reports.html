@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Reports</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="/css/admin.css">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    h1 {
+      margin-bottom: 25px;
+      font-size: 28px;
+      color: #333;
+    }
+
+    .section {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 25px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    select, input[type="date"] {
+      padding: 8px;
+      width: 250px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 18px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      background: #005fa3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+
+    #resultsSection {
+      display: none;
+    }
+
+    #exportBtn {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Admin Navigation -->
+  <div id="adminNav"></div>
+
+  <div class="container">
+    <h1>Admin Reports</h1>
+
+    <!-- Report Selector -->
+    <div class="section">
+      <label for="reportType">Select Report</label>
+      <select id="reportType">
+        <option value="">-- Choose a report --</option>
+        <option value="nextTwoWeeks">Available Next Two Weeks</option>
+        <option value="specificDate">Available on Specific Date</option>
+      </select>
+
+      <!-- League Selector -->
+      <div id="leagueSection" style="display:none;">
+        <label for="leagueSelect">League</label>
+        <select id="leagueSelect"></select>
+      </div>
+
+      <!-- Date Picker -->
+      <div id="dateSection" style="display:none;">
+        <label for="dateInput">Date</label>
+        <input type="date" id="dateInput">
+      </div>
+
+      <button id="runReportBtn" style="display:none;">Run Report</button>
+    </div>
+
+    <!-- Results -->
+    <div id="resultsSection" class="section">
+      <h2>Results</h2>
+      <table id="resultsTable"></table>
+      <button id="exportBtn">Export CSV</button>
+    </div>
+
+  </div>
+
+  <script src="/js/admin-reports.js"></script>
+
+  <script>
+    // Load admin navigation partial
+    fetch("/partials/admin/admin-nav")
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById("adminNav").innerHTML = html;
+      });
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const current = window.location.pathname;
+        const links = document.querySelectorAll(".nav-links a");
+
+        links.forEach(link => {
+          if (link.getAttribute("href") === current) {
+            link.classList.add("active");
+          }
+        });
+      });
+
+  </script>
+
+</body>
+</html>

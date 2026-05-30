@@ -42,6 +42,17 @@
     border-radius: 6px;
   }
 
+#errorMessage {
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#errorMessage.show {
+  display: block;
+  opacity: 1;
+}
+
   button {
     width: 100%;
     padding: 10px;
@@ -62,6 +73,18 @@
     margin-bottom: 10px;
     text-align: center;
   }
+
+  #errorMessage {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  #errorMessage.show {
+    display: block;
+    opacity: 1;
+  }
+
 </style>
 </head>
 
@@ -71,26 +94,29 @@
 <div id="navContainer"></div>
 
 <script>
-// Load shared nav bar + handle login errors
 document.addEventListener("DOMContentLoaded", () => {
-  fetch("/partials/login-nav")
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("navContainer").innerHTML = html;
-    });
+  // Load shared nav bar
+    fetch("/partials/login-nav.html")
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById("navContainer").innerHTML = html;
+      });
 
   const params = new URLSearchParams(window.location.search);
+  const email = params.get("email");
+  const error = params.get("error");
 
-  // Restore email
-  const emailField = document.querySelector('input[name="email"]');
-  if (emailField && params.get("email")) {
-    emailField.value = params.get("email");
+  // Restore email field
+  if (email) {
+    const emailField = document.querySelector('input[name="email"]');
+    if (emailField) emailField.value = decodeURIComponent(email);
   }
 
   // Show error message
-  if (params.get("error")) {
-    document.getElementById("errorMessage").textContent =
-      "Invalid Email or Password";
+  if (error) {
+    const box = document.getElementById("errorMessage");
+    box.textContent = "Invalid email or password";
+    box.classList.add("show");
   }
 });
 </script>

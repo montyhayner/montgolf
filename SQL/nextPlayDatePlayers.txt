@@ -1,0 +1,59 @@
+SELECT (users.first_name || " " || users.last_name) ||
+       (CASE WHEN is_member = 0 THEN " *" ELSE "" END) as player
+	 ,(users.last_name || " " || users.first_name) AS last_name_first
+  FROM schedule, users
+ WHERE users.league_id = 1
+   AND schedule.user_id = users.id
+   AND schedule.is_playing
+   AND schedule.date = 
+   (SELECT min(schedule.date)
+      FROM schedule, users
+     WHERE users.league_id = 1
+	   AND schedule.is_playing = 1
+	   AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours"))
+	)
+ UNION
+ SELECT (guest_first_name || " " || guest_last_name) || 
+        " *" AS player
+	 ,(guest_last_name || " " || guest_first_name) AS last_name_first
+  FROM guests, users
+ WHERE users.league_id = 1
+   AND guests.sponsor_user_id = users.id
+   AND (guests.date1 in 
+       (SELECT strftime("%Y-%m-%d", (min(schedule.date)))
+          FROM schedule, users
+         WHERE users.league_id = 1
+	       AND schedule.is_playing = 1
+	       AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours")))
+	OR guests.date2 in 
+       (SELECT strftime("%Y-%m-%d", (min(schedule.date)))
+          FROM schedule, users
+         WHERE users.league_id = 1
+	       AND schedule.is_playing = 1
+	       AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours")))
+	OR guests.date3 in 
+       (SELECT strftime("%Y-%m-%d", (min(schedule.date)))
+          FROM schedule, users
+         WHERE users.league_id = 1
+	       AND schedule.is_playing = 1
+	       AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours")))
+	OR guests.date4 in 
+       (SELECT strftime("%Y-%m-%d", (min(schedule.date)))
+          FROM schedule, users
+         WHERE users.league_id = 1
+	       AND schedule.is_playing = 1
+	       AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours")))
+	OR guests.date5 in 
+       (SELECT strftime("%Y-%m-%d", (min(schedule.date)))
+          FROM schedule, users
+         WHERE users.league_id = 1
+	       AND schedule.is_playing = 1
+	       AND schedule.date BETWEEN date(datetime("now", "+8 hours")) 
+		                     AND date(datetime("now", "+152 hours")))
+	)
+ORDER BY last_name_first

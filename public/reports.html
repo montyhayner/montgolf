@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reports</title>
+  <link rel="stylesheet" href="/css/navbar.css">
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/reports.css" />
+</head>
+
+<body>
+
+<!-- Shared Nav Bar -->
+<div id="user-nav-container"></div>
+
+<h1 id="pageHeader">Reports</h1>
+
+<div id="reportsLayout">
+
+  <!-- LEFT COLUMN -->
+  <div id="reportsLeft">
+
+    <h2>Next Play Day Report</h2>
+
+    <!-- Report Selector -->
+    <div id="reportSelector">
+      <label for="reportType">Choose Report:</label>
+      <select id="reportType">
+        <option value="nextPlayDay">Players for Next League Play Day</option>
+      </select>
+    </div>
+
+    <!-- Action Buttons -->
+    <div id="reportActions">
+      <button id="printReportBtn">Print</button>
+      <button id="emailReportBtn">Email Report</button>
+    </div>
+
+    <!-- Admin-only: User Recipient Picker -->
+    <div id="recipientPickerContainer" style="display:none; margin-top:20px;">
+      <h3>Select Recipients</h3>
+
+    <div id="recipientMode" style="margin-top:10px; margin-bottom:10px;">
+      <strong>Apply selections to:</strong><br>
+
+      <label>
+        <input type="radio" name="recipientMode" value="extraRecipients" checked>
+        TO
+      </label>
+
+      <label style="margin-left:15px;">
+        <input type="radio" name="recipientMode" value="ccRecipients">
+        CC
+      </label>
+
+      <label style="margin-left:15px;">
+        <input type="radio" name="recipientMode" value="bccRecipients">
+        BCC
+      </label>
+    </div>
+
+      <label style="font-weight:bold;">
+        <input type="checkbox" id="selectAllRecipients">
+        Select All Users
+      </label>
+
+      <div id="recipientPicker" class="recipient-list" style="margin-top:10px;">
+        <!-- JS will populate checkboxes here -->
+      </div>
+    </div>
+
+    <!-- Admin-only extra recipients -->
+    <div id="extraRecipientsContainer" style="display:none; margin-top:15px;">
+      <label for="extraRecipients">Additional Recipients (comma-separated):</label>
+      <input id="extraRecipients" type="text" class="extra-input"
+             placeholder="email1@example.com, email2@example.com">
+    </div>
+
+    <!-- CC/BCC -->
+    <div id="ccBccContainer" style="margin-top:15px;">
+      <label>CC:</label>
+      <input id="ccRecipients" type="text" placeholder="comma-separated emails">
+
+      <label>BCC:</label>
+      <input id="bccRecipients" type="text" placeholder="comma-separated emails">
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div id="reportsRight">
+    <pre id="reportOutput" class="report-box"></pre>
+  </div>
+
+</div>
+
+
+<script src="/js/reportsjs.js"></script>
+
+</body>

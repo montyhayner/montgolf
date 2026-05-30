@@ -140,7 +140,7 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  fetch("/partials/admin-nav")
+  fetch("/partials/admin/admin-nav")
     .then(res => res.text())
     .then(html => {
       document.getElementById("navContainer").innerHTML = html;

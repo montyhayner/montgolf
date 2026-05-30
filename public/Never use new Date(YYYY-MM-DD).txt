@@ -1,0 +1,12 @@
+Never use new Date("YYYY-MM-DD")
+
+always parse manually:
+const [y, m, d] = date.split("-")
+const dow = new Date(y, m - 1, d)getDay();
+
+
+
+    <div class="toggle-container">
+      <input type="checkbox" id="showPasswordToggle">
+      <label for="showPasswordToggle">Show Password</label>
+    </div>	

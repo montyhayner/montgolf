@@ -1,133 +1,348 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Admin Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background: #f5f5f5;
-    }
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/admin-nav.css">
+    <link rel="stylesheet" href="/css/admin-identity.css">
 
-    /* NAV BAR */
-    .admin-nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #222;
-      padding: 12px 20px;
-      border-radius: 6px;
-      margin-bottom: 25px;
-    }
-    .admin-nav .nav-title {
-      color: #fff;
-      font-size: 20px;
-      font-weight: bold;
-    }
-    .admin-nav a {
-      color: #ddd;
-      text-decoration: none;
-      margin-left: 18px;
-      font-size: 15px;
-      transition: color 0.2s ease;
-    }
-    .admin-nav a:hover {
-      color: #fff;
-    }
-    .admin-nav .logout-link {
-      color: #ff6b6b;
-    }
-    .admin-nav .logout-link:hover {
-      color: #ff9b9b;
-    }
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
 
-    h1 {
-      margin-bottom: 30px;
-      font-size: 28px;
-    }
+        .container {
+            max-width: 900px;
+            margin: 10px auto;
+            background: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+        }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 25px;
-      max-width: 700px;
-    }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
 
-    .card {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      text-align: center;
-    }
+        .card {
+            background: #fafafa;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
 
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    }
+        .label {
+            font-weight: bold;
+            color: #555;
+        }
 
-    .card h2 {
-      margin: 0 0 10px 0;
-      font-size: 20px;
-    }
+        .value {
+            margin-top: 6px;
+            font-size: 1.1em;
+        }
 
-    .card p {
-      margin: 0;
-      color: #555;
-      font-size: 14px;
-    }
-  </style>
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+       .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 8px;
+        }
+
+    </style>
 </head>
 
 <body>
 
-  <!-- NAV BAR -->
-<div id="adminNav"></div>
+    <div id="admin-nav-container"></div>
+    <div id="admin-identity-container"></div>
+
+    <div class="container">
+
+        <!-- Loading message -->
+        <div id="loading">Loading...</div>
+
+        <!-- Dashboard wrapper (hidden until JS decides to show it) -->
+        <div id="dashboard-wrapper" style="display:none;">
+	<!-- PAGE HEADER -->
+	<div style="margin: 0px auto 0; max-width: 900px;">
+
+ 	   <h1 style="
+  	      text-align: center;
+  	      font-size: 26px;
+  	      margin-bottom: 4px;
+	        color: #2c3e50;
+ 	   ">
+ 	       Admin Dashboard
+	    </h1>
+
+  	  <hr style="
+   	     width: 35%;
+ 	       margin: 0 auto 4px;
+  	      border: none;
+	      border-top: 1px solid #ccc;
+  	  ">
+
+	</div>
+
+        <div id="error-box" style="
+            display:none;
+            background:#fdecea;
+            color:#b71c1c;
+            border:1px solid #f5c6cb;
+            padding:12px 16px;
+            border-radius:6px;
+            margin:10px 0;
+            font-size:15px;
+        ">
+	    <span id="error-message"></span>
+            <br>
+            <a href="#" onclick="loadDashboard()" style="color:#b71c1c; text-decoration:underline;">
+                Retry
+            </a>
+
+        </div>
+
+            <div id="content">
+                <div class="info-grid">
+
+                    <div class="card">
+                        <div class="label">League Name</div>
+                        <div class="value" id="league-name"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="label">Coordinator</div>
+                        <div class="value" id="coordinator-name"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="label">Description</div>
+                        <div class="value" id="league-description"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="label">Coordinator Email</div>
+                        <div class="value" id="coordinator-email"></div>
+                    </div>
+
+                </div>
+
+		<!-- ACTION BUTTONS (centered, 3 buttons) -->
+		<div class="dashboard-actions"
+			style="
+    				display: flex;
+   				 justify-content: center;
+    				gap: 10px;
+   				 margin-top: 10px;
+			 ">
+ 		   <a class="btn" href="/admin/golfers">👥 Manage Golfers</a>
+                   <a class="btn" href="/admin/leagues">🏆 Manage Leagues</a>
+                   <a class="btn" href="/admin/reports">📊 View Reports</a>
+		</div>
+
+            </div>
+        </div>
+    </div>
+
 <script>
-  fetch("/partials/admin-nav")
-    .then(r => r.text())
-    .then(html => {
-      document.getElementById("adminNav").innerHTML = html;
+
+        async function safeJson(res) {
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch {
+                throw new Error("Invalid JSON response: " + text);
+            }
+        }
+
+async function loadAdminNav() {
+    const navContainer = document.getElementById("admin-nav-container");
+    const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+    const html = await res.text();
+    navContainer.innerHTML = html;
+
+    // Highlight current page
+    const path = window.location.pathname;
+
+    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href === path || (href !== "/" && path.startsWith(href))) {
+            link.classList.add("active");
+        }
     });
+
+    return true;
+}
+
+        function showError(message) {
+            const loading = document.getElementById("loading");
+            const errorBox = document.getElementById("error-box");
+
+            loading.style.display = "none";
+            errorBox.style.display = "block";
+
+            document.getElementById("error-message").innerText = message;
+        }
+
+// -------------------------------------------------------
+// Load Session variable values
+//--------------------------------------------------------
+async function loadSession() {
+    const res = await fetch("/admin/session-info", { credentials: "include" });
+    const session = await res.json();
+
+    const leaguesLink = document.getElementById("nav-leagues-link");
+    if (leaguesLink) {
+        leaguesLink.style.display = session.is_super_admin ? "inline-block" : "none";
+    }
+
+    return session;   // ⭐ FIXED
+}
+
+// --------------------------------------------------------------------------
+//   Populate Identity bar (icon + role + name + color)
+// --------------------------------------------------------------------------
+async function loadAdminIdentity(session) {
+    const container = document.getElementById("admin-identity-container");
+    if (!container) return;
+
+    // Load the HTML partial
+    const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+    container.innerHTML = html;
+
+    // =========================
+    // session is passed in from initPage()
+    // =========================
+
+    const bar = container.querySelector(".admin-identity");
+    const icon = container.querySelector("#identity-icon");
+    const name = container.querySelector("#identity-name");
+    const role = container.querySelector("#identity-role");
+
+    name.innerText = `${session.first_name} ${session.last_name}`;
+
+    if (session.is_super_admin) {
+        bar.classList.add("super-admin");
+        icon.innerText = "⭐";
+        role.innerText = "Super Admin";
+    } else {
+        bar.classList.add("league-admin");
+        icon.innerText = "🏌️";
+        role.innerText = "League Admin";
+    }
+}
+
+async function loadDashboard(session) {
+    try {
+
+        // -----------------------------
+        // 1. Update nav user name safely
+        // -----------------------------
+        const displayName =
+            (session.first_name && session.last_name)
+                ? `${session.first_name} ${session.last_name}`
+                : session.email;
+
+        // Super Admin nav options
+        if (session.is_super_admin) {
+            document.getElementById("nav-leagues-link").style.display = "inline";
+        }
+
+        // -----------------------------
+        // 2. Super Admin with no league selected → redirect
+        // -----------------------------
+        if (session.is_super_admin && !session.league_id) {
+            window.location.href = "/auth/select-league";
+            return;
+        }
+
+        let league = null;
+
+        // -----------------------------
+        // 3. Load leagues (Super Admin only)
+        // -----------------------------
+        if (session.is_super_admin) {
+            const leaguesRes = await fetch("/admin/leagues/api", { credentials: "include" });
+            const leagues = await safeJson(leaguesRes);
+            league = leagues.find(l => l.id === session.league_id);
+        } else {
+            // League Admin: fetch only their league
+            const leagueRes = await fetch(`/admin/leagues/api/${session.league_id}`, {
+                credentials: "include"
+            });
+            league = await safeJson(leagueRes);
+        }
+
+        // -----------------------------
+        // 4. Validate league
+        // -----------------------------
+        if (!league) {
+            showError("League not found.");
+            return;
+        }
+
+        // -----------------------------
+        // 5. Populate dashboard
+        // -----------------------------
+        document.getElementById("league-name").innerText = league.league_name;
+        document.getElementById("coordinator-name").innerText =
+            `${league.first_name} ${league.last_name}`;
+        document.getElementById("coordinator-email").innerText = league.email;
+        document.getElementById("league-description").innerText = league.description;
+
+        // -----------------------------
+        // 6. Show dashboard content
+        // -----------------------------
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("dashboard-wrapper").style.display = "block";
+
+    } catch (err) {
+        console.error(err);
+        showError("Something went wrong while loading the dashboard.");
+    }
+}
+
+async function initPage() {
+    try {
+        await loadAdminNav();
+        const session = await loadSession();
+        await loadAdminIdentity(session);
+        await loadDashboard(session);
+    } catch (err) {
+        console.error("Page initialization error:", err);
+    }
+}
+
+initPage();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const current = window.location.pathname;
+  const links = document.querySelectorAll(".nav-links a");
+
+  links.forEach(link => {
+    if (link.getAttribute("href") === current) {
+      link.classList.add("active");
+    }
+  });
+});
+
 </script>
-
-  <h1>Admin Dashboard</h1>
-
-  <div class="grid">
-
-    <div class="card" onclick="location.href='admin-scheduler.html'">
-      <h2>Manage Schedules</h2>
-      <p>Edit any golfer’s monthly schedule</p>
-    </div>
-
-    <div class="card" onclick="location.href='admin-play-months.html'">
-      <h2>Manage Play Months</h2>
-      <p>Edit which months golfers are in town</p>
-    </div>
-
-    <div class="card" onclick="location.href='admin-play-days.html'">
-      <h2>Manage Play Days</h2>
-      <p>Edit golfers’ preferred weekly play days</p>
-    </div>
-
-    <div class="card" onclick="location.href='admin-league-management.html'">
-      <h2>Manage Leagues</h2>
-      <p>Add, rename, or delete leagues</p>
-    </div>
-
-    <div class="card" onclick="location.href='admin-league-play-days.html'">
-      <h2>League Play Days</h2>
-      <p>Edit which days each league plays</p>
-    </div>
-
-    <div class="card" onclick="location.href='admin-users.html'">
-      <h2>Manage Users</h2>
-      <p>Add, edit, or delete golfers</p>
-    </div>
-
-  </div>
 
 </body>
 </html>

@@ -153,3 +153,18 @@ WHERE id = ?;
 DELETE FROM leagues WHERE id = ?;
 
 INSERT INTO leagues (league_name, coordinator_last_name, coordinator_first_name) VALUES ("Renegades", "Hayner", "Monty");
+
+CREATE TABLE "super_admins" (
+    "id"            INTEGER,
+    "last_name"     TEXT NOT NULL,
+    "first_name"    TEXT NOT NULL,
+    "email"         TEXT NOT NULL,
+    "password_hash" TEXT NOT NULL,
+    UNIQUE("email"),
+    PRIMARY KEY("id" AUTOINCREMENT)
+);
+select * from users;
+insert into super_admins (last_name, first_name, email, password_hash) VALUES
+("Hayner", "Monty", "rlhayner@verizon.net", "1664");
+insert into super_admins (last_name, first_name, email, password_hash) VALUES
+("Jameson", "Linda", "linbobj1212@gmail.com", "0000");

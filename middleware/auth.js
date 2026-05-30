@@ -1,16 +1,26 @@
 // middleware/auth.js
 
 function requireLogin(req, res, next) {
-  if (!req.session.user) {
-    return res.status(401).json({ error: "Login required" });
-  }
-  next();
+    console.log("🔐 requireLogin CHECK:", req.session.user);
+
+    if (!req.session.user) {
+        console.log("🔐 BLOCKED — NO SESSION USER");
+        return res.redirect("/login?error=1");
+    }
+
+    // ⭐ FIX: Attach req.user
+    req.user = req.session.user;
+
+    console.log("🔐 PASSED — USER:", req.user);
+    next();
 }
 
 function requireAdmin(req, res, next) {
   if (!req.session.user || req.session.user.is_admin !== 1) {
     return res.status(403).json({ error: "Admin only" });
   }
+    req.user = req.session.user;
+
   next();
 }
 

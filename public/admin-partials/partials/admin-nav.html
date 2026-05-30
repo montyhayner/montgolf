@@ -1,0 +1,30 @@
+<nav class="admin-nav">
+    <div class="nav-left">
+        <a href="/admin-dashboard">Dashboard</a>
+        <a href="/admin-golfers">Golfers</a>
+        <a href="/admin-leagues">Leagues</a>
+        <a href="/admin-reports">Reports</a>
+    </div>
+
+    <div class="nav-right">
+        <span id="admin-name"></span>
+        <span id="league-name"></span>
+        <a href="/logout">Logout</a>
+    </div>
+</nav>
+
+<script>
+fetch("/admin/session-info")
+    .then(res => res.json())
+    .then(session => {
+        if (session.user) {
+            document.getElementById("admin-name").textContent =
+                session.user.email;
+
+            if (session.user.league_name) {
+                document.getElementById("league-name").textContent =
+                    "League: " + session.user.league_name;
+            }
+        }
+    });
+</script>

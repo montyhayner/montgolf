@@ -43,14 +43,11 @@
   }
 </style>
 </head>
-
 <body>
-
 <div id="navContainer"></div>
-
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  fetch("/admin/partials/nav")
+  fetch("/admin-partials/partials/nav")
     .then(res => res.text())
     .then(html => {
       document.getElementById("navContainer").innerHTML = html;

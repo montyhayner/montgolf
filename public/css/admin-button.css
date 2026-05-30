@@ -1,0 +1,43 @@
+/* --- UNIVERSAL ADMIN BUTTON STYLE --- */
+/* Ensure this file overrides admin.css */
+:root { --force: 1; }
+
+button {
+  background-color: #2d6cdf;        /* strong blue */
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  min-width: 110px;                 /* makes all buttons feel substantial */
+  text-align: center;
+}
+
+button:hover {
+  background-color: #1f54b8;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* Secondary buttons (Cancel, Delete) */
+button.secondary {
+  background-color: #777;
+}
+
+button.secondary:hover {
+  background-color: #555;
+}
+
+/* Danger buttons (Delete Entire Block, Delete Single) */
+button.danger {
+  background-color: #d9534f;
+}
+
+button.danger:hover {
+  background-color: #c9302c;
+}
