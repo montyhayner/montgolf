@@ -22,5 +22,9 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "react-froala-wysiwyg": "^4.5.2"
-  }
+  },
+"engines": {
+  "node": "18.20.3"
+}
+
 }
