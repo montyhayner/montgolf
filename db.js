@@ -6,8 +6,7 @@ const db = new sqlite3.Database('./golf.db', (err) => {
   if (err) {
     console.error("❌ SQLITE OPEN ERROR:", err.message);
   } else {
-    console.log("✔ SQLITE OPEN SUCCESS:", db.filename);
-    console.log("DB METHODS NOW AVAILABLE:", Object.keys(db));
+    console.log("✔ SQLITE OPEN SUCCESS:", './golf.db');
   }
 });
 

@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^5.2.1",
@@ -20,7 +21,6 @@
     "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
-    "react-froala-wysiwyg": "^4.5.2",
-    "sqlite3": "^5.0.2"
+    "react-froala-wysiwyg": "^4.5.2"
   }
 }
