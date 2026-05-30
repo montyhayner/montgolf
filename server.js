@@ -5,8 +5,6 @@ const session = require("express-session");
 const path = require("path");
 delete require.cache[require.resolve("./db")];
 console.log("REQUIRING DB FROM:", require.resolve("./db"));
-//const sqlite3 = require("sqlite3").verbose();
-//const db = new sqlite3.Database("golf.db");
 const app = express();
 const db = require("./db");
 const { requireLogin } = require("./middleware/auth");
@@ -296,7 +294,7 @@ app.get("/edit-profile", requireLogin, (req, res) => {
 async function formatSqliteTimestamp() {
 // ----------------------------------------------------------------------------------
 // determine whether to subtract 4 hours or 5 hours from
-// the sqlite3 timestamp depending on whether today's
+// the db timestamp depending on whether today's
 // date is EDT (eastern daylight savings time) or EST
 // (eastern standard time).  EDT is between 2nd Sunday
 // in March and the first Sunday in November.
