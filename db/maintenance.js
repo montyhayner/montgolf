@@ -1,5 +1,5 @@
 // db/maintenance.js
-const db = require("C:/users/monty/golf/golf-scheduler/db.js"); // your existing db.js wrapper
+const db = require("../db.js"); // your existing db.js wrapper
 
 async function optimizeDatabase() {
   try {
