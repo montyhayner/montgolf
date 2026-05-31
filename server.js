@@ -262,6 +262,15 @@ app.get("/my-availability", (req, res) => {
 app.get("/admin/allocated-tee-times", requireLeagueAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin-allocated-tee-times.html"));
 });
+
+app.get("/dashboard", requireLogin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "user-dashboard.html"));
+});
+
+app.get("/admin/reports", requireLeagueAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin-reports.html"));
+});
+
   
 // ------------------------------
 // AUTH ROUTES

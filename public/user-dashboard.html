@@ -2,29 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin Reports</title>
+  <title>User Dashboard</title>
   <link rel="stylesheet" href="/css/styles.css">
-  <link rel="stylesheet" href="/css/admin-nav.css">
-  <script defer src="/js/admin-reports.js"></script>
+  <link rel="stylesheet" href="/css/navbar.css">
+  <script defer src="/js/user-dashboard.js"></script>
 </head>
 <body>
 
-  <!-- Load Admin Nav -->
+  <!-- Load User Nav -->
   <div id="nav-container"></div>
   <script>
-    fetch("/partials/admin-nav.html")
+    fetch("/partials/user-nav.html")
       .then(r => r.text())
       .then(html => document.getElementById("nav-container").innerHTML = html);
   </script>
 
   <div class="container" style="margin-top: 30px;">
-    <h1>Admin Reports</h1>
+    <h1>User Dashboard</h1>
     <p>This page is under construction.</p>
 
-    <p>Planned reports:</p>
+    <p>Coming soon:</p>
     <ul>
-      <li>Two-week club report</li>
-      <li>Next play date player list</li>
+      <li>Upcoming play dates</li>
+      <li>Quick links to schedule & availability</li>
+      <li>Recent notifications</li>
+      <li>Two-week club report access</li>
     </ul>
   </div>
 
