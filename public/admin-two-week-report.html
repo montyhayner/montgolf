@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Two-Week Club Report</title>
+  <link rel="stylesheet" href="/css/admin-nav.css">
+  <link rel="stylesheet" href="/css/admin-identity.css">
+
+  <style>
+    .report-container {
+      margin: 30px;
+    }
+
+    .two-week-report-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    table.report-table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    table.report-table th,
+    table.report-table td {
+      border: 1px solid #444;
+      padding: 6px 8px;
+      text-align: center;
+    }
+
+    table.report-table th {
+      background-color: #e8f0ff;
+      font-weight: bold;
+    }
+
+    .two-week-report table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed; /* forces columns to shrink proportionally */
+    }
+
+    .two-week-report th,
+    .two-week-report td {
+      padding: 4px 6px; /* was probably 10–14px */
+      border: 1px solid #ccc;
+      font-size: 0.9rem; /* slightly smaller but still readable */
+      word-wrap: break-word;
+    }
+
+    .two-week-report .col-tee-time { width: 70px; }
+    .two-week-report .col-hole { width: 50px; }
+    .two-week-report .col-group { width: 50px; }
+    .two-week-report .col-player { width: 160px; }
+    .two-week-report .col-notes { width: 200px; }
+
+
+    .totals-row td {
+      font-weight: bold;
+      background-color: #f4f4f4;
+    }
+
+    .controls {
+      margin-top: 20px;
+    }
+
+    .controls button {
+      margin-right: 10px;
+      padding: 8px 14px;
+      font-size: 14px;
+    }
+
+    @media print {
+      .two-week-report-container {
+        max-width: 100%;
+      }
+      th, td {
+        padding: 3px 4px;
+        font-size: 0.8rem;
+      }
+    }
+
+  </style>
+
+  <script defer src="/js/admin-two-week-report.js"></script>
+</head>
+<body>
+
+  <!-- Load Admin Nav -->
+  <div id="nav-container"></div>
+  <script>
+    fetch("/partials/admin-nav.html")
+      .then(r => r.text())
+      .then(html => document.getElementById("nav-container").innerHTML = html);
+  </script>
+
+  <div class="report-container">
+    <h1>Two-Week Club Report</h1>
+
+    <div class="controls">
+      <button onclick="window.print()">Print Report</button>
+      <button id="emailBtn">Email to Club Staff</button>
+    </div>
+
+    <div id="report-table-container">
+      <!-- JS will inject the table here -->
+    </div>
+  </div>
+
+</body>
+</html>

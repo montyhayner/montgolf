@@ -8,35 +8,67 @@ function requireLogin(req, res, next) {
         return res.redirect("/login?error=1");
     }
 
-    // ⭐ FIX: Attach req.user
     req.user = req.session.user;
-
     console.log("🔐 PASSED — USER:", req.user);
     next();
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.is_admin !== 1) {
-    return res.status(403).json({ error: "Admin only" });
-  }
-    req.user = req.session.user;
+    console.log(">>> REQUIRE ADMIN CHECK:", req.session.user);
 
-  next();
+    const user = req.session.user;
+
+    if (!user) {
+        if (req.originalUrl.includes("/api")) {
+            return res.status(401).json({ error: "Not logged in" });
+        }
+        return res.redirect("/admin-login");
+    }
+
+    // ⭐ SUPER ADMINS ALWAYS PASS
+    if (user.is_super_admin) {
+        req.user = user;
+        return next();
+    }
+
+    // ⭐ REGULAR ADMINS WITH LEAGUE PASS
+    if (user.is_admin === 1 && user.league_id) {
+        req.user = user;
+        return next();
+    }
+
+    // ⭐ API REQUESTS GET JSON ERRORS
+    if (req.originalUrl.includes("/api")) {
+        return res.status(403).json({ error: "Admin only" });
+    }
+
+    // ⭐ NON-API REQUESTS GET REDIRECT
+    return res.redirect("/auth/select-league");
 }
 
 function requireAdminOrSelf(req, res, next) {
-  const loggedIn = req.session.user;
-  const targetUserId = parseInt(req.params.userId);
+    const user = req.session.user;
+    const targetUserId = parseInt(req.params.userId);
 
-  if (loggedIn.is_admin === 1 || loggedIn.id === targetUserId) {
-    return next();
-  }
+    if (!user) {
+        return res.status(401).json({ error: "Not logged in" });
+    }
 
-  return res.status(403).json({ error: "Forbidden" });
+    // ⭐ SUPER ADMIN ALWAYS ALLOWED
+    if (user.is_super_admin) {
+        return next();
+    }
+
+    // ⭐ ADMIN OR SELF
+    if (user.is_admin === 1 || user.id === targetUserId) {
+        return next();
+    }
+
+    return res.status(403).json({ error: "Forbidden" });
 }
 
 module.exports = {
-  requireLogin,
-  requireAdmin,
-  requireAdminOrSelf
+    requireLogin,
+    requireAdmin,
+    requireAdminOrSelf
 };

@@ -1,12 +1,13 @@
 //server.js
+console.log(">>> RUNNING SERVER.JS FROM:", __filename);
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const path = require("path");
-delete require.cache[require.resolve("./db")];
+// delete require.cache[require.resolve("./db")];
 console.log("REQUIRING DB FROM:", require.resolve("./db"));
 const app = express();
-const db = require("./db");
+const db = require("./db"); 
 const { requireLogin } = require("./middleware/auth");
 const bcrypt = require("bcrypt");
 const { easternNow } = require("./utils/easternTime");
@@ -23,7 +24,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({
     secret: "your-secret",
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: "lax"
+    }
 }));
 
 console.log("🧩 SESSION MIDDLEWARE LOADED");
@@ -61,32 +66,29 @@ app.get("/login", (req, res) => {
 // Routers
 // ------------------------------
 
-console.log("🔍 About to require routes...");
-
-[
-  "./routes/auth",
-  "./routes/user",
-  "./routes/guests",
-  "./routes/reports"
-].forEach(r => {
-  try {
-    console.log("🔎 Trying require:", r);
-    require(r);
-    console.log("   ✔ Success:", r);
-  } catch (err) {
-    console.log("   ❌ Failed:", r, "→", err.message);
-  }
-});
-
+// AUTH
 app.use("/auth", require("./routes/auth"));
+
+// USER
 app.use("/user", require("./routes/user"));
+
+// GUESTS API
 const guestsRouter = require("./routes/guests");
 app.use("/api/guests", requireLogin, guestsRouter);
-const reportsRoutes = require("./routes/reports");
-app.use("/reports", reportsRoutes);
+
+// PARTIALS
 app.use("/partials", express.static(__dirname + "/public/partials"));
+
+// LEAGUE PLAY DAYS API
 const leaguePlayDaysRouter = require("./routes/leaguePlayDays")(db);
 app.use("/api/league-play-days", requireLogin, leaguePlayDaysRouter);
+
+// REPORTS API
+const reportsRoutes = require("./routes/reports");
+app.use("/api/reports", reportsRoutes);
+
+// TWO-WEEK REPORT API
+app.use("/", require("./routes/twoWeekReport"));
 
 // ------------------------------
 // Safety net — allow login.html
@@ -116,7 +118,10 @@ function dbRun(sql, params = []) {
 // ------------------------------
 // Middleware
 // ------------------------------
+
+
 function requireAdmin(req, res, next) {
+    console.log(">>> server.js line 123 REQUIRE ADMIN CHECK:", req.session.user);
     if (!req.session.user) {
         if (req.originalUrl.includes("/api")) {
             return res.status(401).json({ error: "Not logged in" });
@@ -124,22 +129,27 @@ function requireAdmin(req, res, next) {
         return res.redirect("/admin-login");
     }
 
+    // ⭐ SUPER ADMINS ALWAYS PASS
     if (req.session.user.is_super_admin) {
         return next();
     }
 
-    if (req.session.user.is_admin && req.session.user.league_id) {
+    // ⭐ REGULAR ADMINS WITH LEAGUE PASS
+    if (req.session.user.is_admin === 1 && req.session.user.league_id) {
         return next();
     }
 
+    // ⭐ API REQUESTS GET JSON ERRORS
     if (req.originalUrl.includes("/api")) {
-        return res.status(403).json({ error: "No league selected" });
+        return res.status(403).json({ error: "Admin only" });
     }
 
+    // ⭐ NON-API REQUESTS GET REDIRECT
     return res.redirect("/auth/select-league");
 }
 
 function requireAdminLoginOnly(req, res, next) {
+    console.log(">>> server.js line 152 REQUIRE ADMIN CHECK:", req.session.user);
     console.log("→ requireAdminLoginOnly fired");
     console.log("  session.user =", req.session.user);
 
