@@ -13,6 +13,8 @@ const bcrypt = require("bcrypt");
 const { easternNow } = require("./utils/easternTime");
 const latestApplyResultMap = {};
 const transporter = require("./services/mailer");
+const generateTwoWeekReportText = require("./services/generateTwoWeekReportText");
+
 
 
 // ------------------------------

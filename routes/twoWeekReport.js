@@ -2,9 +2,13 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { requireAdmin } = require("../middleware/auth");
+const transporter = require("../services/mailer");
+const buildTwoWeekReportData = require("../services/buildTwoWeekReportData");
+const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
+const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
 
 // -----------------------------------------------------------------------------
-// TWO-WEEK CLUB REPORT (players + guests)
+// TWO-WEEK GOLFERS REPORT (players + guests)
 // -----------------------------------------------------------------------------
 router.get("/admin/reports/two-week", requireAdmin, (req, res) => {
   try {
@@ -103,6 +107,8 @@ router.get("/admin/reports/two-week", requireAdmin, (req, res) => {
 
     const players = allPeople.map(person => {
       const row = {
+        id: person.id,                         // ⭐ ADD THIS
+        is_guest: person.type === "guest" ? 1 : 0,   // ⭐ ADD THIS
         name: `${person.first_name} ${person.last_name}${person.is_member ? "" : "*"}`,
         is_member: person.is_member,
         plays: {}
@@ -149,6 +155,128 @@ router.get("/admin/reports/two-week", requireAdmin, (req, res) => {
   } catch (err) {
     console.error("Two-week report error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// routes/admin-reports.js (or wherever your report routes live)
+
+router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const leagueId = user.league_id;
+
+    const {
+      includePlayers,
+      includeAdmins,
+      includeStaff,
+      includeSelf,
+      playersInReport = [],   // array of user_ids
+      guestsInReport = []     // array of guest_ids
+    } = req.body;
+
+    // -----------------------------
+    // 1. Build unified report data
+    // -----------------------------
+    const { dates, rows, totals } = await buildTwoWeekReportData(db, leagueId);
+
+    // Format both versions from the same data
+    const reportText = generateTwoWeekReportText(dates, rows, totals);
+    const htmlReport  = generateTwoWeekReportHTML(dates, rows, totals);
+
+    // -----------------------------
+    // 2. Build recipient list
+    // -----------------------------
+    const recipients = new Set();
+
+    // A. Always include logged-in admin
+    if (includeSelf && user.email) {
+      recipients.add(user.email);
+    }
+
+    // B. Players in the report (users table)
+    if (includePlayers && playersInReport.length > 0) {
+      const placeholders = playersInReport.map(() => "?").join(",");
+      const players = db.prepare(`
+        SELECT DISTINCT email
+        FROM users
+        WHERE id IN (${placeholders})
+          AND league_id = ?
+      `).all(...playersInReport, leagueId);
+
+      players.forEach(p => {
+        if (p.email) recipients.add(p.email);
+      });
+    }
+
+    // C. Guests in the report (guests table)
+    if (includePlayers && guestsInReport.length > 0) {
+      const placeholders = guestsInReport.map(() => "?").join(",");
+      const guests = db.prepare(`
+        SELECT g.guest_email, u.email AS sponsor_email
+        FROM guests g
+        JOIN users u ON u.id = g.sponsor_user_id
+        WHERE g.id IN (${placeholders})
+          AND u.league_id = ?
+      `).all(...guestsInReport, leagueId);
+
+      guests.forEach(g => {
+        if (!g.guest_email) return;
+        if (g.guest_email === g.sponsor_email) return;
+        recipients.add(g.guest_email);
+      });
+    }
+
+    // D. League admins
+    if (includeAdmins) {
+      const admins = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE league_id = ?
+          AND is_admin = 1
+      `).all(leagueId);
+
+      admins.forEach(a => {
+        if (a.email) recipients.add(a.email);
+      });
+    }
+
+    // E. Club staff
+    if (includeStaff) {
+      const staff = db.prepare(`
+        SELECT email
+        FROM club_staff
+        WHERE league_id = ?
+      `).all(leagueId);
+
+      staff.forEach(s => {
+        if (s.email) recipients.add(s.email);
+      });
+    }
+
+    const finalRecipients = Array.from(recipients);
+
+    if (finalRecipients.length === 0) {
+      return res.status(400).json({ error: "No recipients selected" });
+    }
+
+    console.log("📧 Sending Two-Week Report to:", finalRecipients);
+
+    // -----------------------------
+    // 3. Send the email
+    // -----------------------------
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: finalRecipients.join(", "),
+      subject: "Two-Week Report",
+      text: reportText,   // plain text fallback
+      html: htmlReport    // beautiful HTML version
+    });
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ Error sending two-week report:", err);
+    return res.status(500).json({ error: "Unable to send report email" });
   }
 });
 

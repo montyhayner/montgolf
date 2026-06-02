@@ -2,63 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Two-Week Club Report</title>
+  <title>Two-Week Golfers Report</title>
   <link rel="stylesheet" href="/css/admin-nav.css">
   <link rel="stylesheet" href="/css/admin-identity.css">
 
   <style>
+
+    /* ------------------------------
+       MODAL OVERLAY
+    --------------------------------*/
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      width: 420px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.2);
+    }
+
+    .recipient-section label {
+      display: block;
+      margin: 8px 0;
+      font-size: 1rem;
+    }
+
+    .modal-buttons {
+      margin-top: 20px;
+      text-align: right;
+    }
+
+    .modal-buttons button {
+      margin-left: 10px;
+    }
+
+    /* ------------------------------
+       REPORT LAYOUT
+    --------------------------------*/
     .report-container {
       margin: 30px;
-    }
-
-    .two-week-report-container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    table.report-table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-      font-size: 14px;
-    }
-
-    table.report-table th,
-    table.report-table td {
-      border: 1px solid #444;
-      padding: 6px 8px;
-      text-align: center;
-    }
-
-    table.report-table th {
-      background-color: #e8f0ff;
-      font-weight: bold;
-    }
-
-    .two-week-report table {
-      border-collapse: collapse;
-      width: 100%;
-      table-layout: fixed; /* forces columns to shrink proportionally */
-    }
-
-    .two-week-report th,
-    .two-week-report td {
-      padding: 4px 6px; /* was probably 10–14px */
-      border: 1px solid #ccc;
-      font-size: 0.9rem; /* slightly smaller but still readable */
-      word-wrap: break-word;
-    }
-
-    .two-week-report .col-tee-time { width: 70px; }
-    .two-week-report .col-hole { width: 50px; }
-    .two-week-report .col-group { width: 50px; }
-    .two-week-report .col-player { width: 160px; }
-    .two-week-report .col-notes { width: 200px; }
-
-
-    .totals-row td {
-      font-weight: bold;
-      background-color: #f4f4f4;
     }
 
     .controls {
@@ -71,11 +68,45 @@
       font-size: 14px;
     }
 
+    /* ------------------------------
+       SLIM TABLE
+    --------------------------------*/
+    .report-table {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 0.9rem;
+    }
+
+    .report-table th,
+    .report-table td {
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      word-wrap: break-word;
+      text-align: center;
+    }
+
+    .report-table th {
+      background: #f4f4f4;
+      font-weight: bold;
+    }
+
+    .totals-row td {
+      background: #fafafa;
+      font-weight: bold;
+    }
+
+    /* ------------------------------
+       PRINT VERSION
+    --------------------------------*/
     @media print {
-      .two-week-report-container {
+      .report-table {
         max-width: 100%;
       }
-      th, td {
+      .report-table th,
+      .report-table td {
         padding: 3px 4px;
         font-size: 0.8rem;
       }
@@ -96,15 +127,63 @@
   </script>
 
   <div class="report-container">
-    <h1>Two-Week Club Report</h1>
+    <h1>Two-Week Golfers Report</h1>
 
     <div class="controls">
       <button onclick="window.print()">Print Report</button>
-      <button id="emailBtn">Email to Club Staff</button>
+      <button id="btnEmailReport">Send Report</button>
     </div>
 
     <div id="report-table-container">
-      <!-- JS will inject the table here -->
+      <!-- JS injects the table here -->
+    </div>
+  </div>
+
+  <!-- SEND REPORT MODAL -->
+  <div id="sendReportModal" class="modal hidden">
+    <div class="modal-content">
+
+      <h2>Send Two‑Week Report</h2>
+
+      <div class="recipient-section">
+
+        <label>
+          <input type="checkbox" id="chkSelectAll">
+          Select All
+        </label>
+
+        <label>
+          <input type="checkbox" id="chkPlayers">
+          Players in this report
+        </label>
+
+        <label>
+          <input type="checkbox" id="chkAdmins">
+          League admins
+        </label>
+
+        <label>
+          <input type="checkbox" id="chkStaff">
+          Club staff
+        </label>
+
+        <label>
+          <input type="checkbox" id="chkSelf" checked disabled>
+          Me (always included)
+        </label>
+
+        <label>
+          <input type="checkbox" id="chkSelfOnly">
+          Send to Myself Only
+        </label>
+
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnSendReport" class="primary">SEND</button>
+        <button id="btnCancelSend" class="secondary">CANCEL</button>
+      </div>
+
     </div>
   </div>
 
