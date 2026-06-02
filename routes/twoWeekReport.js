@@ -173,6 +173,16 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       playersInReport = [],   // array of user_ids
       guestsInReport = []     // array of guest_ids
     } = req.body;
+    // -----------------------------
+    // 0. get name of league 
+    // -----------------------------
+    const league = db.prepare(`
+      SELECT league_name
+      FROM leagues
+      WHERE id = ?
+    `).get(leagueId);
+
+    const leagueName = league?.league_name || "";
 
     // -----------------------------
     // 1. Build unified report data
