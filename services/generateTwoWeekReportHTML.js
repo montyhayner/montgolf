@@ -1,10 +1,10 @@
 // services/generateTwoWeekReportHTML.js
 
-function generateTwoWeekReportHTML(dates, rows, totals) {
+function generateTwoWeekReportHTML(dates, rows, totals, leagueName = "") {
   if (!dates || dates.length === 0) {
     return `
       <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-        <h2>Two‑Week Golfers Report</h2>
+        <h2>Two‑Week Golfers Report - ${leagueName}</h2>
         <p>No scheduled play in the next 14 days.</p>
       </div>
     `;
@@ -12,7 +12,7 @@ function generateTwoWeekReportHTML(dates, rows, totals) {
 
   return `
   <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-    <h2 style="text-align:center; margin-bottom: 20px;">Two‑Week Golfers Report</h2>
+    <h2 style="text-align:center; margin-bottom: 20px;">Two‑Week Golfers Report - ${leagueName}</h2>
 
     <table style="width:100%; border-collapse: collapse; max-width: 700px; margin: 0 auto;">
       <thead>

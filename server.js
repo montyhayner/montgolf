@@ -15,8 +15,6 @@ const latestApplyResultMap = {};
 const transporter = require("./services/mailer");
 const generateTwoWeekReportText = require("./services/generateTwoWeekReportText");
 
-
-
 // ------------------------------
 // Express Setup
 // ------------------------------

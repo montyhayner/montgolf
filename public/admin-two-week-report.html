@@ -71,8 +71,14 @@
     /* ------------------------------
        SLIM TABLE
     --------------------------------*/
+
+    #report-table-container {
+      display: flex;
+      justify-content: center;
+    }
+
     .report-table {
-      width: 100%;
+      width: auto;
       max-width: 900px;
       margin: 0 auto;
       border-collapse: collapse;
@@ -86,11 +92,30 @@
       border: 1px solid #ccc;
       word-wrap: break-word;
       text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .report-table th {
       background: #f4f4f4;
       font-weight: bold;
+    }
+
+    .report-header {
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .report-header h1 {
+      margin-bottom: 12px;
+    }
+
+    .report-buttons {
+      display: inline-flex;
+      gap: 12px;
     }
 
     .totals-row td {
@@ -127,11 +152,13 @@
   </script>
 
   <div class="report-container">
-    <h1>Two-Week Golfers Report</h1>
+    <div class="report-header">
+      <h1>Two-Week Golfers Report</h1>
 
-    <div class="controls">
-      <button onclick="window.print()">Print Report</button>
-      <button id="btnEmailReport">Send Report</button>
+      <div class="report-buttons">
+        <button id="btnEmailReport">Send Report</button>
+        <button onclick="window.print()">Print Report</button>
+      </div>
     </div>
 
     <div id="report-table-container">

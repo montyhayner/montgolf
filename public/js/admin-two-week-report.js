@@ -21,14 +21,55 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Build table
-  let html = `<table class="report-table"><thead><tr><th>Golfer</th>`;
+  // Build table HTML
+  let html = `
+    <table class="report-table" style="table-layout: fixed; width: auto;">
+      <thead>
+        <tr>
+          <th style="
+            text-align:left;
+            width: 180px;
+            min-width: 180px;
+            max-width: 180px;
+            padding: 4px 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">
+            Golfer
+          </th>
+  `;
 
+  // Date headers (DOW + M/D, no leading zeros, narrow columns)
   data.dates.forEach(d => {
-    html += `<th>${d}</th>`;
+    const [year, month, day] = d.split("-").map(Number);
+    const dt = new Date(year, month - 1, day);
+
+    const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
+    const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+
+    html += `
+      <th style="
+        text-align:center;
+        width: 55px;
+        min-width: 55px;
+        max-width: 55px;
+        padding: 4px 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      ">
+        <div>${dow}</div>
+        <div style="font-size:12px; color:#555;">${md}</div>
+      </th>
+    `;
   });
 
-  html += `</tr></thead><tbody>`;
+  html += `
+        </tr>
+      </thead>
+      <tbody>
+  `;
 
   // Capture players + guests
   data.players.forEach(p => {

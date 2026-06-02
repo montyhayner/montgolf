@@ -1,12 +1,12 @@
 // services/generateTwoWeekReportText.js
 
-function generateTwoWeekReportText(dates, rows, totals) {
+function generateTwoWeekReportText(dates, rows, totals, leagueName = "") {
   if (!dates || dates.length === 0) {
     return "Two‑Week Golfers Report\n\nNo scheduled play in the next 14 days.";
   }
 
   let text = "";
-  text += "Two‑Week Golfers Report\n";
+  text += `Two‑Week Golfers Report - ${leagueName}\n`;
   text += "=====================\n\n";
 
   text += `Dates: ${dates.join(", ")}\n\n`;

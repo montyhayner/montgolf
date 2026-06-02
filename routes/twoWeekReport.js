@@ -190,8 +190,8 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
     const { dates, rows, totals } = await buildTwoWeekReportData(db, leagueId);
 
     // Format both versions from the same data
-    const reportText = generateTwoWeekReportText(dates, rows, totals);
-    const htmlReport  = generateTwoWeekReportHTML(dates, rows, totals);
+    const reportText = generateTwoWeekReportText(dates, rows, totals, leagueName);
+    const htmlReport  = generateTwoWeekReportHTML(dates, rows, totals, leagueName);
 
     // -----------------------------
     // 2. Build recipient list
@@ -269,7 +269,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
-    console.log("📧 Sending Two-Week Report to:", finalRecipients);
+    console.log(`📧 Sending Two-Week Golfers Report - ${leagueName} to:`, finalRecipients);
 
     // -----------------------------
     // 3. Send the email
@@ -277,7 +277,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: finalRecipients.join(", "),
-      subject: "Two-Week Report",
+      subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,   // plain text fallback
       html: htmlReport    // beautiful HTML version
     });
