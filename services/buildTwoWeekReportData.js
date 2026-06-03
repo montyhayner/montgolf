@@ -1,7 +1,10 @@
 // services/buildTwoWeekReportData.js
 
 async function buildTwoWeekReportData(db, leagueId) {
+
+  // ------------------------------------------------------------
   // 1. Dates in next 14 days
+  // ------------------------------------------------------------
   const dateRows = db.prepare(`
     SELECT DISTINCT schedule.date AS play_date
     FROM schedule
@@ -16,10 +19,12 @@ async function buildTwoWeekReportData(db, leagueId) {
   const dates = dateRows.map(r => r.play_date);
 
   if (dates.length === 0) {
-    return { dates: [], rows: [], totals: {} };
+    return { dates: [], rows: [], totals: {}, allocatedTeeTimes: {} };
   }
 
+  // ------------------------------------------------------------
   // 2. Players
+  // ------------------------------------------------------------
   const playerRows = db.prepare(`
     SELECT DISTINCT users.id,
            users.first_name,
@@ -34,7 +39,9 @@ async function buildTwoWeekReportData(db, leagueId) {
     ORDER BY users.last_name, users.first_name
   `).all(leagueId);
 
+  // ------------------------------------------------------------
   // 3. Guests
+  // ------------------------------------------------------------
   const guestRows = db.prepare(`
     SELECT guests.id AS guest_id,
            guests.guest_first_name AS first_name,
@@ -73,6 +80,9 @@ async function buildTwoWeekReportData(db, leagueId) {
     }))
   ];
 
+  // ------------------------------------------------------------
+  // 4. Build spreadsheet matrix
+  // ------------------------------------------------------------
   const totals = {};
   dates.forEach(d => totals[d] = 0);
 
@@ -104,10 +114,35 @@ async function buildTwoWeekReportData(db, leagueId) {
       plays[d] = mark;
     }
 
-    return { name, plays };
+    return { id: person.id, is_guest: person.type === "guest" ? 1 : 0, name, plays };
   });
 
-  return { dates, rows, totals };
+  // ------------------------------------------------------------
+  // 5. Allocated Tee Times (NEW)
+  // ------------------------------------------------------------
+  const allocatedTeeTimes = {};
+
+  dates.forEach(date => {
+    const rows = db.prepare(`
+      SELECT tee_time_number, tee_time, first_nine
+      FROM allocated_tee_times
+      WHERE league_id = ?
+        AND play_date = ?
+      ORDER BY tee_time_number
+    `).all(leagueId, date);
+
+    allocatedTeeTimes[date] = rows;
+  });
+
+  // ------------------------------------------------------------
+  // 6. Return unified structure
+  // ------------------------------------------------------------
+  return {
+    dates,
+    rows,
+    totals,
+    allocatedTeeTimes
+  };
 }
 
 module.exports = buildTwoWeekReportData;

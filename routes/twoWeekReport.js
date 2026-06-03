@@ -158,7 +158,44 @@ router.get("/admin/reports/two-week", requireAdmin, (req, res) => {
   }
 });
 
-// routes/admin-reports.js (or wherever your report routes live)
+// ============================================================================
+// TWO-WEEK GOLFERS REPORT + ALLOCATED TEE TIMES (combined)
+// ============================================================================
+router.get("/admin/reports/two-week/full", requireAdmin, async (req, res) => {
+  try {
+    const leagueId = req.session.user.league_id;
+
+    // Use the unified service (dates, rows, totals, allocatedTeeTimes)
+    const {
+      dates,
+      rows,
+      totals,
+      allocatedTeeTimes
+    } = await buildTwoWeekReportData(db, leagueId);
+
+    // Return empty structure if no dates
+    if (!dates || dates.length === 0) {
+      return res.json({
+        dates: [],
+        players: [],
+        totals: {},
+        allocatedTeeTimes: {}
+      });
+    }
+
+    // The frontend expects "players" instead of "rows"
+    res.json({
+      dates,
+      players: rows,
+      totals,
+      allocatedTeeTimes
+    });
+
+  } catch (err) {
+    console.error("Two-week FULL report error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
   try {
@@ -170,11 +207,12 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       includeAdmins,
       includeStaff,
       includeSelf,
-      playersInReport = [],   // array of user_ids
-      guestsInReport = []     // array of guest_ids
+      playersInReport = [],
+      guestsInReport = []
     } = req.body;
+
     // -----------------------------
-    // 0. get name of league 
+    // 0. Get league name
     // -----------------------------
     const league = db.prepare(`
       SELECT league_name
@@ -187,23 +225,58 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
     // -----------------------------
     // 1. Build unified report data
     // -----------------------------
-    const { dates, rows, totals } = await buildTwoWeekReportData(db, leagueId);
+    const {
+      dates,
+      rows,
+      totals,
+      allocatedTeeTimes
+    } = await buildTwoWeekReportData(db, leagueId);
 
-    // Format both versions from the same data
-    const reportText = generateTwoWeekReportText(dates, rows, totals, leagueName);
-    const htmlReport  = generateTwoWeekReportHTML(dates, rows, totals, leagueName);
+    // If no dates, send empty report
+    if (!dates || dates.length === 0) {
+      const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: `Two-Week Golfers Report - ${leagueName}`,
+        text: emptyText,
+        html: `<p>No scheduled play in the next 14 days.</p>`
+      });
+
+      return res.json({ ok: true });
+    }
 
     // -----------------------------
-    // 2. Build recipient list
+    // 2. Generate email content
+    // -----------------------------
+    const reportText = generateTwoWeekReportText(
+      dates,
+      rows,
+      totals,
+      allocatedTeeTimes,
+      leagueName
+    );
+
+    const htmlReport = generateTwoWeekReportHTML(
+      dates,
+      rows,
+      totals,
+      allocatedTeeTimes,
+      leagueName
+    );
+
+    // -----------------------------
+    // 3. Build recipient list
     // -----------------------------
     const recipients = new Set();
 
-    // A. Always include logged-in admin
+    // Always include logged-in admin
     if (includeSelf && user.email) {
       recipients.add(user.email);
     }
 
-    // B. Players in the report (users table)
+    // Players in report
     if (includePlayers && playersInReport.length > 0) {
       const placeholders = playersInReport.map(() => "?").join(",");
       const players = db.prepare(`
@@ -213,12 +286,10 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
           AND league_id = ?
       `).all(...playersInReport, leagueId);
 
-      players.forEach(p => {
-        if (p.email) recipients.add(p.email);
-      });
+      players.forEach(p => p.email && recipients.add(p.email));
     }
 
-    // C. Guests in the report (guests table)
+    // Guests in report
     if (includePlayers && guestsInReport.length > 0) {
       const placeholders = guestsInReport.map(() => "?").join(",");
       const guests = db.prepare(`
@@ -236,7 +307,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       });
     }
 
-    // D. League admins
+    // Admins
     if (includeAdmins) {
       const admins = db.prepare(`
         SELECT email
@@ -245,12 +316,10 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
           AND is_admin = 1
       `).all(leagueId);
 
-      admins.forEach(a => {
-        if (a.email) recipients.add(a.email);
-      });
+      admins.forEach(a => a.email && recipients.add(a.email));
     }
 
-    // E. Club staff
+    // Staff
     if (includeStaff) {
       const staff = db.prepare(`
         SELECT email
@@ -258,9 +327,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
         WHERE league_id = ?
       `).all(leagueId);
 
-      staff.forEach(s => {
-        if (s.email) recipients.add(s.email);
-      });
+      staff.forEach(s => s.email && recipients.add(s.email));
     }
 
     const finalRecipients = Array.from(recipients);
@@ -269,17 +336,15 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
-    console.log(`📧 Sending Two-Week Golfers Report - ${leagueName} to:`, finalRecipients);
-
     // -----------------------------
-    // 3. Send the email
+    // 4. Send the email
     // -----------------------------
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
-      text: reportText,   // plain text fallback
-      html: htmlReport    // beautiful HTML version
+      text: reportText,
+      html: htmlReport
     });
 
     return res.json({ ok: true });

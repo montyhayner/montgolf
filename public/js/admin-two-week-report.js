@@ -1,27 +1,105 @@
-document.addEventListener("DOMContentLoaded", async () => {
+// ============================================================================
+// admin-two-week-report.js
+// Two-Week Golfers Report + Allocated Tee Times (side-by-side)
+// ============================================================================
 
-  // Track players + guests appearing in the report
-  const playersInReport = new Set();
-  const guestsInReport = new Set();
+// ------------------------------------------------------
+// Helper: Build Allocated Tee Times HTML (right column)
+// ------------------------------------------------------
+function buildAllocatedTeeTimesTableHTML(dates, allocated) {
+  // Collect all tee time numbers across all dates
+  const allTeeNumbers = new Set();
 
-  // Load the report data
-  const container = document.getElementById("report-table-container");
-  const res = await fetch("/admin/reports/two-week", { credentials: "include" });
+  dates.forEach(date => {
+    const rows = allocated[date] || [];
+    rows.forEach(r => allTeeNumbers.add(r.tee_time_number));
+  });
 
-  console.log("STATUS:", res.status);
+  const teeNumbers = Array.from(allTeeNumbers).sort((a, b) => a - b);
 
-  const text = await res.text();
-  console.log("RAW RESPONSE:", text);
+  let html = `
+    <table class="report-table" style="table-layout: fixed; width: auto;">
+      <thead>
+        <tr>
+          <th style="
+            text-align:left;
+            width: 120px;
+            min-width: 120px;
+            max-width: 120px;
+            padding: 4px 6px;
+          ">
+            Tee Time
+          </th>
+  `;
 
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    console.log("JSON PARSE FAILED");
-    return;
-  }
+  // Date headers
+  dates.forEach(d => {
+    const [year, month, day] = d.split("-").map(Number);
+    const dt = new Date(year, month - 1, day);
 
-  // Build table HTML
+    const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
+    const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+
+    html += `
+      <th style="
+        text-align:center;
+        width: 55px;
+        min-width: 55px;
+        max-width: 55px;
+        padding: 4px 2px;
+      ">
+        <div>${dow}</div>
+        <div style="font-size:12px; color:#555;">${md}</div>
+      </th>
+    `;
+  });
+
+  html += `
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  // -----------------------------
+  // Starting 9 row
+  // -----------------------------
+  html += `<tr><td><strong>Starting 9</strong></td>`;
+
+  dates.forEach(date => {
+    const rows = allocated[date] || [];
+    const starting9 = rows.length > 0 ? rows[0].first_nine : "—";
+    html += `<td style="text-align:center;">${starting9}</td>`;
+  });
+
+  html += `</tr>`;
+
+  // -----------------------------
+  // Tee time rows
+  // -----------------------------
+  teeNumbers.forEach(num => {
+    html += `<tr><td>${num}</td>`;
+
+    dates.forEach(date => {
+      const rows = allocated[date] || [];
+      const match = rows.find(r => r.tee_time_number === num);
+      html += `<td style="text-align:center;">${match ? match.tee_time : ""}</td>`;
+    });
+
+    html += `</tr>`;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  return html;
+}
+
+// ------------------------------------------------------
+// Helper: Build Two-Week Golfers Report Table (left column)
+// ------------------------------------------------------
+function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
   let html = `
     <table class="report-table" style="table-layout: fixed; width: auto;">
       <thead>
@@ -40,7 +118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </th>
   `;
 
-  // Date headers (DOW + M/D, no leading zeros, narrow columns)
+  // Date headers
   data.dates.forEach(d => {
     const [year, month, day] = d.split("-").map(Number);
     const dt = new Date(year, month - 1, day);
@@ -71,7 +149,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <tbody>
   `;
 
-  // Capture players + guests
+  // Player rows
   data.players.forEach(p => {
 
     if (p.is_guest) {
@@ -81,9 +159,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     html += `<tr><td>${p.name}</td>`;
+
     data.dates.forEach(d => {
       html += `<td>${p.plays[d] || " "}</td>`;
     });
+
     html += `</tr>`;
   });
 
@@ -95,7 +175,50 @@ document.addEventListener("DOMContentLoaded", async () => {
   html += `</tr>`;
 
   html += `</tbody></table>`;
-  container.innerHTML = html;
+  return html;
+}
+
+// ------------------------------------------------------
+// DOMContentLoaded
+// ------------------------------------------------------
+document.addEventListener("DOMContentLoaded", async () => {
+
+  // Track players + guests appearing in the report
+  const playersInReport = new Set();
+  const guestsInReport = new Set();
+
+  // Load the combined report data
+  const container = document.getElementById("report-table-container");
+  const res = await fetch("/admin/reports/two-week/full", { credentials: "include" });
+
+  console.log("STATUS:", res.status);
+
+  const text = await res.text();
+  console.log("RAW RESPONSE:", text);
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    console.log("JSON PARSE FAILED");
+    return;
+  }
+
+  // Build left + right columns
+  const leftHTML = buildTwoWeekTableHTML(data, playersInReport, guestsInReport);
+  const rightHTML = buildAllocatedTeeTimesTableHTML(data.dates, data.allocatedTeeTimes);
+
+  // Insert side-by-side layout
+  container.innerHTML = `
+    <div class="reports-two-column">
+      <div class="left-report">
+        ${leftHTML}
+      </div>
+      <div class="right-report">
+        ${rightHTML}
+      </div>
+    </div>
+  `;
 
   // -----------------------------
   // MODAL OPEN/CLOSE
