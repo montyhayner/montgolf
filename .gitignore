@@ -1,2 +1,20 @@
+# Environment variables
+.env
+
+# Node modules
 node_modules/
-node_modules/
+
+# Logs
+logs/
+*.log
+
+# SQLite DB files
+*.db
+*.sqbpro
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
