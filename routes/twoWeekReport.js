@@ -237,7 +237,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
       await transporter.sendMail({
-        from: `rlhayner@verizon.net`,
+        from: "rlhayner@verizon.net",
         to: user.email,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         text: emptyText,
@@ -340,7 +340,7 @@ router.post("/admin/reports/two-week/email", requireAdmin, async (req, res) => {
     // 4. Send the email
     // -----------------------------
     await transporter.sendMail({
-      from: `rlhayner@verizon.net`,
+      from: "rlhayner@verizon.net",
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,
