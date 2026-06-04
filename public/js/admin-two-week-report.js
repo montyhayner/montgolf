@@ -20,8 +20,9 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
   let html = `
     <table class="report-table" style="table-layout: fixed; width: auto;">
       <thead>
-        <tr>
+        <tr style="background:#e6ffe6;">
           <th style="
+            background:#e6ffe6;
             text-align:left;
             width: 120px;
             min-width: 120px;
@@ -42,6 +43,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
 
     html += `
       <th style="
+        background:#e6ffe6;
         text-align:center;
         width: 55px;
         min-width: 55px;
@@ -61,9 +63,9 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
   `;
 
   // -----------------------------
-  // Starting 9 row
+  // Starting 9 row (always white)
   // -----------------------------
-  html += `<tr><td><strong>Starting 9</strong></td>`;
+  html += `<tr style="background:#ffffff;"><td><strong>Starting 9</strong></td>`;
 
   dates.forEach(date => {
     const rows = allocated[date] || [];
@@ -74,10 +76,13 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
   html += `</tr>`;
 
   // -----------------------------
-  // Tee time rows
+  // Tee time rows (alternate green/white)
   // -----------------------------
-  teeNumbers.forEach(num => {
-    html += `<tr><td>${num}</td>`;
+  teeNumbers.forEach((num, idx) => {
+    html += `
+      <tr style="background:${idx % 2 === 0 ? '#e6ffe6' : '#ffffff'};">
+        <td>${num}</td>
+    `;
 
     dates.forEach(date => {
       const rows = allocated[date] || [];
@@ -96,6 +101,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
   return html;
 }
 
+
 // ------------------------------------------------------
 // Helper: Build Two-Week Golfers Report Table (left column)
 // ------------------------------------------------------
@@ -103,8 +109,9 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
   let html = `
     <table class="report-table" style="table-layout: fixed; width: auto;">
       <thead>
-        <tr>
+        <tr style="background:#e6ffe6;">
           <th style="
+            background:#e6ffe6;
             text-align:left;
             width: 180px;
             min-width: 180px;
@@ -128,6 +135,7 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
 
     html += `
       <th style="
+        background:#e6ffe6;
         text-align:center;
         width: 55px;
         min-width: 55px;
@@ -149,8 +157,8 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
       <tbody>
   `;
 
-  // Player rows
-  data.players.forEach(p => {
+  // Player rows (alternate white/green)
+  data.players.forEach((p, idx) => {
 
     if (p.is_guest) {
       guestsInReport.add(p.id);
@@ -158,25 +166,39 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
       playersInReport.add(p.id);
     }
 
-    html += `<tr><td>${p.name}</td>`;
+    html += `
+      <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#e6ffe6'};">
+        <td>${p.name}</td>
+    `;
 
     data.dates.forEach(d => {
-      html += `<td>${p.plays[d] || " "}</td>`;
+      html += `<td style="text-align:center;">${p.plays[d] || " "}</td>`;
     });
 
     html += `</tr>`;
   });
 
-  // Totals row
-  html += `<tr class="totals-row"><td><strong>Total</strong></td>`;
-  data.dates.forEach(d => {
-    html += `<td>${data.totals[d]}</td>`;
-  });
-  html += `</tr>`;
+  // Totals row (follows alternating pattern)
+  const totalRowColor = data.players.length % 2 === 0 ? '#ffffff' : '#e6ffe6';
 
-  html += `</tbody></table>`;
+  html += `
+    <tr style="background:${totalRowColor}; font-weight:bold;">
+      <td>Total</td>
+  `;
+
+  data.dates.forEach(d => {
+    html += `<td style="text-align:center;">${data.totals[d]}</td>`;
+  });
+
+  html += `
+    </tr>
+    </tbody>
+    </table>
+  `;
+
   return html;
 }
+
 
 // ------------------------------------------------------
 // DOMContentLoaded

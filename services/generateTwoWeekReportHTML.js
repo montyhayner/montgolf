@@ -25,70 +25,65 @@ function generateTwoWeekReportHTML(dates, rows, totals, allocatedTeeTimes, leagu
 
     let html = `
       <table style="width:100%; border-collapse: collapse; max-width: 700px; margin: 20px auto 0 auto;">
-        <thead>
-          <tr>
-            <th style="padding: 8px; background:#f4f4f4; border:1px solid #ccc; text-align:left;">
-              Tee Time
-            </th>
-    `;
+      <thead>
+        <tr style="background:#e6ffe6;">
+          <th style="padding: 8px; border:1px solid #ccc; text-align:left;">Tee Time</th>
+          ${dates.map(d => {
+            const [y, m, day] = d.split("-").map(Number);
+            const dt = new Date(y, m - 1, day);
+            const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
+            const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 
-    dates.forEach(d => {
-      const [y, m, day] = d.split("-").map(Number);
-      const dt = new Date(y, m - 1, day);
-      const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
-      const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
-
-      html += `
-        <th style="padding: 8px; background:#f4f4f4; border:1px solid #ccc; text-align:center;">
-          <div>${dow}</div>
-          <div style="font-size:12px; color:#555;">${md}</div>
-        </th>
-      `;
-    });
-
-    html += `
-          </tr>
-        </thead>
+            return `
+              <th style="padding: 8px; border:1px solid #ccc; text-align:center;">
+                <div>${dow}</div>
+                <div style="font-size:12px; color:#555;">${md}</div>
+              </th>
+            `;
+          }).join("")}
+        </tr>
+      </thead>
         <tbody>
     `;
 
-    // Starting 9 row
-    html += `
-      <tr>
-        <td style="padding: 6px; border:1px solid #ccc;"><strong>Starting 9</strong></td>
-    `;
-
-    dates.forEach(date => {
+// Starting 9 row (always white)
+html += `
+  <tr style="background:#ffffff;">
+    <td style="padding: 6px; border:1px solid #ccc;"><strong>Starting 9</strong></td>
+    ${dates.map(date => {
       const rows = allocated[date] || [];
       const starting9 = rows.length > 0 ? rows[0].first_nine : "—";
-      html += `
+      return `
         <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
           ${starting9}
         </td>
       `;
-    });
+    }).join("")}
+  </tr>
+`;
 
-    html += `</tr>`;
+// Tee time rows with alternating green shading
+teeNumbers.forEach((num, idx) => {
+  html += `
+    <tr style="background:${idx % 2 === 0 ? '#e6ffe6' : '#ffffff'};">
+      <td style="padding: 6px; border:1px solid #ccc;">${num}</td>
+  `;
 
-    // Tee time rows
-    teeNumbers.forEach(num => {
-      html += `
-        <tr>
-          <td style="padding: 6px; border:1px solid #ccc;">${num}</td>
-      `;
+  dates.forEach(date => {
+    const rows = allocated[date] || [];
+    const match = rows.find(r => r.tee_time_number === num);
 
-      dates.forEach(date => {
-        const rows = allocated[date] || [];
-        const match = rows.find(r => r.tee_time_number === num);
-        html += `
-          <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
-            ${match ? match.tee_time : ""}
-          </td>
-        `;
-      });
+    html += `
+      <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
+        ${match ? match.tee_time : ""}
+      </td>
+    `;
+  });
 
-      html += `</tr>`;
-    });
+  html += `</tr>`;
+});
+
+
 
     html += `
         </tbody>
@@ -109,45 +104,46 @@ function generateTwoWeekReportHTML(dates, rows, totals, allocatedTeeTimes, leagu
 
     <!-- LEFT SIDE TABLE -->
     <table style="width:100%; border-collapse: collapse; max-width: 700px; margin: 0 auto;">
-      <thead>
-        <tr>
-          <th style="padding: 8px; background:#f4f4f4; border:1px solid #ccc; text-align:left;">Golfer</th>
-            ${dates.map(d => {
-              const [year, month, day] = d.split("-").map(Number);
-              const dt = new Date(year, month - 1, day);
-              const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
-              const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+    <thead>
+      <tr style="background:#e6ffe6;">
+        <th style="padding: 8px; border:1px solid #ccc; text-align:left;">Golfer</th>
+        ${dates.map(d => {
+          const [year, month, day] = d.split("-").map(Number);
+          const dt = new Date(year, month - 1, day);
+          const dow = dt.toLocaleDateString("en-US", { weekday: "short" });
+          const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 
-              return `
-                <th style="padding: 8px; background:#f4f4f4; border:1px solid #ccc; text-align:center;">
-                  <div>${dow}</div>
-                  <div style="font-size:12px; color:#555;">${md}</div>
-                </th>
-              `;
-            }).join("")}
-        </tr>
-      </thead>
+          return `
+            <th style="padding: 8px; border:1px solid #ccc; text-align:center;">
+              <div>${dow}</div>
+              <div style="font-size:12px; color:#555;">${md}</div>
+            </th>
+          `;
+        }).join("")}
+      </tr>
+    </thead>
+
 
       <tbody>
-        ${rows.map(r => `
-          <tr>
-            <td style="padding: 6px; border:1px solid #ccc;">${r.name}</td>
-            ${dates.map(d => `
-              <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
-                ${r.plays[d] || ""}
-              </td>
-            `).join("")}
-          </tr>
+    ${rows.map((r, idx) => `
+      <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#e6ffe6'};">
+        <td style="padding: 6px; border:1px solid #ccc;">${r.name}</td>
+        ${dates.map(d => `
+          <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
+            ${r.plays[d] || ""}
+          </td>
         `).join("")}
+      </tr>
+    `).join("")}
 
-        <tr style="background:#fafafa; font-weight:bold;">
-          <td style="padding: 6px; border:1px solid #ccc;">Total</td>
-          ${dates.map(d => `
-            <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
-              ${totals[d]}
-            </td>
-          `).join("")}
-        </tr>
+      <tr style="background:${rows.length % 2 === 0 ? '#ffffff' : '#e6ffe6'}; font-weight:bold;">
+        <td style="padding: 6px; border:1px solid #ccc;">Total</td>
+        ${dates.map(d => `
+          <td style="padding: 6px; border:1px solid #ccc; text-align:center;">
+            ${totals[d]}
+          </td>
+        `).join("")}
+      </tr>
       </tbody>
     </table>
 
