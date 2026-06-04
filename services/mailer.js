@@ -1,12 +1,12 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,      // smtp.aol.com
-  port: process.env.EMAIL_PORT,      // 465
-  secure: process.env.EMAIL_SECURE === "true", // true
+  host: "smtp.sendgrid.net",
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.EMAIL_USER,    // rlhayner@verizon.net
-    pass: process.env.EMAIL_PASS
+    user: "apikey",
+    pass: process.env.SENDGRID_API_KEY
   }
 });
 
