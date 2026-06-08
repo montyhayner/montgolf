@@ -1490,41 +1490,32 @@ app.post(
   }
 );
 
-// ---------------------------------------------------------------------
-// SUPER ADMIN LEAGUE SELECTION (POST)
-// ---------------------------------------------------------------------
 app.post("/auth/select-league", requireAdminLoginOnly, async (req, res) => {
     const leagueId = parseInt(req.body.league_id, 10);
 
     try {
         const league = await db.getAsync(
-            `SELECT id
-                  , league_name 
-               FROM leagues 
-              WHERE id = ?`,
+            `SELECT id, league_name FROM leagues WHERE id = ?`,
             [leagueId]
         );
 
         if (!league) {
-            return res.status(400).send("Invalid league selection.");
+            return res.status(400).json({ error: "Invalid league selection." });
         }
 
-        // Store selected league in session
-        req.session.league_id = league.id;
-        req.session.league_name = league.league_name;
-
-        // Also update the user object for consistency
+        // Store selected league ONLY inside req.session.user
         req.session.user.league_id = league.id;
+        req.session.user.league_name = league.league_name;
 
-        console.log("SUPER ADMIN SELECTED LEAGUE:", req.session);
+        console.log("SUPER ADMIN SELECTED LEAGUE:", req.session.user);
 
-        return req.session.save(() => {
-            res.redirect("/admin-dashboard");
+        req.session.save(() => {
+            res.json({ success: true });
         });
 
     } catch (err) {
         console.error("Error selecting league:", err);
-        res.status(500).send("Server error");
+        res.status(500).json({ error: "Server error" });
     }
 });
 
