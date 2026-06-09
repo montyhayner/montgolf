@@ -452,103 +452,80 @@ async function autoPlaceGolfers(leagueId, teeDate, addedGolfers, changedBy) {
 app.post("/admin-login", async (req, res) => {
     const { email, password } = req.body;
 
-    console.log("LOGIN BODY:", req.body);
-
     try {
-        // 1. SUPER ADMIN LOGIN
-	console.log(  "SQL:",
-  "SELECT * FROM super_admins WHERE email = '" + email + "' AND password_hash = '" + password + "'"
-);
+        // SUPER ADMIN LOGIN
         const superAdmin = await db.getAsync(
             "SELECT * FROM super_admins WHERE email = ? AND password_hash = ?",
             [email, password]
         );
 
-        console.log("SUPER ADMIN QUERY RESULT:", superAdmin);
+        if (superAdmin) {
+            req.session.user = {
+                id: superAdmin.id,
+                email: superAdmin.email,
+                first_name: superAdmin.first_name,
+                last_name: superAdmin.last_name,
+                is_super_admin: true,
+                is_admin: false,
+                league_id: null,
+                league_name: null
+            };
 
-    if (superAdmin) {
-        req.session.user = {
-            id: superAdmin.id,
-            email: superAdmin.email,
-            first_name: superAdmin.first_name,
-            last_name: superAdmin.last_name,
-            is_super_admin: true,
-            is_admin: false,
-            league_id: null
-        };
+            return req.session.save(() => {
+                res.redirect("/auth/select-league");
+            });
+        }
 
-         // ADD THESE TWO LINES:
-        req.session.league_id = null;
-        req.session.league_name = null;
-
-        console.log("SUPER ADMIN LOGIN SUCCESS:", req.session.user);
-
-        return req.session.save(() => {
-            res.redirect("/auth/select-league");
-        });
-     }
-
-  // 2. LEAGUE ADMIN LOGIN (supports multi-league admins)
-  // Get all users that match on email id and have is_admin = 1 (league admin)
-  // If no rows are returned, display a message indicating that the user
-  // is neither a Super Admin nor a League Admin.
-  // If at least one row is returned, compare the bcryption of the user entered
-  // password against the value found in the users table.  If the password 	
-  // matches, the user IS a League Admin.  If none of the rows returned
-  // matches on password, the user is Neither a Super Admin Nor a League
-  // Admin.  If only one league matches the user's email and PW, return the
-  // league id.  If more than one league matches, return -1 as the league_id
-
+        // LEAGUE ADMIN LOGIN
         const rows = await db.allAsync(
-             `SELECT users.id
-	                 , users.email
- 			             , users.password_hash
-	                 , users.first_name
-                   , users.last_name
-                   , leagues.league_name
-                FROM  users
-                JOIN leagues ON leagues.id = users.league_id
-               WHERE users.email = ?
-                 AND users.is_admin = 1`,
+            `SELECT users.id,
+                    users.email,
+                    users.password_hash,
+                    users.first_name,
+                    users.last_name,
+                    users.league_id,
+                    leagues.league_name
+             FROM users
+             JOIN leagues ON leagues.id = users.league_id
+             WHERE users.email = ?
+               AND users.is_admin = 1`,
             [email]
         );
 
-  let user = null;
-	let leaguesCount = 0;
+        let user = null;
 
-  for (const row of rows) {
-    const match = await bcrypt.compare(password, row.password_hash);
-    if (match) {
+        for (const row of rows) {
+            const match = await bcrypt.compare(password, row.password_hash);
+            if (match) {
                 user = row;
-		            adminLeague = user.league_id;
-		            leaguesCount = 1;
-                console.log("LEAGUE ADMIN User and Password  MATCHED:", user);
-                req.session.user = {
-                id: user.id,
-                email: user.email,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                is_super_admin: false,
-                is_admin: true,
-                league_id: user.league_id
-                };
-		  req.session.league_id = user.league_id;
-      req.session.league_name = user.league_name;
- 	    break;
-	    }
-    }
-	  if (leaguesCount === 0) {
-      console.log("LOGIN FAILED user is neither a Super Admin nor a League Admin email = ", email );
-      return res.redirect("/admin-login?error=Invalid Admin credentials");
-	  }
-    return req.session.save(() => {
-           res.redirect("/admin-dashboard");  // NOT select-league for league admins
-    });
 
-  } catch (err) {
-        console.error("❌ Login error in POST of admin-login:", err);
+                req.session.user = {
+                    id: user.id,
+                    email: user.email,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    is_super_admin: false,
+                    is_admin: true,
+                    league_id: user.league_id,
+                    league_name: user.league_name
+                };
+
+                break;
+            }
+        }
+
+        if (!user) {
+            return res.redirect("/admin-login?error=Invalid Admin credentials");
+        }
+
+        return req.session.save(() => {
+            res.redirect("/admin-dashboard");
+        });
+
+    } catch (err) {
+        console.error("❌ Login error:", err);
         return res.redirect("/admin-login?error=Server error.");
-  }
+    }
 });
 
 // ------------------------------
@@ -823,50 +800,48 @@ app.get("/admin/tee-sheet/:leagueId/:teeDate", requireTeeSheetEditor, (req, res)
 
 
 app.get("/admin/tee-sheet", requireAdmin, async (req, res) => {
-  console.log("admin/tee-sheet get route - TEE SHEET ROUTE SESSION:", req.session);
+    console.log("admin/tee-sheet get route - SESSION:", req.session);
 
-  const leagueId = req.session.league_id;
+    const leagueId = req.session.user?.league_id;
 
-  if (!leagueId) {
-    return res.status(400).send("No league selected. Please log in again.");
-  }
-
-  try {
-    // Find the most recent tee_date for this league
-    const row = await dbGet(
-      `SELECT MAX(tee_date) AS max_date
-            FROM tee_sheet
-        WHERE league_id = ?`,
-      [leagueId]
-    );
-
-    if (!row || !row.max_date) {
-      return res.send(`
-        <h2>No tee sheet found</h2>
-        <p>The upcoming tee sheet has not been generated yet.</p>
-      `);
+    if (!leagueId) {
+        return res.status(400).send("No league selected. Please log in again.");
     }
 
-    const maxDate = row.max_date;
-    const today = new Date().toISOString().slice(0, 10);
-
-    if (maxDate < today) {
-      return res.send(`
-        <h2>No upcoming tee sheet</h2>
-        <p>The most recent tee sheet (${maxDate}) is in the past.<br>
-        The upcoming tee sheet has not been generated yet.</p>
-      `);
-    }
-
-    // Redirect to the editor for this league/date
-        return res.redirect(
-          `/admin/tee-sheet/${leagueId}/${maxDate}?leagueId=${leagueId}&teeDate=${maxDate}`
+    try {
+        const row = await dbGet(
+            `SELECT MAX(tee_date) AS max_date
+             FROM tee_sheet
+             WHERE league_id = ?`,
+            [leagueId]
         );
 
-  } catch (err) {
-    console.error("Error loading tee sheet:", err);
-    res.status(500).send("Server error");
-  }
+        if (!row || !row.max_date) {
+            return res.send(`
+                <h2>No tee sheet found</h2>
+                <p>The upcoming tee sheet has not been generated yet.</p>
+            `);
+        }
+
+        const maxDate = row.max_date;
+        const today = new Date().toISOString().slice(0, 10);
+
+        if (maxDate < today) {
+            return res.send(`
+                <h2>No upcoming tee sheet</h2>
+                <p>The most recent tee sheet (${maxDate}) is in the past.<br>
+                The upcoming tee sheet has not been generated yet.</p>
+            `);
+        }
+
+        return res.redirect(
+            `/admin/tee-sheet/${leagueId}/${maxDate}?leagueId=${leagueId}&teeDate=${maxDate}`
+        );
+
+    } catch (err) {
+        console.error("Error loading tee sheet:", err);
+        res.status(500).send("Server error");
+    }
 });
 
 // ----------------------------------------------------------------------------------
@@ -1490,33 +1465,21 @@ app.post(
   }
 );
 
-app.post("/auth/select-league", requireAdminLoginOnly, async (req, res) => {
-    const leagueId = parseInt(req.body.league_id, 10);
+app.post("/auth/select-league", requireAdmin, async (req, res) => {
+    const { league_id } = req.body;
 
-    try {
-        const league = await db.getAsync(
-            `SELECT id, league_name FROM leagues WHERE id = ?`,
-            [leagueId]
-        );
+    req.session.user.league_id = league_id;
 
-        if (!league) {
-            return res.status(400).json({ error: "Invalid league selection." });
-        }
+    const row = await db.getAsync(
+        "SELECT league_name FROM leagues WHERE id = ?",
+        [league_id]
+    );
 
-        // Store selected league ONLY inside req.session.user
-        req.session.user.league_id = league.id;
-        req.session.user.league_name = league.league_name;
+    req.session.user.league_name = row?.league_name || null;
 
-        console.log("SUPER ADMIN SELECTED LEAGUE:", req.session.user);
-
-        req.session.save(() => {
-            res.json({ success: true });
-        });
-
-    } catch (err) {
-        console.error("Error selecting league:", err);
-        res.status(500).json({ error: "Server error" });
-    }
+    return req.session.save(() => {
+        res.redirect("/admin-dashboard");
+    });
 });
 
 // ------------------------------
@@ -1541,8 +1504,9 @@ app.get("/admin-dashboard", requireAdmin, (req, res) => {
         admin_id: req.session.user?.id,
         league_id: req.session.user?.league_id
     });
-    console.log("session.league_id =", req.session.league_id);
-    console.log("session.league_name =", req.session.league_name);
+
+    console.log("session.user.league_id =", req.session.user?.league_id);
+    console.log("session.user.league_name =", req.session.user?.league_name);
 
     res.sendFile(path.join(__dirname, "public", "admin-dashboard.html"));
 });
