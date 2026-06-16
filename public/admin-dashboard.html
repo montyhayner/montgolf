@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Admin Dashboard</title>
-    <link rel="stylesheet" href="/css/admin-nav.css">
     <link rel="stylesheet" href="/css/admin-identity.css">
 
     <style>
@@ -69,7 +68,10 @@
 
 <body>
 
-    <div id="admin-nav-container"></div>
+    <div id="nav-container"></div>
+    <link id="nav-css" rel="stylesheet">
+    <script src="/js/nav-loader.js"></script>
+
     <div id="admin-identity-container"></div>
 
     <div class="container">
@@ -162,43 +164,24 @@
 
 <script>
 
-        async function safeJson(res) {
-            const text = await res.text();
-            try {
-                return JSON.parse(text);
-            } catch {
-                throw new Error("Invalid JSON response: " + text);
-            }
-        }
-
-async function loadAdminNav() {
-    const navContainer = document.getElementById("admin-nav-container");
-    const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
-    const html = await res.text();
-    navContainer.innerHTML = html;
-
-    // Highlight current page
-    const path = window.location.pathname;
-
-    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
-        const href = link.getAttribute("href");
-        if (href === path || (href !== "/" && path.startsWith(href))) {
-            link.classList.add("active");
-        }
-    });
-
-    return true;
+async function safeJson(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error("Invalid JSON response: " + text);
+    }
 }
 
-        function showError(message) {
-            const loading = document.getElementById("loading");
-            const errorBox = document.getElementById("error-box");
+function showError(message) {
+    const loading = document.getElementById("loading");
+    const errorBox = document.getElementById("error-box");
 
-            loading.style.display = "none";
-            errorBox.style.display = "block";
+    loading.style.display = "none";
+    errorBox.style.display = "block";
 
-            document.getElementById("error-message").innerText = message;
-        }
+    document.getElementById("error-message").innerText = message;
+}
 
 // -------------------------------------------------------
 // Load Session variable values
@@ -218,7 +201,7 @@ async function loadSession() {
 // --------------------------------------------------------------------------
 //   Populate Identity bar (icon + role + name + color)
 // --------------------------------------------------------------------------
-async function loadAdminIdentity(session) {
+async function loadAdminIdentityBar(session) {
     const container = document.getElementById("admin-identity-container");
     if (!container) return;
 
@@ -267,10 +250,10 @@ async function loadDashboard(session) {
         // -----------------------------
         // 2. Super Admin with no league selected → redirect
         // -----------------------------
-        if (session.is_super_admin && !session.league_id) {
-            window.location.href = "/auth/select-league";
-            return;
-        }
+        // if (session.is_super_admin && !session.league_id) {
+        //    window.location.href = "/auth/select-league";
+        //    return;
+        // }
 
         let league = null;
 
@@ -320,26 +303,16 @@ async function loadDashboard(session) {
 
 async function initPage() {
     try {
-        await loadAdminNav();
         const session = await loadSession();
-        await loadAdminIdentity(session);
+        await loadAdminIdentityBar(session);
         await loadDashboard(session);
     } catch (err) {
         console.error("Page initialization error:", err);
     }
 }
 
-initPage();
-
-document.addEventListener("DOMContentLoaded", () => {
-  const current = window.location.pathname;
-  const links = document.querySelectorAll(".nav-links a");
-
-  links.forEach(link => {
-    if (link.getAttribute("href") === current) {
-      link.classList.add("active");
-    }
-  });
+document.addEventListener("DOMContentLoaded", async () => {
+  initPage();
 });
 
 </script>

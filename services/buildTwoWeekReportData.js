@@ -11,7 +11,7 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = schedule.user_id
     WHERE schedule.is_playing = 1
       AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
+      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-16 hours')
       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
     ORDER BY play_date
   `).all(leagueId);
@@ -19,7 +19,12 @@ async function buildTwoWeekReportData(db, leagueId) {
   const dates = dateRows.map(r => r.play_date);
 
   if (dates.length === 0) {
-    return { dates: [], rows: [], totals: {}, allocatedTeeTimes: {} };
+    return {
+      dates: [],
+      players: [],
+      totals: {},
+      allocatedTeeTimes: {}
+    };
   }
 
   // ------------------------------------------------------------
@@ -34,7 +39,7 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = schedule.user_id
     WHERE schedule.is_playing = 1
       AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
+      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-16 hours')
       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
     ORDER BY users.last_name, users.first_name
   `).all(leagueId);
@@ -52,11 +57,11 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = guests.sponsor_user_id
     WHERE users.league_id = ?
       AND (
-           guests.date1 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date2 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date3 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date4 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date5 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+           guests.date1 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date2 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date3 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date4 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date5 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
       )
     ORDER BY last_name, first_name
   `).all(leagueId);
@@ -81,12 +86,12 @@ async function buildTwoWeekReportData(db, leagueId) {
   ];
 
   // ------------------------------------------------------------
-  // 4. Build spreadsheet matrix
+  // 4. Build players array (unified structure)
   // ------------------------------------------------------------
   const totals = {};
   dates.forEach(d => totals[d] = 0);
 
-  const rows = allPeople.map(person => {
+  const players = allPeople.map(person => {
     const name = `${person.first_name} ${person.last_name}${person.is_member ? "" : "*"}`;
     const plays = {};
 
@@ -114,32 +119,38 @@ async function buildTwoWeekReportData(db, leagueId) {
       plays[d] = mark;
     }
 
-    return { id: person.id, is_guest: person.type === "guest" ? 1 : 0, name, plays };
+    return {
+      id: person.id,
+      is_guest: person.type === "guest" ? 1 : 0,
+      name,
+      plays
+    };
   });
 
   // ------------------------------------------------------------
-  // 5. Allocated Tee Times (NEW)
+  // 5. Allocated Tee Times (flattened)
   // ------------------------------------------------------------
-  const allocatedTeeTimes = {};
+const allocatedTeeTimes = {};
 
-  dates.forEach(date => {
-    const rows = db.prepare(`
-      SELECT tee_time_number, tee_time, first_nine
-      FROM allocated_tee_times
-      WHERE league_id = ?
-        AND play_date = ?
-      ORDER BY tee_time_number
-    `).all(leagueId, date);
+dates.forEach(date => {
+  const teeRows = db.prepare(`
+    SELECT tee_time_number, tee_time, first_nine
+    FROM allocated_tee_times
+    WHERE league_id = ?
+      AND play_date = ?
+    ORDER BY tee_time_number
+  `).all(leagueId, date);
 
-    allocatedTeeTimes[date] = rows;
-  });
+  allocatedTeeTimes[date] = teeRows;
+});
+
 
   // ------------------------------------------------------------
   // 6. Return unified structure
   // ------------------------------------------------------------
   return {
     dates,
-    rows,
+    players,
     totals,
     allocatedTeeTimes
   };

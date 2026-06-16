@@ -7,11 +7,28 @@
     <link rel="stylesheet" href="/css/navbar.css">
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f7f7f7;
-            margin: 0;
-            padding: 0;
+      body {
+          margin: 0;
+          padding: 0;
+          font-family: Arial, sans-serif;
+          background: #f7f7f7;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        /* Page Header */
+        #pageHeader {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #f7f5bc;      
+            color: #333;
+            padding: 2px 0 4px 0;
+            border-bottom: 1px solid #ddd;
+            line-height: 1.2;
+            margin-top: 0;
         }
 
         .container {
@@ -22,6 +39,18 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+
+          /* Page Header */
+          #pageHeader {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+          }
 
         h2 {
             margin-top: 0;
@@ -165,7 +194,11 @@
 
 <body>
 
-<div id="user-nav-container"></div>
+<div id="nav-container"></div>
+<link id="nav-css" rel="stylesheet">
+<script src="/js/nav-loader.js"></script>
+
+<h1 id="pageHeader"></h1>
 
 <div class="container">
   <h2>Edit Profile</h2>
@@ -194,34 +227,20 @@
 document.addEventListener("DOMContentLoaded", async () => {
 
   //
-  // 1. Load NAV BAR FIRST
+  // Load user + league info and build page header
   //
-  const navHtml = await fetch("/partials/user-nav.html").then(r => r.text());
-  document.getElementById("user-nav-container").innerHTML = navHtml;
+   const [userInfo, leagueInfo] = await Promise.all([
+     fetch("/user/info").then(r => r.json()),
+     fetch("/user/selected-league").then(r => r.json())
+  ]);
+  const user = userInfo.user;
+  const league = leagueInfo.league;
+  const userName = `${user.first_name} ${user.last_name}`;
+  const leagueName = league.league_name;
+  document.getElementById("pageHeader").textContent =
+  `Edit Profile – ${userName} – ${leagueName}`;
 
-  //
-  // 2. Highlight active link
-  //
-  const path = window.location.pathname;
-  document.querySelectorAll("#topNav .nav-link").forEach(link => {
-    if (link.getAttribute("href") === path) {
-      link.classList.add("active");
-    }
-  });
-
-  //
-  // 3. Attach Change Password link handler
-  //
-  const cpLink = document.querySelector("#topNav .nav-link[href='#']");
-  if (cpLink) {
-    cpLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      openChangePassword();
-    });
-  }
-
-  //
-  // 4. Attach modal button handlers
+  // 1. Attach modal button handlers
   //
     document.getElementById("cpCancel").addEventListener("click", closeChangePassword);
   document.getElementById("changePasswordBtn").addEventListener("click", openChangePassword);
@@ -271,7 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 1200);
   });
 
-  // 6. Attach password toggle handlers
+  // 2. Attach password toggle handlers
     document.querySelectorAll(".toggle-visibility").forEach(toggle => {
       toggle.addEventListener("click", () => {
         const id = toggle.getAttribute("data-target");
@@ -292,25 +311,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-  // 👉 7. ESC key closes modal
+  // 👉 3. ESC key closes modal
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeChangePassword();
     }
   });
 
-  // 👉 8. Click outside closes modal
+  // 👉 4. Click outside closes modal
   document.getElementById("changePasswordModal").addEventListener("click", (e) => {
     if (e.target.id === "changePasswordModal") {
       closeChangePassword();
     }
   });
 
-  // 9. Load profile
+  // 5. Load profile
   loadProfile();
 
 });
-
 
 //
 // Supporting functions

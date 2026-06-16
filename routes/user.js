@@ -7,6 +7,12 @@ const db = require("../db");
 const logger = require("../utils/logger");
 const { requireLogin } = require("../middleware/auth");
 const { easternNow } = require("../utils/easternTime");
+const {
+  getTwoWeekReport,
+  sendTwoWeekReportEmail,
+  getLatestTeeSheet,
+  sendLatestTeeSheetEmail
+} = require("../services/reportHandlers");
 
 // --- DB helpers (async/await wrappers) ---
 function dbGet(sql, params = []) {
@@ -42,6 +48,22 @@ router.get("/info", requireLogin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ------------------------------------------------------------
+// USER REPORTS
+// ------------------------------------------------------------
+
+// Two‑Week Golfers Report (JSON for the page)
+router.get("/reports/two-week", requireLogin, getTwoWeekReport);
+
+// Two‑Week Golfers Report (send email)
+router.post("/admin/reports/two-week/email", requireLogin, sendTwoWeekReportEmail);
+
+// Latest Tee Sheet Report (JSON for the page)
+router.get("/reports/latest-tee-sheet", requireLogin, getLatestTeeSheet);
+
+// Latest Tee Sheet Report (send email)
+router.post("/admin/reports/latest-tee-sheet/email", requireLogin, sendLatestTeeSheetEmail);
 
 // -----------------------------------------------------------------------------
 // SELECTED LEAGUE
@@ -526,6 +548,47 @@ for (const [date, newVal] of Object.entries(schedule)) {
   }
 });
 
+// ============================================================================
+// POST /auth/admin-login  (ADMIN LOGIN)
+// ============================================================================
+router.post("/admin-login", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Look up admin user
+    const user = await db.getAsync(
+      "SELECT * FROM users WHERE email = ? AND is_admin = 1",
+      [email]
+    );
+
+    if (!user) {
+      return res.redirect("/admin-login?error=1");
+    }
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.redirect("/admin-login?error=1");
+    }
+
+    // Save session
+    req.session.user = {
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      league_id: user.league_id,
+      is_admin: true,
+      is_super_admin: user.is_super_admin === 1,
+      user_mode: "admin"   // ⭐ REQUIRED
+    };
+
+    return res.redirect("/admin-dashboard");
+
+  } catch (err) {
+    console.error("🔥 ADMIN LOGIN ERROR:", err);
+    return res.redirect("/admin-login?error=1");
+  }
+});
 
 //---------------------------------------------------------
 //  DEFAULT (Generate default schedule, never save it)
@@ -655,7 +718,7 @@ router.put("/edit-profile", requireLogin, async (req, res) => {
     req.session.user.first_name = first_name;
     req.session.user.last_name = last_name;
     req.session.user.email = email;
-
+    req.session.user.user_mode = "user";
     res.json({ success: true });
 
   } catch (err) {
@@ -768,7 +831,14 @@ router.post("/select-league", requireLogin, async (req, res) => {
     req.session.user = {
       id: row.id,
       email: row.email,
-      league_id: row.league_id
+      league_id: row.league_id,
+
+      // ⭐ Preserve admin flags
+      is_admin: req.session.user.is_admin,
+      is_super_admin: req.session.user.is_super_admin,
+
+      // ⭐ Preserve user/admin mode
+      user_mode: req.session.user.user_mode
     };
 
     delete req.session.pendingUser;

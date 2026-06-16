@@ -3,19 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin Reports</title>
+<style>
+  .container h1, .container h2 {
+      text-align: center;
+  }
+  .container {
+      max-width: 1100px;
+      margin: 40px auto;
+      text-align: center;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+</style>
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/admin-nav.css">
-  <script defer src="/js/admin-reports.js"></script>
+  <link rel="stylesheet" href="/css/admin-identity.css">
 </head>
 <body>
 
   <!-- Load Admin Nav -->
-  <div id="nav-container"></div>
-  <script>
-    fetch("/partials/admin-nav.html")
-      .then(r => r.text())
-      .then(html => document.getElementById("nav-container").innerHTML = html);
-  </script>
+  <div id="admin-nav-container"></div>
+
+  <div id="admin-identity-container"></div>
 
   <div class="container" style="margin-top: 30px;">
     <h1>Admin Reports</h1>
@@ -29,10 +40,112 @@
 
     <p>Planned reports:</p>
     <ul>
-      <li>Two-week Golfers report</li>
-      <li>Next play date player list</li>
+      <li>Latest Tee Sheet report</li>
     </ul>
   </div>
 
+<script>
+
+// -------------------------------------------------------
+// Load Admin Nav Bar
+//--------------------------------------------------------
+async function loadAdminNav() {
+    const navContainer = document.getElementById("admin-nav-container");
+    const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+    const html = await res.text();
+    navContainer.innerHTML = html;
+
+    // Highlight current page
+    const path = window.location.pathname;
+
+    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href === path || (href !== "/" && path.startsWith(href))) {
+            link.classList.add("active");
+        }
+    });
+
+    return true;
+}  
+
+// -------------------------------------------------------
+// Load Session variable values
+//--------------------------------------------------------
+async function loadSession() {
+    const res = await fetch("/admin/session-info", { credentials: "include" });
+    const session = await res.json();
+
+    // Show Leagues link only for Super Admin
+    const leaguesLink = document.getElementById("nav-leagues-link");
+    if (leaguesLink) {
+        leaguesLink.style.display = session.is_super_admin ? "inline-block" : "none";
+    }
+
+    return session;   // ⭐ CRITICAL
+}
+
+// --------------------------------------------------------------------------
+//   Populate Identity bar (icon + role + name + color)
+// --------------------------------------------------------------------------
+async function loadAdminIdentity(session) {
+    const container = document.getElementById("admin-identity-container");
+    if (!container) return;
+
+    const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+    container.innerHTML = html;
+
+    const bar = container.querySelector(".admin-identity");
+    const icon = container.querySelector("#identity-icon");
+    const role = container.querySelector("#identity-role");
+    const name = container.querySelector("#identity-name");
+    const leagueBadge = container.querySelector("#identity-league");
+
+    // Always show admin's name
+    name.innerText = `${session.first_name} ${session.last_name}`;
+
+    if (session.is_super_admin) {
+        // Super Admin styling
+        bar.classList.add("super-admin");
+        icon.innerText = "⭐";
+        role.innerText = "Super Admin";
+
+        // Show league with prefix
+        if (session.league_name) {
+            leagueBadge.innerText = `Current League: ${session.league_name}`;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+
+    } else {
+        // League Admin styling
+        bar.classList.add("league-admin");
+        icon.innerText = "🏌️";
+        role.innerText = "League Admin";
+
+        // Show league name without prefix
+        if (session.league_name) {
+            leagueBadge.innerText = session.league_name;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+    }
+}
+async function initPage() {
+    try {
+        await loadAdminNav();
+        const session = await loadSession();
+        await loadAdminIdentity(session);
+        // await loadReports();
+    } catch (err) {
+        console.error("Page initialization error:", err);
+    }
+}
+
+initPage();
+
+</script>
+<script defer src="/js/admin-reports.js"></script>
 </body>
 </html>

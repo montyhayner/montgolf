@@ -1,38 +1,44 @@
-/* Admin Navigation Bar */
+/* Compact Admin Navigation Bar — slightly taller than identity bar */
 .admin-nav {
     background: #222;
     color: white;
-    padding: 12px 20px;
+    padding: 3px 6px;        /* ⬅️ was 1px — now +2px top and bottom */
     display: flex;
     align-items: center;
     font-family: Arial, sans-serif;
+    height: auto;
+    line-height: 1.1;        /* ⬅️ adds a hair of vertical comfort */
+    gap: 6px;
 }
 
+/* Left title ("Golf Scheduler") */
 .admin-nav .nav-left {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
+    line-height: 1.1;        /* ⬅️ matches nav bar line-height */
+    padding: 0;
 }
 
+/* Right-side links */
 .admin-nav .nav-links {
     margin-left: auto;
     display: flex;
-    gap: 24px;
+    gap: 12px;
     align-items: center;
 }
 
 .admin-nav .nav-links a {
     color: white;
     text-decoration: none;
-    font-size: 16px;
-}
-
-.admin-nav .nav-links a:hover {
-    text-decoration: underline;
+    font-size: 15px;
+    line-height: 1.1;        /* ⬅️ matches nav bar */
+    padding: 2px 6px;        /* ⬅️ slightly taller than identity bar */
+    border-radius: 4px;
 }
 
 .admin-nav .nav-links a.active {
     background: rgba(255, 255, 255, 0.18);
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: 2px 8px;        /* ⬅️ keeps highlight proportional */
+    border-radius: 4px;
     font-weight: bold;
 }

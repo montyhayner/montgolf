@@ -1,13 +1,14 @@
 /* FULL-WIDTH IDENTITY BAR */
 
+/* FULL-WIDTH IDENTITY BAR — FINAL VERSION */
 .admin-identity {
     width: 100%;
-    padding: 12px 20px;
+    padding: 1px 6px;        /* ⬅️ minimal vertical padding */
     border-radius: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    background-color: inherit; /* allows role class to override */
+    gap: 6px;                /* modest spacing between items */
+    background-color: inherit;
     border: none;
     margin: 0;
 }
@@ -17,8 +18,8 @@
     background-color: #fff7d6 !important;
     border: 1px solid #e6c76f !important;
     color: #8a6d1d !important;
-    padding: 4px 8px;
-    border-radius: 6px;
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 /* League Admin version */
@@ -54,16 +55,6 @@
 
 #identity-name {
     font-weight: bold;
-}
-
-/* FULL-WIDTH IDENTITY BAR */
-.admin-identity {
-    width: 100% !important;
-    padding: 12px 20px;
-    border-radius: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
 }
 
 /* FORCE SUPER ADMIN GOLD BACKGROUND */

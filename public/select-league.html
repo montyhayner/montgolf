@@ -106,10 +106,6 @@
             }
         }
 
-	async function loadUserSession() {
-
-	}
-
         document.addEventListener("DOMContentLoaded", () => {
             // Run immediately on page load
                 showLoginErrorFromURL();
@@ -164,31 +160,31 @@ async function loadLeagues() {
 
         // Continue with selected league
 
-		async function selectLeague() {
-    		const leagueId = document.getElementById("leagueSelect").value;
+async function selectLeague() {
+    try {
+        const leagueId = document.getElementById("leagueSelect").value;
 
-   		 if (!leagueId) {
-       		 showToast("Please select a league");
-       		 return;
-    		}
+        if (!leagueId) {
+            showToast("Please select a league");
+            return;
+        }
 
-    		try {
-        		await fetch("/auth/select-league", {
-          		  method: "POST",
-           		 headers: {
-                		"Content-Type": "application/x-www-form-urlencoded"
-           		 },
-           		 body: `league_id=${encodeURIComponent(leagueId)}`,
-            		credentials: "include"
-       		 });
+        await fetch("/auth/select-league", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ league_id: leagueId }),
+            credentials: "include"
+        });
 
-        		window.location.href = "/admin";
+        window.location.href = "/admin-dashboard";
 
-    		} catch (err) {
-     		   console.error(err);
-     		   showToast("Error selecting league");
-    		}
-		}
+    } catch (err) {
+        console.error(err);
+        showToast("Error selecting league");
+    }
+}
 
         // Create new league
         function createNewLeague() {

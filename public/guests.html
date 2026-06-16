@@ -3,21 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <title>My Guests</title>
-  <link rel="stylesheet" href="/css/navbar.css">
   <link rel="stylesheet" href="/css/common.css" />
   <link rel="stylesheet" href="/css/guests.css" />
 </head>
-
+<style>
+body {
+  margin: 0;
+  padding: 0;
+}
+h1, h2, h3 {
+    margin-top: 0;
+}
+/* Page Header */
+#pageHeader {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 20px;
+    font-weight: bold;
+    background-color: #f7f5bc;      
+    color: #333;
+    padding: 2px 0 4px 0;
+    border-bottom: 1px solid #ddd;
+    line-height: 1.2;
+    margin-top: 0;
+}
+</style>
 <body>
 
   <!-- USER NAV -->
-  <div id="userNav"></div>
-  <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-      const nav = await fetch("/partials/user-nav.html");
-      document.getElementById("userNav").innerHTML = await nav.text();
-    });
-  </script>
+  <div id="nav-container"></div>
+  <link id="nav-css" rel="stylesheet">
+  <script src="/js/nav-loader.js"></script>
+
+  <h1 id="pageHeader"></h1> 
 
   <div class="page-container">
 

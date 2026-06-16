@@ -1,31 +1,74 @@
+// ============================================================================
 // routes/reports.js
+// Centralized Reports Router
+// Mounted at: /api/reports
+// ============================================================================
+
 console.log("Reports router loaded");
 
 const express = require("express");
 const router = express.Router();
+const path = require("path");
 const db = require("../db");
 const logger = require("../utils/logger");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 const transporter = require("../services/mailer");
 
-// --- DB helpers (async/await wrappers) ---
+// Services
+const buildTwoWeekReportData = require("../services/buildTwoWeekReportData");
 
-function dbGet(sql, params = []) {
-  return db.getAsync(sql, params);
-}
+// DB async helpers
+function dbGet(sql, params = []) { return db.getAsync(sql, params); }
+function dbAll(sql, params = []) { return db.allAsync(sql, params); }
+function dbRun(sql, params = []) { return db.runAsync(sql, params); }
 
-function dbAll(sql, params = []) {
-  return db.allAsync(sql, params);
-}
+// ============================================================================
+// TWO-WEEK GOLFERS REPORT + ALLOCATED TEE TIMES (combined)
+// GET /api/reports/two-week/full
+// ============================================================================
+router.get("/two-week/full", requireLogin, async (req, res) => {
+  try {
+    const leagueId = req.session.user.league_id;
 
-function dbRun(sql, params = []) {
-  return db.runAsync(sql, params);
-}
+    const {
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes
+    } = await buildTwoWeekReportData(db, leagueId);
 
-// -----------------------------------------------------------------------------
-// REPORT 1: AVAILABLE NEXT TWO WEEKS FOR A LEAGUE
-// -----------------------------------------------------------------------------
+    if (!dates || dates.length === 0) {
+      return res.json({
+        dates: [],
+        players: [],
+        totals: {},
+        allocatedTeeTimes: {}
+      });
+    }
+    console.log("=== TWO-WEEK REPORT DEBUG ===");
+    console.log("dates:", dates);
+    console.log("players:", players);
+    console.log("totals:", totals);
+    console.log("allocatedTeeTimes:", allocatedTeeTimes);
+    console.log("================================");
 
+    res.json({
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes
+    });
+
+  } catch (err) {
+    console.error("Two-week FULL report error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// AVAILABLE NEXT TWO WEEKS FOR A LEAGUE
+// GET /api/reports/available-next-two-weeks/:leagueId
+// ============================================================================
 router.get("/available-next-two-weeks/:leagueId", requireAdmin, async (req, res) => {
   logger.route("GET", "/available-next-two-weeks/:leagueId");
 
@@ -69,10 +112,10 @@ router.get("/available-next-two-weeks/:leagueId", requireAdmin, async (req, res)
   }
 });
 
-// -----------------------------------------------------------------------------
-// REPORT 2: AVAILABLE ON A SPECIFIC DATE
-// -----------------------------------------------------------------------------
-
+// ============================================================================
+// AVAILABLE ON A SPECIFIC DATE
+// GET /api/reports/available-date/:leagueId/:date
+// ============================================================================
 router.get("/available-date/:leagueId/:date", requireAdmin, async (req, res) => {
   logger.route("GET", "/available-date/:leagueId/:date");
 
@@ -91,10 +134,7 @@ router.get("/available-date/:leagueId/:date", requireAdmin, async (req, res) => 
 
     const rows = await dbAll(sql, [leagueId, date]);
 
-    res.json({
-      date,
-      available: rows
-    });
+    res.json({ date, available: rows });
 
   } catch (err) {
     logger.error(err, "GET /available-date/:leagueId/:date");
@@ -102,6 +142,10 @@ router.get("/available-date/:leagueId/:date", requireAdmin, async (req, res) => 
   }
 });
 
+// ============================================================================
+// USER LIST (for admin email recipient selection)
+// GET /api/reports/usrs/list
+// ============================================================================
 router.get("/usrs/list", requireAdmin, async (req, res) => {
   try {
     const rows = await dbAll(
@@ -115,16 +159,16 @@ router.get("/usrs/list", requireAdmin, async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error("Error loading user list (as possible email recipients):", err);
-    res.status(500).json({ error: "Unable to load users (as possible email recipients)" });
+    console.error("Error loading user list:", err);
+    res.status(500).json({ error: "Unable to load users" });
   }
 });
 
-// -------------------------------------------------------------------------------------------------------------------
-// NEXT PLAY DAY ALPHABETICAL LIST OF PLAYERS - INCLUDING GUESTS
-// -------------------------------------------------------------------------------------------------------------------
+// ============================================================================
+// NEXT PLAY DAY ALPHABETICAL LIST (including guests)
+// GET /api/reports/next-play-day/:leagueId
+// ============================================================================
 router.get("/next-play-day/:leagueId", async (req, res) => {
-
   logger.route("GET", "/next-play-day/:leagueId");
 
   try {
@@ -185,10 +229,7 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
     const nextPlayDate = rows.length > 0 ? rows[0].play_date : null;
     const text = rows.map(r => r.player).join("\n");
 
-    res.json({
-      next_play_date: nextPlayDate,
-      report: text
-    });
+    res.json({ next_play_date: nextPlayDate, report: text });
 
   } catch (err) {
     logger.error(err, "GET /next-play-day/:leagueId");
@@ -196,28 +237,28 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
   }
 });
 
+// ============================================================================
+// DOWNLOAD DATABASE (admin only)
+// GET /api/reports/download-db
+// ============================================================================
 router.get("/download-db", (req, res) => {
   const file = path.join(__dirname, "..", "golf.db");
   res.download(file, "golf.db");
 });
 
-// POST - /EMAIL
+// ============================================================================
+// GENERIC EMAIL SENDER (Next Play Day Report)
+// POST /api/reports/email
+// ============================================================================
 router.post("/email", requireLogin, async (req, res) => {
   const { reportText, extraRecipients = "" } = req.body;
 
-  console.log("📥 Incoming email request body:", req.body);
+  console.log("📥 Incoming email request:", req.body);
   console.log("👤 Logged-in user:", req.user);
 
-  // Always include the logged-in user's email
-  const baseRecipient = req.user.email;
+  let recipients = [req.user.email];
 
-  let recipients = [baseRecipient];
-
-  console.log("📧 req.user.is_admin=", req.user.is_admin);
-
-  // -----------------------------
-  // EMAIL VALIDATION HELPERS
-  // -----------------------------
+  // Email validation helpers
   function backendValidateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (email.includes("..")) return false;
@@ -226,26 +267,19 @@ router.post("/email", requireLogin, async (req, res) => {
 
   function validateRecipientList(list) {
     if (!list.trim()) return { ok: true };
-
     const emails = list.split(",").map(e => e.trim());
-
     for (const email of emails) {
       if (!backendValidateEmail(email)) {
         return { ok: false, badEmail: email };
       }
     }
-
     return { ok: true };
   }
 
-  // -----------------------------
-  // VALIDATE ADMIN EXTRA RECIPIENTS
-  // -----------------------------
+  // Admins may add extra recipients
   if (req.user.is_admin === 1) {
     const validation = validateRecipientList(extraRecipients);
-
     if (!validation.ok) {
-      console.log("❌ Invalid email detected:", validation.badEmail);
       return res.status(400).json({
         error: `Invalid email address: ${validation.badEmail}`
       });
@@ -258,8 +292,6 @@ router.post("/email", requireLogin, async (req, res) => {
 
     recipients = [...recipients, ...extraList];
   }
-
-  console.log("📧 Final recipients list:", recipients);
 
   try {
     await transporter.sendMail({
@@ -277,11 +309,15 @@ router.post("/email", requireLogin, async (req, res) => {
   }
 });
 
+// ============================================================================
+// TEST EMAIL
+// GET /api/reports/test-email
+// ============================================================================
 router.get("/test-email", async (req, res) => {
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,   // send to yourself
+      to: process.env.EMAIL_USER,
       subject: "Golf Scheduler Test Email",
       text: "This is a test email from your golf scheduler backend."
     });
@@ -291,6 +327,161 @@ router.get("/test-email", async (req, res) => {
   } catch (err) {
     console.error("Test email error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// SEND TWO-WEEK GOLFERS REPORT (email)
+// POST /api/reports/two-week/email
+// ============================================================================
+const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
+const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
+
+router.post("/two-week/email", requireLogin, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const leagueId = user.league_id;
+
+    // Get league name
+    const league = db.prepare(`
+      SELECT league_name
+      FROM leagues
+      WHERE id = ?
+    `).get(leagueId);
+
+    const leagueName = league?.league_name || "";
+
+    // Build report data
+    const {
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes
+    } = await buildTwoWeekReportData(db, leagueId);
+
+    // Handle empty report
+    if (!dates || dates.length === 0) {
+      const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: user.email,
+        subject: `Two-Week Golfers Report - ${leagueName}`,
+        text: emptyText,
+        html: `<p>No scheduled play in the next 14 days.</p>`
+      });
+
+      return res.json({ ok: true });
+    }
+
+    // Generate email content
+    const reportText = generateTwoWeekReportText(
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes,
+      leagueName
+    );
+
+    const htmlReport = generateTwoWeekReportHTML(
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes,
+      leagueName
+    );
+
+    // Recipient logic
+    const {
+      includePlayers,
+      includeAdmins,
+      includeStaff,
+      includeSelf,
+      playersInReport = [],
+      guestsInReport = []
+    } = req.body;
+
+    const recipients = new Set();
+
+    // Always include logged-in user if requested
+    if (includeSelf && user.email) {
+      recipients.add(user.email);
+    }
+
+    // Players in report
+    if (includePlayers && playersInReport.length > 0) {
+      const placeholders = playersInReport.map(() => "?").join(",");
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE id IN (${placeholders})
+          AND league_id = ?
+      `).all(...playersInReport, leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Guests in report
+    if (includePlayers && guestsInReport.length > 0) {
+      const placeholders = guestsInReport.map(() => "?").join(",");
+      const rows = db.prepare(`
+        SELECT g.guest_email, u.email AS sponsor_email
+        FROM guests g
+        JOIN users u ON u.id = g.sponsor_user_id
+        WHERE g.id IN (${placeholders})
+          AND u.league_id = ?
+      `).all(...guestsInReport, leagueId);
+
+      rows.forEach(g => {
+        if (!g.guest_email) return;
+        if (g.guest_email === g.sponsor_email) return;
+        recipients.add(g.guest_email);
+      });
+    }
+
+    // Admins
+    if (includeAdmins) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE league_id = ?
+          AND is_admin = 1
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Staff
+    if (includeStaff) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM club_staff
+        WHERE league_id = ?
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    const finalRecipients = Array.from(recipients);
+
+    if (finalRecipients.length === 0) {
+      return res.status(400).json({ error: "No recipients selected" });
+    }
+
+    // Send email
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: finalRecipients.join(", "),
+      subject: `Two-Week Golfers Report - ${leagueName}`,
+      text: reportText,
+      html: htmlReport
+    });
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ Error sending two-week report:", err);
+    res.status(500).json({ error: "Unable to send report email" });
   }
 });
 

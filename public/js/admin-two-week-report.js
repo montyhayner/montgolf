@@ -7,7 +7,6 @@
 // Helper: Build Allocated Tee Times HTML (right column)
 // ------------------------------------------------------
 function buildAllocatedTeeTimesTableHTML(dates, allocated) {
-  // Collect all tee time numbers across all dates
   const allTeeNumbers = new Set();
 
   dates.forEach(date => {
@@ -21,14 +20,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
     <table class="report-table" style="table-layout: fixed; width: auto;">
       <thead>
         <tr style="background:#e6ffe6;">
-          <th style="
-            background:#e6ffe6;
-            text-align:left;
-            width: 120px;
-            min-width: 120px;
-            max-width: 120px;
-            padding: 4px 6px;
-          ">
+          <th style="background:#e6ffe6; text-align:left; width:120px; padding:4px 6px;">
             Tee Time
           </th>
   `;
@@ -42,14 +34,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
     const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 
     html += `
-      <th style="
-        background:#e6ffe6;
-        text-align:center;
-        width: 55px;
-        min-width: 55px;
-        max-width: 55px;
-        padding: 4px 2px;
-      ">
+      <th style="background:#e6ffe6; text-align:center; width:55px; padding:4px 2px;">
         <div>${dow}</div>
         <div style="font-size:12px; color:#555;">${md}</div>
       </th>
@@ -62,9 +47,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
       <tbody>
   `;
 
-  // -----------------------------
-  // Starting 9 row (always white)
-  // -----------------------------
+  // Starting 9 row
   html += `<tr style="background:#ffffff;"><td><strong>Starting 9</strong></td>`;
 
   dates.forEach(date => {
@@ -75,9 +58,7 @@ function buildAllocatedTeeTimesTableHTML(dates, allocated) {
 
   html += `</tr>`;
 
-  // -----------------------------
-  // Tee time rows (alternate green/white)
-  // -----------------------------
+  // Tee time rows
   teeNumbers.forEach((num, idx) => {
     html += `
       <tr style="background:${idx % 2 === 0 ? '#e6ffe6' : '#ffffff'};">
@@ -110,17 +91,7 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
     <table class="report-table" style="table-layout: fixed; width: auto;">
       <thead>
         <tr style="background:#e6ffe6;">
-          <th style="
-            background:#e6ffe6;
-            text-align:left;
-            width: 180px;
-            min-width: 180px;
-            max-width: 180px;
-            padding: 4px 6px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          ">
+          <th style="background:#e6ffe6; text-align:left; width:180px; padding:4px 6px;">
             Golfer
           </th>
   `;
@@ -134,17 +105,7 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
     const md  = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 
     html += `
-      <th style="
-        background:#e6ffe6;
-        text-align:center;
-        width: 55px;
-        min-width: 55px;
-        max-width: 55px;
-        padding: 4px 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      ">
+      <th style="background:#e6ffe6; text-align:center; width:55px; padding:4px 2px;">
         <div>${dow}</div>
         <div style="font-size:12px; color:#555;">${md}</div>
       </th>
@@ -157,14 +118,10 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
       <tbody>
   `;
 
-  // Player rows (alternate white/green)
+  // Player rows
   data.players.forEach((p, idx) => {
-
-    if (p.is_guest) {
-      guestsInReport.add(p.id);
-    } else {
-      playersInReport.add(p.id);
-    }
+    if (p.is_guest) guestsInReport.add(p.id);
+    else playersInReport.add(p.id);
 
     html += `
       <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#e6ffe6'};">
@@ -178,7 +135,7 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
     html += `</tr>`;
   });
 
-  // Totals row (follows alternating pattern)
+  // Totals row
   const totalRowColor = data.players.length % 2 === 0 ? '#ffffff' : '#e6ffe6';
 
   html += `
@@ -205,42 +162,30 @@ function buildTwoWeekTableHTML(data, playersInReport, guestsInReport) {
 // ------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
 
-  // Track players + guests appearing in the report
   const playersInReport = new Set();
   const guestsInReport = new Set();
 
-  // Load the combined report data
-  const container = document.getElementById("report-table-container");
-  const res = await fetch("/admin/reports/two-week/full", { credentials: "include" });
+  const leftContainer  = document.getElementById("report-table-container");
+  const rightContainer = document.getElementById("allocated-tee-times-container");
 
-  console.log("STATUS:", res.status);
+  const res = await fetch("/api/reports/two-week/full", { credentials: "include" });
 
   const text = await res.text();
-  console.log("RAW RESPONSE:", text);
-
   let data;
+
   try {
     data = JSON.parse(text);
   } catch (e) {
-    console.log("JSON PARSE FAILED");
+    console.error("JSON parse failed:", text);
     return;
   }
 
-  // Build left + right columns
-  const leftHTML = buildTwoWeekTableHTML(data, playersInReport, guestsInReport);
+  // Build both tables
+  const leftHTML  = buildTwoWeekTableHTML(data, playersInReport, guestsInReport);
   const rightHTML = buildAllocatedTeeTimesTableHTML(data.dates, data.allocatedTeeTimes);
 
-  // Insert side-by-side layout
-  container.innerHTML = `
-    <div class="reports-two-column">
-      <div class="left-report">
-        ${leftHTML}
-      </div>
-      <div class="right-report">
-        ${rightHTML}
-      </div>
-    </div>
-  `;
+  leftContainer.innerHTML  = leftHTML;
+  rightContainer.innerHTML = rightHTML;
 
   // -----------------------------
   // MODAL OPEN/CLOSE
@@ -275,15 +220,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const payload = {
       includePlayers: selfOnly ? false : document.getElementById("chkPlayers").checked,
       includeAdmins: selfOnly ? false : document.getElementById("chkAdmins").checked,
-      includeStaff: selfOnly ? false : document.getElementById("chkStaff").checked,
+      includeStaff:  selfOnly ? false : document.getElementById("chkStaff").checked,
       includeSelf: true,
       playersInReport: selfOnly ? [] : Array.from(playersInReport),
-      guestsInReport: selfOnly ? [] : Array.from(guestsInReport)
+      guestsInReport:  selfOnly ? [] : Array.from(guestsInReport)
     };
 
-    console.log("PAYLOAD:", payload);
-
-    const response = await fetch("/admin/reports/two-week/email", {
+    const response = await fetch("/api/reports/two-week/email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

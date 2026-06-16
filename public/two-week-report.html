@@ -120,6 +120,7 @@
 /* ============================================================
    REPORT LAYOUT
    ============================================================ */
+
 .report-container { margin: 30px; }
 
 .report-header {
@@ -129,7 +130,10 @@
   border-bottom: 1px solid #ccc;
 }
 
-.report-header h1 { margin-bottom: 12px; }
+.report-header h1 { 
+  text-align: center;
+  margin-bottom: 12px; 
+}
 
 .report-buttons {
   display: inline-flex;
@@ -263,8 +267,6 @@
   loadNav();
 </script>
 
-
-
   <div class="report-container">
 
     <div class="report-header">
@@ -288,14 +290,12 @@
 
       <!-- RIGHT: ALLOCATED TEE TIMES -->
       <div class="right-report">
-        <h2>Allocated Tee Times</h2>
         <div id="allocated-tee-times-container">
           <!-- JS injects tee time blocks -->
         </div>
       </div>
 
     </div>
-  </div>
 
   <!-- SEND REPORT MODAL -->
   <div id="sendReportModal" class="modal hidden">

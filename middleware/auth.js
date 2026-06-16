@@ -1,74 +1,95 @@
 // middleware/auth.js
 
+// ============================================================================
+// REQUIRE LOGIN
+// ============================================================================
 function requireLogin(req, res, next) {
-    console.log("🔐 requireLogin CHECK:", req.session.user);
+  console.log("🔐 requireLogin CHECK:", req.session.user);
 
-    if (!req.session.user) {
-        console.log("🔐 BLOCKED — NO SESSION USER");
-        return res.redirect("/login?error=1");
-    }
+  if (!req.session.user) {
+    console.log("🔐 BLOCKED — NO SESSION USER");
 
-    req.user = req.session.user;
-    console.log("🔐 PASSED — USER:", req.user);
-    next();
-}
-
-function requireAdmin(req, res, next) {
-    console.log(">>> REQUIRE ADMIN CHECK:", req.session.user);
-
-    const user = req.session.user;
-
-    if (!user) {
-        if (req.originalUrl.includes("/api")) {
-            return res.status(401).json({ error: "Not logged in" });
-        }
-        return res.redirect("/admin-login");
-    }
-
-    // ⭐ SUPER ADMINS ALWAYS PASS
-    if (user.is_super_admin) {
-        req.user = user;
-        return next();
-    }
-
-    // ⭐ REGULAR ADMINS WITH LEAGUE PASS
-    if (user.is_admin === 1 && user.league_id) {
-        req.user = user;
-        return next();
-    }
-
-    // ⭐ API REQUESTS GET JSON ERRORS
+    // API requests get JSON
     if (req.originalUrl.includes("/api")) {
-        return res.status(403).json({ error: "Admin only" });
+      return res.status(401).json({ error: "Not logged in" });
     }
 
-    // ⭐ NON-API REQUESTS GET REDIRECT
-    return res.redirect("/auth/select-league");
+    // Page requests redirect
+    return res.redirect("/login?error=1");
+  }
+
+  req.user = req.session.user;
+  console.log("🔐 PASSED — USER:", req.user);
+  next();
 }
 
+// ============================================================================
+// REQUIRE ADMIN (admin OR super admin)
+// ============================================================================
+function requireAdmin(req, res, next) {
+  const user = req.session.user;
+  console.log(">>> REQUIRE ADMIN CHECK:", user);
+
+  if (!user) {
+    if (req.originalUrl.includes("/api")) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    return res.redirect("/admin-login");
+  }
+
+  const isAdmin = user.is_admin === 1;
+  const isSuper = user.is_super_admin === 1;
+
+  // ⭐ SUPER ADMIN ALWAYS PASSES
+  if (isSuper) {
+    req.user = user;
+    return next();
+  }
+
+  // ⭐ REGULAR ADMIN PASSES
+  if (isAdmin) {
+    req.user = user;
+    return next();
+  }
+
+  // ⭐ API REQUESTS GET JSON ERRORS
+  if (req.originalUrl.includes("/api")) {
+    return res.status(403).json({ error: "Admin only" });
+  }
+
+  // ⭐ NON-API REQUESTS GET REDIRECT
+  return res.redirect("/auth/select-league");
+}
+
+// ============================================================================
+// REQUIRE ADMIN OR SELF (used for profile edits, etc.)
+// ============================================================================
 function requireAdminOrSelf(req, res, next) {
-    const user = req.session.user;
-    const targetUserId = parseInt(req.params.userId);
+  const user = req.session.user;
 
-    if (!user) {
-        return res.status(401).json({ error: "Not logged in" });
-    }
+  if (!user) {
+    return res.status(401).json({ error: "Not logged in" });
+  }
 
-    // ⭐ SUPER ADMIN ALWAYS ALLOWED
-    if (user.is_super_admin) {
-        return next();
-    }
+  const isAdmin = user.is_admin === 1;
+  const isSuper = user.is_super_admin === 1;
+  const targetUserId = parseInt(req.params.userId);
 
-    // ⭐ ADMIN OR SELF
-    if (user.is_admin === 1 || user.id === targetUserId) {
-        return next();
-    }
+  // ⭐ SUPER ADMIN ALWAYS ALLOWED
+  if (isSuper) {
+    return next();
+  }
 
-    return res.status(403).json({ error: "Forbidden" });
+  // ⭐ ADMIN OR SELF
+  if (isAdmin || user.id === targetUserId) {
+    return next();
+  }
+
+  return res.status(403).json({ error: "Forbidden" });
 }
 
 module.exports = {
-    requireLogin,
-    requireAdmin,
-    requireAdminOrSelf
+  requireLogin,
+  requireAdmin,
+  requireAdminOrSelf
 };

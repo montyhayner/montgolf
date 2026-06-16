@@ -7,10 +7,31 @@
 <link rel="stylesheet" href="/css/common.css">
 
 <style>
+
+body {
+  margin: 0;
+  padding: 0;
+}
+h1, h2, h3 {
+    margin-top: 0;
+}
+/* Page Header */
+#pageHeader {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 20px;
+    font-weight: bold;
+    background-color: #f7f5bc;      
+    color: #333;
+    padding: 2px 0 4px 0;
+    border-bottom: 1px solid #ddd;
+    line-height: 1.2;
+    margin-top: 0;
+}  
 /* ------------------------------------------------------------
    GLOBAL CENTERING FOR SCHEDULE PAGE
 ------------------------------------------------------------ */
-#pageHeader,
 #statusBanner,
 #scheduleToolbar,
 #calendarContainer {
@@ -18,18 +39,6 @@
   margin-right: auto;
   text-align: center;
   width: 100%;
-}
-
-/* ------------------------------------------------------------
-   SPACING POLISH
------------------------------------------------------------- */
-#pageHeader {
-  margin: 20px 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #ddd;
-  font-size: 22px;
-  font-weight: bold;
-  color: #333;
 }
 
 /* Centers the banner wrapper */
@@ -351,7 +360,9 @@
 
 <body>
 
-<div id="navContainer"></div>
+<div id="nav-container"></div>
+<link id="nav-css" rel="stylesheet">
+<script src="/js/nav-loader.js"></script>
 
 <h1 id="pageHeader"></h1>
 
@@ -407,8 +418,21 @@
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Schedule JS running");
+  // Wait a bit for nav-loader.js to finish inserting the nav
+  setTimeout(() => {
+    document.querySelectorAll(".nav-link").forEach(link => {
+      link.addEventListener("click", (e) => {
+        if (!unsavedChanges) return;
 
-  loadNavBar();
+        const leave = confirm("You have unsaved changes. Save before leaving?");
+        if (!leave) {
+          e.preventDefault();
+        }
+      });
+    });
+  }, 200);
+
+  // loadNavBar(); --- code replaced by code immediately above
   loadPageHeader()
   configureMonthPickerLimits();
   wireUpEventListeners();
@@ -476,6 +500,7 @@ function refreshSaveUI() {
   }
 }
 
+// remove function below if we get the new dynamic nav bar loader code working (loadNav)
 function loadNavBar() {
   fetch("/partials/user-nav.html")
     .then(res => res.text())

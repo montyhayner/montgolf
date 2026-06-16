@@ -5,7 +5,10 @@
   <title>Allocate Tee Times</title>
   <link rel="stylesheet" href="/css/admin.css">
   <link rel="stylesheet" href="/css/admin-button.css">
-
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/admin-nav.css">
+  <link rel="stylesheet" href="/css/admin-identity.css">
+  
   <style>
     .tee-time-row {
       display: flex;
@@ -16,14 +19,27 @@
     .tee-time-row input {
       width: 120px;
     }
-  </style>
+    .container h2 {
+        text-align: center;
+    }
+    .container {
+        max-width: 1100px;
+        margin: 40px auto;
+        text-align: center;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+</style>
+
 </head>
 
 <body>
     <div id="admin-nav-container"></div>
     <div id="admin-identity-container"></div>
 
-    <div class="admin-container">
+    <div class="container">
 
     <h2>Allocate Tee Times</h2>
 
@@ -86,6 +102,6 @@
     </div>
   </div>
 
-  <script src="/js/admin-allocated-tee-times.js"></script>
+  <script defer src="/js/admin-allocated-tee-times.js"></script>
 </body>
 </html>

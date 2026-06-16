@@ -1,6 +1,9 @@
-// services/generateTwoWeekReportText.js
+// ============================================================================
+// generateTwoWeekReportText.js
+// Text-only email generator for Two-Week Golfers Report + Allocated Tee Times
+// ============================================================================
 
-function generateTwoWeekReportText(dates, rows, totals, allocatedTeeTimes, leagueName = "") {
+function generateTwoWeekReportText(dates, players, totals, allocatedTeeTimes, leagueName = "") {
 
   // ------------------------------------------------------------
   // Handle empty report
@@ -14,7 +17,7 @@ function generateTwoWeekReportText(dates, rows, totals, allocatedTeeTimes, leagu
   text += `=====================================\n\n`;
 
   // ------------------------------------------------------------
-  // Build header row
+  // Header row
   // ------------------------------------------------------------
   text += `Golfer`.padEnd(22);
 
@@ -33,11 +36,11 @@ function generateTwoWeekReportText(dates, rows, totals, allocatedTeeTimes, leagu
   // ------------------------------------------------------------
   // Player rows
   // ------------------------------------------------------------
-  rows.forEach(r => {
-    text += r.name.padEnd(22);
+  players.forEach(p => {
+    text += p.name.padEnd(22);
 
     dates.forEach(d => {
-      const val = r.plays[d] || "";
+      const val = p.plays[d] || "";
       text += val.padStart(8);
     });
 
@@ -57,7 +60,7 @@ function generateTwoWeekReportText(dates, rows, totals, allocatedTeeTimes, leagu
   text += `\n\n`;
 
   // ------------------------------------------------------------
-  // Allocated Tee Times (stacked)
+  // Allocated Tee Times (stacked by date)
   // ------------------------------------------------------------
   text += `Allocated Tee Times\n`;
   text += `====================\n\n`;

@@ -4,21 +4,34 @@
 <meta charset="UTF-8">
 <title>My Availability</title>
 
-<link rel="stylesheet" href="/css/navbar.css">
+<div id="nav-container"></div>
+<link id="nav-css" rel="stylesheet">
 <link rel="stylesheet" href="/css/common.css">
+<script src="/js/nav-loader.js"></script>
 
 <style>
-  /* Page Header */
-  #pageHeader {
+
+body {
+  margin: 0;
+  padding: 0;
+}
+h1, h2, h3 {
+    margin-top: 0;
+}
+/* Page Header */
+#pageHeader {
     text-align: center;
     margin-left: auto;
     margin-right: auto;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: bold;
+    background-color: #f7f5bc;      
     color: #333;
-    padding-bottom: 8px;
+    padding: 2px 0 4px 0;
     border-bottom: 1px solid #ddd;
-  }
+    line-height: 1.2;
+    margin-top: 0;
+}
 
   /* Status Banner (colors only — base lives in common.css) */
   .status-saved   { background: #d4edda; color: #155724; }
@@ -151,7 +164,9 @@
 <body>
 
 <!-- Shared Nav Bar -->
-<div id="user-nav-container"></div>
+<div id="nav-container"></div>
+<link id="nav-css" rel="stylesheet">
+<script src="/js/nav-loader.js"></script>
 
 <h1 id="pageHeader"></h1>
 
@@ -189,17 +204,18 @@ let unsavedChanges = false;
 // ---- Shared Nav Loader + Highlight + Navigation Warning ----
 document.addEventListener("DOMContentLoaded", async () => {
 
-  // Load user nav
-  const html = await fetch("/partials/user-nav.html").then(r => r.text());
-  document.getElementById("user-nav-container").innerHTML = html;
+    setTimeout(() => {
+    document.querySelectorAll(".nav-link").forEach(link => {
+      link.addEventListener("click", (e) => {
+        if (!unsavedChanges) return;
 
-  // Highlight active link
-  const path = window.location.pathname;
-  document.querySelectorAll("#topNav .nav-link").forEach(link => {
-    if (link.getAttribute("href") === path) {
-      link.classList.add("active");
-    }
-  });
+        const leave = confirm("You have unsaved changes. Save before leaving?");
+        if (!leave) {
+          e.preventDefault();
+        }
+      });
+    });
+  }, 200);
 
   // Load user + league info and build header
    const [userInfo, leagueInfo] = await Promise.all([
@@ -212,15 +228,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const leagueName = league.league_name;
   document.getElementById("pageHeader").textContent =
   `My Availability – ${userName} – ${leagueName}`;
-
-  // Navigation warning for unsaved changes
-  document.querySelectorAll("#topNav a").forEach(link => {
-    link.addEventListener("click", (e) => {
-      if (!unsavedChanges) return;
-      const leave = confirm("You have unsaved changes. Save before leaving?");
-      if (!leave) e.preventDefault();
-    });
-  });
 
   // Initialize availability page AFTER nav loads
   initAvailabilityPage();

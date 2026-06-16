@@ -53,6 +53,19 @@ function isValidRange(dt) {
 // ------------------------------------------------------------
 let currentGuestId = null;
 async function loadGuests() {
+
+  // Load user + league info and build header
+   const [userInfo, leagueInfo] = await Promise.all([
+     fetch("/user/info").then(r => r.json()),
+     fetch("/user/selected-league").then(r => r.json())
+  ]);
+  const user = userInfo.user;
+  const league = leagueInfo.league;
+  const userName = `${user.first_name} ${user.last_name}`;
+  const leagueName = league.league_name;
+  document.getElementById("pageHeader").textContent =
+  `My Guests – ${userName} – ${leagueName}`;
+
   try {
     const res = await fetch("/api/guests");
     const guests = await res.json();
