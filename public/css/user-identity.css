@@ -1,0 +1,29 @@
+/* Compact User Identity Bar */
+.user-identity {
+    width: 100%;
+    padding: 1px 6px;          /* ⬅️ same as admin identity bar */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #fff7d6; /* user-side gold identity bar */
+    border: 1px solid #e6c76f;
+    color: #8a6d1d;
+    border-radius: 0;
+}
+
+/* Icon */
+.user-identity #identity-icon {
+    font-size: 18px;           /* ⬅️ reduced to match nav bar height */
+    line-height: 1;
+}
+
+/* Name + role badges */
+.user-identity span {
+    background-color: white;
+    border: 1px solid #e6c76f;
+    padding: 1px 4px;          /* ⬅️ compact vertical padding */
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.1;
+}

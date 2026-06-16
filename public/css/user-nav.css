@@ -1,0 +1,44 @@
+/* Compact User Navigation Bar — matches admin nav bar height */
+.user-nav {
+    background: #0275d8;      /* user-side blue */
+    color: white;
+    padding: 3px 6px;         /* was 12px — now compact and aligned */
+    display: flex;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    height: auto;
+    line-height: 1.1;         /* slight breathing room */
+    gap: 6px;
+}
+
+/* Left title ("Golf Scheduler") */
+.user-nav .nav-left {
+    font-size: 18px;          /* was 20px — matches admin */
+    font-weight: bold;
+    line-height: 1.1;         /* prevents extra vertical space */
+    padding: 0;
+}
+
+/* Right-side links */
+.user-nav .nav-links {
+    margin-left: auto;
+    display: flex;
+    gap: 12px;                /* was 24px — tighter, cleaner */
+    align-items: center;
+}
+
+.user-nav .nav-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 15px;          /* matches admin */
+    line-height: 1.1;
+    padding: 2px 6px;         /* was 0 — now matches admin */
+    border-radius: 4px;
+}
+
+.user-nav .nav-links a.active {
+    background: rgba(255, 255, 255, 0.18);
+    padding: 2px 8px;         /* was 6px 10px — now compact */
+    border-radius: 4px;
+    font-weight: bold;
+}
