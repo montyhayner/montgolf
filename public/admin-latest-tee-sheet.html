@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Latest Tee Sheet Report (Admin)</title>
+
+  <!-- ADMIN CSS -->
+  <link rel="stylesheet" href="/css/admin-nav.css">
+  <link rel="stylesheet" href="/css/admin-identity.css">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/reports.css">
+
+  <!-- Header style -->
+  <style>
+    #pageHeader {
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 20px;
+      font-weight: bold;
+      /* background-color: #f7f5bc; */
+      color: #333;
+      padding: 2px 0 4px 0;
+      border-bottom: 1px solid #ddd;
+      line-height: 1.2;
+      margin-top: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ADMIN NAV -->
+  <div id="admin-nav-container"></div>
+
+  <!-- ADMIN IDENTITY BAR -->
+  <div id="admin-identity-container"></div>
+
+  <!-- PAGE HEADER -->
+  <h1 id="pageHeader"></h1>
+
+  <!-- REPORT CONTENT -->
+  <div class="page">
+    <table id="teeSheetTable" class="report-table">
+      <thead>
+        <tr>
+          <th>Tee Time</th>
+          <th>Nine</th>
+          <th>Players</th>
+        </tr>
+      </thead>
+      <tbody id="teeSheetBody"></tbody>
+    </table>
+
+    <div class="button-row">
+      <button id="btnPrintLatest" class="secondary-action-btn">Print Report</button>
+      <button id="btnSendLatest" class="primary-action-btn">Send Report</button>
+    </div>
+  </div>
+    <div id="notifyModal" class="notify-overlay" style="display:none;">
+  <div class="notify-modal-window">
+
+    <!-- STEP 1 -->
+    <div id="notifyStep1">
+      <h2>Send Notifications</h2>
+
+      <div class="notify-sections-row">
+
+        <div class="notify-section">
+          <label><strong>Recipients:</strong></label>
+          <div class="notify-checkbox-group">
+            <label><input type="checkbox" id="recTeeSheetPlayers"> Tee sheet players</label>
+            <label><input type="checkbox" id="recUnplacedGolfers"> Unplaced golfers</label>
+            <label><input type="checkbox" id="recLeagueAdmins"> League admins</label>
+            <label><input type="checkbox" id="recClubStaff"> Club staff</label>
+          </div>
+        </div>
+
+        <div class="notify-section">
+          <label><strong>Email Body:</strong></label>
+          <div class="notify-checkbox-group">
+            <label><input type="checkbox" id="bodyIncludeTeeSheet"> Include full tee sheet</label>
+            <label><input type="checkbox" id="bodyIncludeUnplaced"> Include unplaced golfers</label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="notify-section">
+        <label><strong>Optional message:</strong></label>
+        <textarea id="notifyMessage" placeholder="Enter an optional message..."></textarea>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnPreviewEmail" class="primary-btn" type="button">Preview Email</button>
+        <button type="button" onclick="closeNotifyModal()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="notifyStep2" style="display:none;">
+      <h2>Preview Email</h2>
+
+      <div id="notifyPreviewBody" class="notify-preview"></div>
+
+      <div class="modal-buttons">
+        <button id="btnSendEmail" class="primary-btn">Send Email</button>
+        <button id="btnBackToOptions">Back</button>
+      </div>
+    </div>
+
+  </div>
+</div>  
+
+  <!-- ADMIN LOADERS -->
+  <script src="/js/admin-nav-loader.js"></script>
+  <script src="/js/admin-identity-loader.js"></script>
+
+  <!-- PAGE HEADER SCRIPT -->
+  <script src="/js/page-header.js"></script>
+
+  <!-- NOTIFY MODAL LOGIC (must load BEFORE latest-tee-sheet.js) -->
+  <script src="/js/build-tee-sheet-HTML.js"></script>
+  <script src="/js/notify-modal.js"></script>
+  <script src="/js/notify-preview.js"></script>
+
+  <!-- MAIN REPORT LOGIC -->
+  <script src="/js/latest-tee-sheet.js"></script>
+
+  <script>
+    // Admin initialization
+    (async () => {
+      await loadAdminNav();
+      const session = await loadSession();
+      await loadAdminIdentity(session);
+    })();
+  </script>
+
+</body>
+</html>

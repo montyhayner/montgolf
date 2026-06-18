@@ -113,6 +113,67 @@ router.get("/available-next-two-weeks/:leagueId", requireAdmin, async (req, res)
 });
 
 // ============================================================================
+// LATEST TEE SHEET REPORT
+// GET /api/reports/latest-tee-sheet
+// ============================================================================
+router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
+  try {
+    const leagueId = req.session.user.league_id;
+
+    // Get latest tee date
+    const row = await dbGet(`
+      SELECT MAX(tee_date) AS latest_date
+      FROM tee_sheet
+      WHERE league_id = ?
+    `, [leagueId]);
+
+    if (!row || !row.latest_date) {
+      return res.json({
+        ok: false,
+        message: "No tee sheet available",
+        teeSheet: [],
+        longDate: null
+      });
+    }
+
+    const teeDate = row.latest_date;
+
+    // Fetch tee sheet rows
+    const teeSheet = await dbAll(`
+      SELECT *
+      FROM tee_sheet
+      WHERE league_id = ?
+        AND tee_date = ?
+      ORDER BY tee_time, starting_nine
+    `, [leagueId, teeDate]);
+
+    // Format long date
+    const longDate = new Date(teeDate).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    const isSuperAdmin = !!req.session.user.is_super_admin;
+    const isLeagueAdmin = !!req.session.user.is_admin;
+    const isAdmin = isSuperAdmin || isLeagueAdmin;
+
+    res.json({
+      ok: true,
+      teeDate,
+      longDate,
+      teeSheet,
+      isAdmin
+    });
+
+  } catch (err) {
+    console.error("Latest tee sheet error:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================================================
 // AVAILABLE ON A SPECIFIC DATE
 // GET /api/reports/available-date/:leagueId/:date
 // ============================================================================
@@ -482,6 +543,149 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
   } catch (err) {
     console.error("❌ Error sending two-week report:", err);
     res.status(500).json({ error: "Unable to send report email" });
+  }
+});
+
+// ============================================================================
+// SEND LATEST TEE SHEET REPORT (email)
+// POST /api/reports/latest-tee-sheet/email
+// ============================================================================
+router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const leagueId = user.league_id;
+
+    // Get league name
+    const league = db.prepare(`
+      SELECT league_name
+      FROM leagues
+      WHERE id = ?
+    `).get(leagueId);
+
+    const leagueName = league?.league_name || "";
+
+    // Get latest tee date
+    const row = await dbGet(`
+      SELECT MAX(tee_date) AS latest_date
+      FROM tee_sheet
+      WHERE league_id = ?
+    `, [leagueId]);
+
+    if (!row || !row.latest_date) {
+      return res.status(400).json({ error: "No tee sheet available" });
+    }
+
+    const teeDate = row.latest_date;
+
+    // Fetch tee sheet rows
+    const teeSheet = await dbAll(`
+      SELECT *
+      FROM tee_sheet
+      WHERE league_id = ?
+        AND tee_date = ?
+      ORDER BY tee_time, starting_nine
+    `, [leagueId, teeDate]);
+
+    // Build HTML table (same as email preview)
+    const buildHTML = rows => {
+      let html = `
+        <h3>Tee Sheet for ${teeDate}</h3>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <tr>
+            <th>Tee Time</th>
+            <th>Starting Nine</th>
+            <th>Players</th>
+          </tr>
+      `;
+
+      rows.forEach(r => {
+        const players = [
+          r.first_name1 && `${r.first_name1} ${r.last_name1}`,
+          r.first_name2 && `${r.first_name2} ${r.last_name2}`,
+          r.first_name3 && `${r.first_name3} ${r.last_name3}`,
+          r.first_name4 && `${r.first_name4} ${r.last_name4}`
+        ].filter(Boolean).join(", ");
+
+        html += `
+          <tr>
+            <td>${r.tee_time}</td>
+            <td>${r.starting_nine}</td>
+            <td>${players}</td>
+          </tr>
+        `;
+      });
+
+      html += `</table>`;
+      return html;
+    };
+
+    const htmlReport = buildHTML(teeSheet);
+
+    // Recipient logic
+    const { includePlayers, includeAdmins, includeStaff, includeSelf, playersInReport = [] } = req.body;
+
+    const recipients = new Set();
+
+    // Always include logged-in user if requested
+    if (includeSelf && user.email) {
+      recipients.add(user.email);
+    }
+
+    // Players in report
+    if (includePlayers && playersInReport.length > 0) {
+      const placeholders = playersInReport.map(() => "?").join(",");
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE id IN (${placeholders})
+          AND league_id = ?
+      `).all(...playersInReport, leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Admins
+    if (includeAdmins) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE league_id = ?
+          AND is_admin = 1
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Staff
+    if (includeStaff) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM club_staff
+        WHERE league_id = ?
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    const finalRecipients = Array.from(recipients);
+
+    if (finalRecipients.length === 0) {
+      return res.status(400).json({ error: "No recipients selected" });
+    }
+
+    // Send email
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: finalRecipients.join(", "),
+      subject: `Latest Tee Sheet - ${leagueName}`,
+      html: htmlReport
+    });
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ Error sending latest tee sheet:", err);
+    res.status(500).json({ error: "Unable to send latest tee sheet email" });
   }
 });
 

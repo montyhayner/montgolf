@@ -2066,7 +2066,7 @@ const { optimizeDatabase, vacuumDatabase } = require("./db/maintenance");
 const { generateTeeSheet } = require("./services/generateTeeSheet");
 
 // TEMP: Run nightly generator immediately on server startup (for testing)
-generateTeeSheet();  // comment out to stop running 8pm cron job to load tee sheet for 2 days hence
+//generateTeeSheet();  // comment out to stop running 8pm cron job to load tee sheet for 2 days hence
 
 // Run ANALYZE + PRAGMA optimize at startup
 (async () => {
@@ -2080,12 +2080,11 @@ cron.schedule("0 3 1 * *", async () => {
 
 // Tee sheet generation (daily at 8 PM)
 cron.schedule("0 20 * * *", async () => {
-  console.log("⏰ not Running tee-sheet cron job (8 PM Eastern)...");
-  // await generateTeeSheet();   // nightly job for all leagues
+  console.log("⏰ nightly running tee-sheet cron job (8 PM Eastern)...");
+  await generateTeeSheet();   // nightly job for all leagues
 }, {
   timezone: "America/New_York"
 });
-
 
 // ------------------------------
 // START SERVER

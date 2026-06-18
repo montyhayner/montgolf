@@ -1,10 +1,11 @@
 /* ============================
    GLOBAL TYPOGRAPHY & SPACING
    ============================ */
-
+   
 body {
   font-family: Arial, sans-serif;
-  padding: 20px;
+  margin: 0;
+  padding: 0;
 }
 
 h1, h2 {

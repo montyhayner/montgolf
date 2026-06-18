@@ -171,28 +171,12 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
     }
 
     // ---------------------------------------------------------------------
-    // CASE B: No saved rows → generate default schedule
+    // CASE B: No saved rows → new month (blank)
     // ---------------------------------------------------------------------
     if (rows.length === 0) {
-      const playDays = await dbAll(
-        `SELECT day_of_week
-         FROM user_play_days
-         WHERE user_id = ? AND is_play_day = 1`,
-        [userId]
-      );
-
-      const allowedDays = playDays.map(r => r.day_of_week);
-      const schedule = {};
-
-      for (let d = 1; d <= endDate; d++) {
-        const dow = new Date(year, month - 1, d).getDay();
-        const fullDate = `${year}-${pad(month)}-${pad(d)}`;
-        schedule[fullDate] = allowedDays.includes(dow);
-      }
-
       return res.json({
-        schedule,
-        status: "default",
+        schedule: {},
+        status: "new",
         in_town: 1,
         leaguePlayDays
       });

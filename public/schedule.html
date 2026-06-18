@@ -565,16 +565,33 @@ function updateStatusBanner(status) {
     return;
   }
 
-  // 4. CLEARED or DEFAULT (but no unsaved changes)
-  if (status === "cleared" || status === "default") {
+  // 4. NEW month (blank, untouched)
+  if (status === "new") {
     banner.classList.add("status-cleared");
     banner.style.display = "inline-block";
-    text.textContent = "No schedule saved for this month";
+    text.textContent = "New month. Click Default to load your usual play days.";
     infoIcon.style.display = "none";
     return;
   }
+// 5. CLEARED (user saved an empty month)
+if (status === "cleared") {
+  banner.classList.add("status-cleared");
+  banner.style.display = "inline-block";
+  text.textContent = "No schedule saved for this month.";
+  infoIcon.style.display = "none";
+  return;
+}
 
-  // 5. Fallback: hide banner
+// 6. DEFAULT (user clicked Default but has not saved)
+if (status === "default") {
+  banner.classList.add("status-unsaved");
+  banner.style.display = "inline-block";
+  text.textContent = "Default schedule loaded. Review and Save.";
+  infoIcon.style.display = "none";
+  return;
+}
+
+// 7. Fallback: hide banner
   banner.style.display = "none";
 }
 

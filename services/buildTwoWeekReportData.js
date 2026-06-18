@@ -11,7 +11,7 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = schedule.user_id
     WHERE schedule.is_playing = 1
       AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-16 hours')
+      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-28 hours')
       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
     ORDER BY play_date
   `).all(leagueId);
@@ -39,7 +39,7 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = schedule.user_id
     WHERE schedule.is_playing = 1
       AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-16 hours')
+      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-28 hours')
       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
     ORDER BY users.last_name, users.first_name
   `).all(leagueId);
@@ -57,11 +57,11 @@ async function buildTwoWeekReportData(db, leagueId) {
     JOIN users ON users.id = guests.sponsor_user_id
     WHERE users.league_id = ?
       AND (
-           guests.date1 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date2 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date3 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date4 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-        OR guests.date5 BETWEEN date(CURRENT_TIMESTAMP, '-16 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+           guests.date1 BETWEEN date(CURRENT_TIMESTAMP, '-28 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date2 BETWEEN date(CURRENT_TIMESTAMP, '-28 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date3 BETWEEN date(CURRENT_TIMESTAMP, '-28 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date4 BETWEEN date(CURRENT_TIMESTAMP, '-28 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+        OR guests.date5 BETWEEN date(CURRENT_TIMESTAMP, '-28 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
       )
     ORDER BY last_name, first_name
   `).all(leagueId);
