@@ -1884,6 +1884,9 @@ app.post("/admin/golfers/api", requireLeagueAdmin, async (req, res) => {
 app.put("/admin/golfers/api/:id", requireLeagueAdmin, async (req, res) => {
     const leagueId = req.session.user.league_id;
     const id = parseInt(req.params.id, 10);
+    console.log("put /admin/golfers/api/:id📌 leagueId =", leagueId);
+    console.log("id =", id);
+    console.log("req.params.id =", req.params.id);
 
     const {
         first_name, last_name, email,
@@ -1989,15 +1992,20 @@ app.delete("/admin/allocated-tee-times/:id", requireLeagueAdmin, async (req, res
 app.put("/admin/golfers/api/:id/password", requireLeagueAdmin, async (req, res) => {
     const leagueId = req.session.user.league_id;
     const id = parseInt(req.params.id, 10);
-    const { password } = req.body;
+    const password = req.body.password;
+    console.log("put /admin/golfers/api/:id/password📌 leagueId =", leagueId);
+    console.log("id =", id);
+    console.log("password:", password, "req.body.password:",  req.body.password);
 
-    if (!password) {
+    if (password === null || password === undefined) {
         return res.status(400).json({ error: "Password required" });
     }
 
     try {
         const existing = await dbGet("SELECT league_id FROM users WHERE id = ?", [id]);
-        if (!existing || existing.league_id !== leagueId) {
+        console.log("put /admin/golfers/api/:id/password📌 existing =", existing);
+        console.log("existing.league_id =", existing.league_id);
+        if (!existing || String(existing.league_id) !== String(leagueId)) {
             return res.status(404).json({ error: "Golfer not found" });
         }
 

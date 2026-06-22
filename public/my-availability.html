@@ -152,11 +152,68 @@ h1, h2, h3 {
   filter: brightness(1.1);
 }
 
-
 @media (max-width: 600px) {
   .month-toggle {
     aspect-ratio: 1 / 1;      /* perfect squares on phones */
   }
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Modal content box */
+.modal-content {
+  background: white;
+  padding: 20px 28px;
+  border-radius: 8px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  text-align: center;
+}
+
+/* Button row */
+.modal-buttons {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Button styles (match your existing theme) */
+.modal-buttons .primary {
+  background: #007bff;
+  color: black;
+  padding: 10px 18px;   /* Increase vertical height */
+  font-size: 1rem;      /* Optional: slightly larger text */
+  border-radius: 6px;   /* Optional: softer corners */
+}
+
+.modal-buttons .warning {
+  background: #f0ad4e;
+  color: black;
+  padding: 10px 18px;   /* Increase vertical height */
+  font-size: 1rem;      /* Optional: slightly larger text */
+  border-radius: 6px;   /* Optional: softer corners */
+}
+
+.modal-buttons .secondary {
+  background: #6c757d;
+  color: black;
+  padding: 10px 18px;   /* Increase vertical height */
+  font-size: 1rem;      /* Optional: slightly larger text */
+  border-radius: 6px;   /* Optional: softer corners */
 }
 
 </style></head>
@@ -200,22 +257,63 @@ let savedPlayMonths = {};
 let leaguePlayDays = [];
 let leaguePlayMonths = [];
 let unsavedChanges = false;
+let unsavedModalCallbacks = {
+  onSave: null,
+  onContinue: null,
+  onCancel: null
+};
+
+function showUnsavedChangesModal(callbacks) {
+  unsavedModalCallbacks = callbacks;
+  document.getElementById("unsavedModal").style.display = "flex";
+}
+
+function hideUnsavedChangesModal() {
+  document.getElementById("unsavedModal").style.display = "none";
+}
+
 
 // ---- Shared Nav Loader + Highlight + Navigation Warning ----
 document.addEventListener("DOMContentLoaded", async () => {
 
-    setTimeout(() => {
+  setTimeout(() => {
     document.querySelectorAll(".nav-link").forEach(link => {
       link.addEventListener("click", (e) => {
         if (!unsavedChanges) return;
 
-        const leave = confirm("You have unsaved changes. Save before leaving?");
-        if (!leave) {
-          e.preventDefault();
-        }
+        e.preventDefault();
+
+        requireNoUnsavedChanges({
+          onSave: async () => {
+            await document.getElementById("saveAvailabilityBtn").click();
+            window.onbeforeunload = null;
+            window.location = link.href;
+          },
+          onContinue: () => {
+            window.onbeforeunload = null;
+            window.location = link.href;
+          },
+          onCancel: () => {}
+        });
       });
     });
   }, 200);
+
+
+  document.getElementById("unsavedSave").addEventListener("click", async () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
+  });
+
+  document.getElementById("unsavedContinue").addEventListener("click", () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
+  });
+
+  document.getElementById("unsavedCancel").addEventListener("click", () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
+  });
 
   // Load user + league info and build header
    const [userInfo, leagueInfo] = await Promise.all([
@@ -235,13 +333,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // ---- Helpers ----
 
-    function showSaving() {
-      document.getElementById("savingIndicator").style.display = "inline";
-    }
+function showSaving() {
+  document.getElementById("savingIndicator").style.display = "inline";
+}
 
-    function hideSaving() {
-      document.getElementById("savingIndicator").style.display = "none";
-    }
+function hideSaving() {
+  document.getElementById("savingIndicator").style.display = "none";
+}
 
 function markUnsaved() {
   unsavedChanges = true;
@@ -258,6 +356,43 @@ function updateUnsavedIndicator() {
     unsavedChanges ? "block" : "none";
 }
 
+function requireNoUnsavedChanges(callbacks) {
+  if (!unsavedChanges) {
+    callbacks.onContinue();
+    return;
+  }
+
+  showUnsavedChangesModal(callbacks);
+}
+
+function restoreDefaultAvailability() {
+  fetch("/user/availability/default", { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      playDays = data.playDays;
+      playMonths = data.playMonths;
+      renderPlayDays();
+      renderPlayMonths();
+      markUnsaved();
+      updateStatusBanner("default");
+    });
+}
+
+function revertAvailability() {
+  playDays = JSON.parse(JSON.stringify(savedPlayDays));
+  playMonths = JSON.parse(JSON.stringify(savedPlayMonths));
+
+  renderPlayDays();
+  renderPlayMonths();
+
+  unsavedChanges = false;
+  updateSaveButtonState();
+  updateUnsavedIndicator();
+
+  updateStatusBanner("reverted");
+}
+
+
 function normalizePlayMonths(obj) {
   const normalized = {};
   for (let m = 1; m <= 12; m++) {
@@ -273,16 +408,23 @@ function updateStatusBanner(type) {
   if (type === "saved") {
     banner.classList.add("status-saved");
     banner.textContent = "Availability saved.";
-  } else if (type === "default") {
+  } 
+  else if (type === "default") {
     banner.classList.add("status-default");
     banner.textContent = "Default availability restored.";
-  } else {
+  } 
+  else if (type === "reverted") {
+    banner.classList.add("status-saved");
+    banner.textContent = "Back to last saved version.";
+  } 
+  else {
     banner.style.display = "none";
     return;
   }
 
   banner.style.display = "block";
 }
+
 
 // ---- Load Availability ----
 async function initAvailabilityPage() {
@@ -418,6 +560,22 @@ document.getElementById("saveAvailabilityBtn").addEventListener("click", async (
 });
 
 // DEFAULT
+
+document.getElementById("defaultAvailabilityBtn").addEventListener("click", () => {
+  requireNoUnsavedChanges({
+    onSave: async () => {
+      await document.getElementById("saveAvailabilityBtn").click();
+      restoreDefaultAvailability();
+      window.onbeforeunload = null;
+    },
+    onContinue: () => {
+      restoreDefaultAvailability();
+      window.onbeforeunload = null;
+    },
+    onCancel: () => {}
+  });
+});
+
 document.getElementById("defaultAvailabilityBtn").addEventListener("click", () => {
   fetch("/user/availability/default", { method: "POST" })
     .then(res => res.json())
@@ -433,24 +591,31 @@ document.getElementById("defaultAvailabilityBtn").addEventListener("click", () =
 
 // REVERT
 document.getElementById("revertAvailabilityBtn").addEventListener("click", () => {
-  playDays = JSON.parse(JSON.stringify(savedPlayDays));
-  playMonths = JSON.parse(JSON.stringify(savedPlayMonths));
-  renderPlayDays();
-  renderPlayMonths();
-  unsavedChanges = false;
-  updateSaveButtonState();
-  updateUnsavedIndicator();
-  updateStatusBanner("saved");
+  revertAvailability();
 });
 
 // ---- Leave Page Warning ----
-
-window.addEventListener("beforeunload", (e) => {
+window.onbeforeunload = (e) => {
   if (!unsavedChanges) return;
   e.preventDefault();
   e.returnValue = "";
-});
+};
+
 </script>
+
+<!-- Unsaved Changes Modal -->
+<div id="unsavedModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:420px;">
+    <h2>Unsaved Changes</h2>
+    <p>You have unsaved changes. What would you like to do?</p>
+
+    <div class="modal-buttons">
+      <button id="unsavedSave" class="primary">Save & Continue</button>
+      <button id="unsavedContinue" class="warning">Continue Without Saving</button>
+      <button id="unsavedCancel" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

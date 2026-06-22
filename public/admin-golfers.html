@@ -446,14 +446,14 @@ async function saveGolferEdits() {
     const data = await res.json();
 
     if (data.error) {
-        hideSpinner();
+        //hideSpinner();
         alert(data.error);
         return;
     }
 
     closeEditModal();
     loadGolfers();
-    hideSpinner();
+    //hideSpinner();
 }
 
 async function deleteGolfer(id) {

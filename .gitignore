@@ -24,6 +24,9 @@ CoPilot Advice.docx
 database.sqlite
 ssh.txt
 
+*.docx
+*.doc
+
 Doc/
 public/js/admin-allocated-tee-timesbak2026-06-13.txt
 public/js/user-reports-bak2026-06-10.js

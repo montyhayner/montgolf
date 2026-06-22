@@ -311,10 +311,10 @@ h1, h2, h3 {
   cursor: pointer;
   font-size: 15px;
 }
-.modal-buttons .primary { background: #007bff; color: white; }
+.modal-buttons .primary { background: #007bff; color: black; }
+.modal-buttons .warning { background: #f0ad4e; color: black; }
 .modal-buttons .danger { background: #d9534f; color: white; }
-.modal-buttons .secondary { background: #ccc; }
-
+.modal-buttons .secondary { background: #6c757d; color: black; }
 
 /* ------------------------------------------------------------
    LEGEND (left-aligned under Sunday)
@@ -424,13 +424,40 @@ document.addEventListener("DOMContentLoaded", () => {
       link.addEventListener("click", (e) => {
         if (!unsavedChanges) return;
 
-        const leave = confirm("You have unsaved changes. Save before leaving?");
-        if (!leave) {
-          e.preventDefault();
-        }
+        e.preventDefault();
+
+        requireNoUnsavedChanges({
+          onSave: async () => {
+            await saveSchedule();
+            window.onbeforeunload = null;
+            window.location = link.href;
+          },
+          onContinue: () => {
+            window.onbeforeunload = null;
+            window.location = link.href;
+          },
+          onCancel: () => {}
+        });
+
       });
     });
   }, 200);
+
+  document.getElementById("unsavedSave").addEventListener("click", async () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
+  });
+
+  document.getElementById("unsavedContinue").addEventListener("click", () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
+  });
+
+  document.getElementById("unsavedCancel").addEventListener("click", () => {
+    hideUnsavedChangesModal();
+    if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
+  });
+
 
   // loadNavBar(); --- code replaced by code immediately above
   loadPageHeader()
@@ -443,7 +470,46 @@ let savedSchedule = null;
 let currentSchedule = null;
 let unsavedChanges = false;
 
+let unsavedModalCallbacks = {
+  onSave: null,
+  onContinue: null,
+  onCancel: null
+};
+
+function showUnsavedChangesModal(callbacks) {
+  unsavedModalCallbacks = callbacks;
+  document.getElementById("unsavedModal").style.display = "flex";
+}
+
+function hideUnsavedChangesModal() {
+  document.getElementById("unsavedModal").style.display = "none";
+}
+
+document.getElementById("unsavedSave").addEventListener("click", async () => {
+  hideUnsavedChangesModal();
+  if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
+});
+
+document.getElementById("unsavedContinue").addEventListener("click", () => {
+  hideUnsavedChangesModal();
+  if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
+});
+
+document.getElementById("unsavedCancel").addEventListener("click", () => {
+  hideUnsavedChangesModal();
+  if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
+});
+
 // ---- Helpers ----
+
+function requireNoUnsavedChanges(callbacks) {
+  if (!unsavedChanges) {
+    callbacks.onContinue();
+    return;
+  }
+
+  showUnsavedChangesModal(callbacks);
+}
 
 function showErrorBanner(msg) {
   const banner = document.getElementById("statusBanner");
@@ -520,10 +586,21 @@ function loadNavBar() {
         link.addEventListener("click", (e) => {
           if (!unsavedChanges) return;
 
-          const leave = confirm("You have unsaved changes. Save before leaving?");
-          if (!leave) {
-            e.preventDefault();
-          }
+          e.preventDefault();
+
+          requireNoUnsavedChanges({
+            onSave: async () => {
+              await saveSchedule();
+              window.onbeforeunload = null;
+              window.location = link.href;
+            },
+            onContinue: () => {
+              window.onbeforeunload = null;
+              window.location = link.href;
+            },
+            onCancel: () => {}
+          });
+
         });
       });
     });
@@ -823,9 +900,9 @@ function clearMonthSchedule(year, month) {
 }
 
 // DEFAULT helper logic - change in_town column from 0 to 1
-//                                              (making current month an in-town month)
-//                                              ... then populate month based user's 
-//                                                  day-of-week play days.
+// (making current month an in-town month)
+// then populate month based user's 
+// day-of-week play days.
 function regenerateDefaultScheduleForceInTown(year, month) {
   fetch(`/user/schedule/default/${year}/${month}?forceInTown=1`, {
     method: "POST"
@@ -857,7 +934,29 @@ function clearSchedule() {
 
 function wireUpEventListeners() {
   const picker = document.getElementById("monthPicker");
-  picker.addEventListener("change", loadScheduleForCurrentMonth);
+  picker.addEventListener("change", (e) => {
+  const newValue = e.target.value;
+
+  requireNoUnsavedChanges({
+    onSave: async () => {
+      await saveSchedule();
+      window.onbeforeunload = null;
+      picker.value = newValue;
+      loadScheduleForCurrentMonth();
+    },
+    onContinue: () => {
+      window.onbeforeunload = null;
+      picker.value = newValue;
+      loadScheduleForCurrentMonth();
+    },
+    onCancel: () => {
+      // revert picker to current month
+      const { year, month } = getMonthParts();
+      picker.value = `${year}-${String(month).padStart(2,"0")}`;
+    }
+  });
+});
+
 
   document.getElementById("saveBtn").addEventListener("click", () => {
     if (!currentMonthInTown && userHasSelectedPlayDays()) {
@@ -867,8 +966,35 @@ function wireUpEventListeners() {
     }
   });
 
-  document.getElementById("defaultBtn").addEventListener("click", regenerateDefaultSchedule);
-  document.getElementById("clearBtn").addEventListener("click", clearSchedule);
+document.getElementById("defaultBtn").addEventListener("click", () => {
+  requireNoUnsavedChanges({
+    onSave: async () => {
+      await saveSchedule();
+      regenerateDefaultSchedule();
+      window.onbeforeunload = null;
+    },
+    onContinue: () => {
+      regenerateDefaultSchedule();
+      window.onbeforeunload = null;
+    },
+    onCancel: () => {}
+  });
+});
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  requireNoUnsavedChanges({
+    onSave: async () => {
+      await saveSchedule();
+      clearSchedule();
+      window.onbeforeunload = null;
+    },
+    onContinue: () => {
+      clearSchedule()
+      window.onbeforeunload = null;
+    },
+    onCancel: () => {}
+  });
+});
 
  wireUpJumpToday();
 }
@@ -1058,13 +1184,28 @@ function wireUpJumpToday() {
   });
 }
 
-window.addEventListener("beforeunload", (e) => {
+window.onbeforeunload = (e) => {
   if (!unsavedChanges) return;
   e.preventDefault();
   e.returnValue = "";
-});
+};
+
 
 </script>
+
+<!-- Unsaved Changes Modal -->
+<div id="unsavedModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:420px;">
+    <h2>Unsaved Changes</h2>
+    <p>You have unsaved changes. What would you like to do?</p>
+
+    <div class="modal-buttons">
+      <button id="unsavedSave" class="primary">Save & Continue</button>
+      <button id="unsavedContinue" class="warning">Continue Without Saving</button>
+      <button id="unsavedCancel" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- Out-of-Town Modal -->
 <div id="outOfTownModal" class="modal-overlay">

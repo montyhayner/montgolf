@@ -5,6 +5,7 @@
     <title>Edit Profile</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/css/navbar.css">
+    <link rel="stylesheet" href="/css/modals.css">
 
     <style>
       body {
@@ -212,7 +213,7 @@
   <label>Email</label>
   <input type="email" id="email">
 
-  <button class="btn" onclick="saveProfile()">Save Changes</button>
+  <button class="btn" id="saveProfileBtn">Save Changes</button>
 
   <button class="btn secondary" id="changePasswordBtn">
     🔒 Change Password
@@ -225,7 +226,12 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
-
+  // ⭐ Track unsaved changes on all profile inputs
+  document.querySelectorAll("#first-name, #last-name, #email").forEach(input => {
+    input.addEventListener("input", () => {
+      unsavedChanges = true;
+    });
+  });
   //
   // Load user + league info and build page header
   //
@@ -242,7 +248,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 1. Attach modal button handlers
   //
-    document.getElementById("cpCancel").addEventListener("click", closeChangePassword);
+  document.getElementById("cpCancel").addEventListener("click", closeChangePassword);
   document.getElementById("changePasswordBtn").addEventListener("click", openChangePassword);
   document.getElementById("cpSubmit").addEventListener("click", async () => {
     const current_password = document.getElementById("cpCurrent").value.trim();
@@ -289,6 +295,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("changePasswordModal").style.display = "none";
     }, 1200);
   });
+
+
+    document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+    await saveProfile();
+    unsavedChanges = false;
+    });
 
   // 2. Attach password toggle handlers
     document.querySelectorAll(".toggle-visibility").forEach(toggle => {
@@ -392,7 +404,8 @@ async function saveProfile() {
   }
 
   showBanner("Profile updated successfully!", "success");
-}
+  unsavedChanges = false;  // Reset unsaved changes flag
+  }
 
 function showBanner(msg, type) {
   const banner = document.getElementById("banner");
@@ -400,6 +413,10 @@ function showBanner(msg, type) {
   banner.className = "banner " + type;
   banner.style.display = "block";
 }
+
+window.savePageChanges = async function() {
+await saveProfile();   // your existing save function
+};
 </script>
 
 <!-- Change Password Modal -->
@@ -447,6 +464,8 @@ function showBanner(msg, type) {
     <button class="btn secondary" id="cpCancel">Cancel</button>
   </div>
 </div>
+
+<script src="/js/unsaved-modal.js"></script>
 
 </body>
 </html>

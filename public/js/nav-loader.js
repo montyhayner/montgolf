@@ -34,6 +34,9 @@ async function loadNav() {
     const navHtml = await fetch(navFile).then(r => r.text());
     navContainer.innerHTML = navHtml;
 
+    // ⭐ FIRE EVENT HERE — SUCCESS PATH
+    document.dispatchEvent(new Event("navLoaded"));
+
   } catch (err) {
     console.error("NAV LOAD ERROR:", err);
 
@@ -44,6 +47,9 @@ async function loadNav() {
       .then(r => r.text())
       .then(html => {
         navContainer.innerHTML = html;
+
+        // ⭐ FIRE EVENT HERE TOO — FALLBACK PATH
+        document.dispatchEvent(new Event("navLoaded"));
       });
   }
 }
