@@ -8,6 +8,9 @@ node_modules/
 logs/
 *.log
 
+# migrations
+migrations/
+
 # SQLite DB files
 *.db
 *.sqbpro

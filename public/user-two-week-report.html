@@ -141,6 +141,17 @@
   font-size: 14px;
 }
 
+.reports-single-column {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+#user-golfers-container,
+#user-tee-times-container {
+  margin-bottom: 40px;
+}
+
 /* ============================================================
    TABLE
    ============================================================ */
@@ -179,9 +190,50 @@
   font-weight: bold;
 }
 
+/* USER VERSION — Responsive Two-Column Layout */
+.user-two-column {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 32px;
+  margin-top: 20px;
+  flex-wrap: wrap; /* allows stacking when needed */
+}
+
+/* Left and right columns */
+.user-left,
+.user-right {
+  flex: 1 1 420px; /* minimum width before stacking */
+  max-width: 600px;
+}
+
+/* Center tables inside each column */
+.user-left table,
+.user-right table {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ============================================================
    PRINT VERSION
    ============================================================ */
+/* When stacked vertically, reduce the vertical spacing */
+@media (max-width: 1100px) {
+  .user-two-column {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+
+  .user-left,
+  .user-right {
+    flex: 0 1 auto;      /* <<< allows shrinking */
+    width: 100%;         /* <<< forces full width when stacked */
+    max-width: 900px;    /* <<< optional, keeps nice centering */
+  }
+}
+
 @media print {
   nav,
   #btnEmailReport,
@@ -189,25 +241,11 @@
   .modal {
     display: none !important;
   }
-
-  .reports-two-column { display: block !important; }
-
-  .left-report,
-  .right-report {
-    width: 100% !important;
-    border: none !important;
-    padding: 0 !important;
-  }
-
-  .right-report {
-    margin-top: 40px;
-    page-break-before: always;
-  }
 }
   </style>
 
   <!-- UNIFIED JS -->
-  <script defer src="/js/two-week-report.js"></script>
+  <script defer src="/js/user-two-week-report.js"></script>
 </head>
 
 <body>
@@ -231,23 +269,10 @@
       </div>
     </div>
 
-    <!-- TWO COLUMN LAYOUT -->
-    <div class="reports-two-column">
-
-      <!-- LEFT: MAIN REPORT -->
-      <div class="left-report">
-        <div id="report-table-container">
-          <!-- JS injects the golfers table -->
-        </div>
-      </div>
-
-      <!-- RIGHT: ALLOCATED TEE TIMES -->
-      <div class="right-report">
-        <h2>Allocated Tee Times</h2>
-        <div id="allocated-tee-times-container">
-          <!-- JS injects tee time blocks -->
-        </div>
-      </div>
+    <div class="user-two-column">
+      <div class="user-left" id="user-golfers-container"></div>
+      <div class="user-right" id="user-tee-times-container"></div>
+    </div>
 
     </div>
   </div>

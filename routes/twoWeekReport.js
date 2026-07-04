@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
-const transporter = require("../services/mailer");
+const { sendEmail } = require("../services/mailer");
 
 const buildTwoWeekReportData = require("../services/buildTwoWeekReportData");
 const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
@@ -70,8 +70,8 @@ router.post("/two-week/email-self", requireLogin, async (req, res) => {
     if (!dates || dates.length === 0) {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+      await sendEmail({
+        
         to: user.email,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         text: emptyText,
@@ -97,8 +97,8 @@ router.post("/two-week/email-self", requireLogin, async (req, res) => {
       leagueName
     );
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+    await sendEmail({
+      
       to: user.email,
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,
@@ -139,8 +139,8 @@ router.post("/two-week/email", requireAdmin, async (req, res) => {
     if (!dates || dates.length === 0) {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+      await sendEmail({
+        
         to: user.email,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         text: emptyText,
@@ -248,8 +248,8 @@ router.post("/two-week/email", requireAdmin, async (req, res) => {
     // -----------------------------
     // Send email
     // -----------------------------
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+    await sendEmail({
+      
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,

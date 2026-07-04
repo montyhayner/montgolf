@@ -2,7 +2,7 @@
 // IMPORTS
 // ------------------------------------------------------------
 const db = require("../db");
-const transporter = require("./mailer");
+const { sendEmail } = require("./mailer");
 
 // ------------------------------------------------------------
 // LATEST TEE SHEET HELPERS (your code)
@@ -387,7 +387,7 @@ async function sendTwoWeekReportEmail(req, res) {
       if (includeSelf) recipients.push(user.email);
     }
 
-    await transporter.sendMail({
+    await sendEmail({
       from: "rlhayner@verizon.net",
       to: recipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
@@ -457,7 +457,7 @@ async function sendLatestTeeSheetEmail(req, res) {
     `).get(leagueId);
 
     if (!row || !row.latest_date) {
-      await transporter.sendMail({
+      await sendEmail({
         from: "rlhayner@verizon.net",
         to: user.email,
         subject: `Latest Tee Sheet Report - ${leagueName}`,
@@ -491,7 +491,7 @@ async function sendLatestTeeSheetEmail(req, res) {
       if (includeSelf) recipients.push(user.email);
     }
 
-    await transporter.sendMail({
+    await sendEmail({
       from: "rlhayner@verizon.net",
       to: recipients.join(", "),
       subject: `Latest Tee Sheet Report - ${leagueName}`,

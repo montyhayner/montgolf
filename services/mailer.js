@@ -1,14 +1,22 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.sendgrid.net",
-  port: 587,
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
   secure: false,
   auth: {
-    user: "apikey",
-    pass: process.env.SENDGRID_API_KEY
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
-module.exports = transporter;
+async function sendEmail({ to, subject, html }) {
+  return transporter.sendMail({
+    from: "notifications@mg.montgolf.net",
+    to,
+    subject,
+    html
+  });
+}
 
+module.exports = { sendEmail };

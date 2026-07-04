@@ -9,6 +9,9 @@
     border: 1px solid #e6c76f;
     color: #8a6d1d;
     border-radius: 0;
+    position: relative;
+    z-index: 2;
+    margin-bottom: 10px;
 }
 
 /* Icon */
@@ -26,4 +29,9 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.1;
+}
+
+#user-identity-container {
+    margin: 10px 0;
+    background: transparent !important;
 }

@@ -70,8 +70,7 @@ router.post("/admin/reports/latest-tee-sheet/email", requireLogin, async (req, r
     if (!row || !row.latest_date) {
       const emptyText = `Latest Tee Sheet Report - ${leagueName}\n\nNo tee sheet found.\n`;
 
-      await transporter.sendMail({
-        from: "rlhayner@verizon.net",
+      await sendEmail({
         to: user.email,
         subject: `Latest Tee Sheet Report - ${leagueName}`,
         text: emptyText,
@@ -175,8 +174,7 @@ router.post("/admin/reports/latest-tee-sheet/email", requireLogin, async (req, r
     // -----------------------------
     // 4. Send the email
     // -----------------------------
-    await transporter.sendMail({
-      from: "rlhayner@verizon.net",
+    await sendEmail({
       to: finalRecipients.join(", "),
       subject: `Latest Tee Sheet Report - ${leagueName}`,
       text: textReport,

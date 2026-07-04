@@ -10,7 +10,7 @@ console.log("REQUIRING DB FROM:", require.resolve("../db"));
 //const db = new sqlite3.Database("golf.db");
 const app = express();
 const { easternNow } = require("../utils/easternTime");
-const transporter = require("../services/mailer");
+const { sendEmail } = require("../services/mailer");
 
 // ------------------------------
 // SQLite Promise Helpers
@@ -1679,7 +1679,7 @@ async function O14000SendTeeSheetEmail(leagueId, playDate) {
     // ------------------------------------------------------------
     // 4. Send the email
     // ------------------------------------------------------------
-    await transporter.sendMail({
+    await sendEmail({
       from: process.env.EMAIL_USER,
       to: emailRecipientList,
       subject: `Tee Sheet for ${playDate}`,

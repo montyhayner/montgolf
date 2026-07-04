@@ -1,0 +1,54 @@
+<div id="topNav">
+  <div class="nav-title">
+    Golf Scheduler
+    <span id="leagueName"></span>
+    <span id="userName"></span>
+  </div>
+
+  <div class="nav-links">
+    <a href="/schedule" class="nav-link">My Schedule</a>
+    <a href="/user-reports" class="nav-link">Reports</a>
+    <a href="/guests" class="nav-link">Guests</a>
+    <a href="/my-availability" class="nav-link">My Availability</a>
+    <a href="/edit-profile" class="nav-link">Edit Profile</a>
+    <a href="/logout" class="nav-link">Logout</a>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+  // --- Load league name ---
+  try {
+    const leagueRes = await fetch("/api/user/selected-league");
+    const leagueData = await leagueRes.json();
+    if (leagueData?.league) {
+      document.getElementById("leagueName").textContent =
+        " — " + leagueData.league.league_name;
+    }
+  } catch (err) {
+    console.warn("Unable to load league name:", err);
+  }
+
+  // --- Load user name ---
+  try {
+    const userRes = await fetch("/api/user/info");
+    const userData = await userRes.json();
+    if (userData?.user) {
+      document.getElementById("userName").textContent =
+        " — " + userData.user.first_name + " " + userData.user.last_name;
+    }
+  } catch (err) {
+    console.warn("Unable to load user name:", err);
+  }
+
+  // --- Highlight active nav link ---
+  const currentPath = window.location.pathname;
+  document.querySelectorAll(".nav-link").forEach(link => {
+    if (link.getAttribute("href") === currentPath) {
+      link.classList.add("active");
+    }
+  });
+
+});
+</script>

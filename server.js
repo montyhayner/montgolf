@@ -14,7 +14,7 @@ const { requireLogin } = require("./middleware/auth");
 const bcrypt = require("bcrypt");
 const { easternNow } = require("./utils/easternTime");
 const latestApplyResultMap = {};
-const transporter = require("./services/mailer");
+const { sendEmail } = require("./services/mailer");
 const generateTwoWeekReportText = require("./services/generateTwoWeekReportText");
 
 // ------------------------------
@@ -1415,8 +1415,7 @@ app.post(
         toList.push(adminEmail);
       }
 
-      await transporter.sendMail({
-        from: adminEmail,
+      await sendEmail({
         to: toList.join(","),
         cc: ccList.join(","),
         subject,

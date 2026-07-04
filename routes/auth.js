@@ -52,16 +52,24 @@ router.post("/login", async (req, res) => {
     }
 
     // Save session (FULL ROLE INFO)
+    // Fetch league name
+    const league = await db.getAsync(
+      "SELECT league_name FROM leagues WHERE id = ?",
+      [user.league_id]
+    );
+
     req.session.user = {
       id: user.id,
       email: user.email,
       first_name: user.first_name,
       last_name: user.last_name,
       league_id: user.league_id,
-      is_admin: user.is_admin,               // 0 or 1
-      is_super_admin: user.is_super_admin,   // 0 or 1
+      league_name: league?.league_name || null,
+      is_admin: user.is_admin,
+      is_super_admin: user.is_super_admin,
       user_mode: "user"
     };
+
 
     console.log("✅ LOGIN SUCCESS — SESSION SET:", req.session.user);
 
@@ -74,6 +82,17 @@ router.post("/login", async (req, res) => {
     console.error("🔥 LOGIN ERROR:", err);
     return res.redirect("/login?error=1");
   }
+});
+
+// ============================================================================
+// GET /auth/session  →  Return session user (safe for user pages)
+// ============================================================================
+router.get("/session", (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.json(null);
+  }
+
+  res.json(req.session.user);
 });
 
 // ============================================================================

@@ -12,10 +12,11 @@ const path = require("path");
 const db = require("../db");
 const logger = require("../utils/logger");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
-const transporter = require("../services/mailer");
 
 // Services
 const buildTwoWeekReportData = require("../services/buildTwoWeekReportData");
+const { sendEmail } = require("../services/mailer");
+const { buildUserTwoWeekEmailHTML } = require("../services/twoWeekEmailBuilders");
 
 // DB async helpers
 function dbGet(sql, params = []) { return db.getAsync(sql, params); }
@@ -148,7 +149,11 @@ router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
     `, [leagueId, teeDate]);
 
     // Format long date
-    const longDate = new Date(teeDate).toLocaleDateString("en-US", {
+    // Format long date (avoid UTC shift)
+    const [year, month, day] = teeDate.split("-");
+    const localDate = new Date(year, month - 1, day);
+
+    const longDate = localDate.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -355,8 +360,7 @@ router.post("/email", requireLogin, async (req, res) => {
   }
 
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    await sendEmail({
       to: recipients.join(", "),
       subject: "Next Play Day Report",
       text: reportText
@@ -370,24 +374,83 @@ router.post("/email", requireLogin, async (req, res) => {
   }
 });
 
+router.post("/send-email", async (req, res) => {
+  try {
+    const { to, subject, message } = req.body;
+
+    const info = await mailgunTransport.sendMail({
+      to,
+      subject,
+      html: message
+    });
+
+    res.json({ success: true, id: info.messageId });
+  } catch (err) {
+    console.error("Mailgun SMTP Error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 // ============================================================================
 // TEST EMAIL
 // GET /api/reports/test-email
 // ============================================================================
 router.get("/test-email", async (req, res) => {
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
-      subject: "Golf Scheduler Test Email",
-      text: "This is a test email from your golf scheduler backend."
+    await sendEmail({
+      to: "montyhayner@outlook.com",
+      subject: "MontGolf SMTP Test",
+      html: "<h1>Your Mailgun SMTP is working!</h1>"
+    });
+    res.send("Email sent!");
+  } catch (err) {
+    console.error(err);
+    res.send("Error sending email.");
+  }
+});
+
+// ============================================================================
+// USER — Email Two-Week Golfers Report to Logged-In User
+// POST /api/reports/user-two-week/email
+// ============================================================================
+router.post("/user-two-week/email", requireLogin, async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user || !user.email) {
+      return res.status(400).json({ error: "User email not available." });
+    }
+
+    // Build the report data
+    const {
+      dates,
+      players,
+      totals,
+      allocatedTeeTimes
+    } = await buildTwoWeekReportData(db, user.league_id);
+
+    // ❌ REMOVE THESE — they call browser-only functions
+    // const golfersTableHTML = buildTwoWeekTableHTML({ dates, players, totals });
+    // const allocatedHTML = buildAllocatedTeeTimesHTML(allocatedTeeTimes);
+
+    // ✔ USE ONLY THIS — the Node-side email builder
+    const html = buildUserTwoWeekEmailHTML(
+      { dates, players, totals },
+      allocatedTeeTimes
+    );
+
+    await sendEmail({
+      to: user.email,
+      subject: "Your Two-Week Golfers Report",
+      html
     });
 
-    res.json({ ok: true, message: "Test email sent" });
+    res.json({ success: true });
 
   } catch (err) {
-    console.error("Test email error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Error sending user two-week report:", err);
+    res.status(500).json({ error: "Failed to send report." });
   }
 });
 
@@ -424,8 +487,8 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
     if (!dates || dates.length === 0) {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+      await sendEmail({
+        
         to: user.email,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         text: emptyText,
@@ -530,8 +593,8 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
     }
 
     // Send email
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+    await sendEmail({
+      
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,
@@ -585,17 +648,36 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
         AND tee_date = ?
       ORDER BY tee_time, starting_nine
     `, [leagueId, teeDate]);
-
-    // Build HTML table (same as email preview)
+    
     const buildHTML = rows => {
+      const [year, month, day] = teeDate.split("-");
+      const localDate = new Date(year, month - 1, day);
+
+      const formattedDate = localDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+
       let html = `
-        <h3>Tee Sheet for ${teeDate}</h3>
-        <table border="1" cellpadding="6" cellspacing="0">
-          <tr>
-            <th>Tee Time</th>
-            <th>Starting Nine</th>
-            <th>Players</th>
-          </tr>
+        <div style="text-align:center; margin-bottom:10px;">
+          <div style="font-size:24px; font-weight:bold; color:#333;">
+            Latest Tee Sheet Report
+          </div>
+          <div style="font-size:16px; color:#555; margin-top:4px;">
+            ${formattedDate}
+          </div>
+        </div>
+
+        <div style="text-align:center;">
+          <table border="1" bordercolor="#000000" cellpadding="6" cellspacing="0"
+            style="border-collapse:collapse; margin:auto; border:1px solid #000;">
+            <tr style="background:#e6ffe6;">
+              <th style="padding:6px;">Tee Time</th>
+              <th style="padding:6px;">Starting Nine</th>
+              <th style="padding:6px;">Players</th>
+            </tr>
       `;
 
       rows.forEach(r => {
@@ -607,17 +689,21 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
         ].filter(Boolean).join(", ");
 
         html += `
-          <tr>
-            <td>${r.tee_time}</td>
-            <td>${r.starting_nine}</td>
-            <td>${players}</td>
-          </tr>
+            <tr>
+              <td style="padding:6px;">${r.tee_time}</td>
+              <td style="padding:6px;">${r.starting_nine}</td>
+              <td style="padding:6px;">${players}</td>
+            </tr>
         `;
       });
 
-      html += `</table>`;
+      html += `
+          </table>
+        </div>
+      `;
+
       return html;
-    };
+};
 
     const htmlReport = buildHTML(teeSheet);
 
@@ -674,8 +760,14 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
     }
 
     // Send email
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+    console.log("EMAIL CONFIG:", {
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT,
+      secure: process.env.EMAIL_SECURE,
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS ? "LOADED" : "MISSING"
+    });
+    await sendEmail({
       to: finalRecipients.join(", "),
       subject: `Latest Tee Sheet - ${leagueName}`,
       html: htmlReport
