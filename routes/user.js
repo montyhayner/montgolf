@@ -57,13 +57,13 @@ router.get("/info", requireLogin, async (req, res) => {
 router.get("/reports/two-week", requireLogin, getTwoWeekReport);
 
 // Two‑Week Golfers Report (send email)
-router.post("/admin/reports/two-week/email", requireLogin, sendTwoWeekReportEmail);
+router.post("two-week/email", requireLogin, sendTwoWeekReportEmail);
 
 // Latest Tee Sheet Report (JSON for the page)
 router.get("/reports/latest-tee-sheet", requireLogin, getLatestTeeSheet);
 
 // Latest Tee Sheet Report (send email)
-router.post("/admin/reports/latest-tee-sheet/email", requireLogin, sendLatestTeeSheetEmail);
+router.post("/reports/latest-tee-sheet/email", requireLogin, sendLatestTeeSheetEmail);
 
 // -----------------------------------------------------------------------------
 // SELECTED LEAGUE
