@@ -229,6 +229,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const response = await fetch("/api/reports/two-week/email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",   // ⭐ REQUIRED ⭐
       body: JSON.stringify(payload)
     });
 

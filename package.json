@@ -23,10 +23,14 @@
     "mailgun.js": "^13.2.0",
     "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.11",
+    "nodemailer": "^9.0.1",
     "react-froala-wysiwyg": "^4.5.2"
   },
   "engines": {
     "node": "18.20.3"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "better-sqlite3@12.10.0": true
   }
 }

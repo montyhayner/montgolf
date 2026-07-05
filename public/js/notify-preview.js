@@ -1,8 +1,32 @@
+function waitForReportData() {
+  if (!window.teeRows || !window.leagueId || !window.teeDate) {
+    console.log("Waiting for report data...");
+    return setTimeout(waitForReportData, 50);
+  }
+
+  console.log("Report data ready:", window.teeRows, window.leagueId, window.teeDate);
+  initializeNotifyPreview();
+}
+
+waitForReportData();
+
+
+function updateStatus(msg, type = "info") {
+  const el = document.getElementById("notifyStatus");
+  if (!el) return;
+
+  el.textContent = msg;
+  el.className = "";
+  el.classList.add("notify-status", `status-${type}`);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const previewBtn = document.getElementById("btnPreviewEmail");
   const backBtn = document.getElementById("btnBackToOptions");
   const sendBtn = document.getElementById("btnSendEmail");
+  const leagueId = window.leagueId;
+  const teeDate = window.tee_date;
 
   // -------------------------------------------------------------
   // PREVIEW EMAIL BUTTON
@@ -151,8 +175,42 @@ if (includeTeeSheet && window.teeRows) {
   if (sendBtn) {
     sendBtn.addEventListener("click", async () => {
       console.log("Send Email clicked");
-      // your send logic goes here
+
+      const includeTeeSheet = document.getElementById("bodyIncludeTeeSheet").checked;
+      const includeUnplaced = document.getElementById("bodyIncludeUnplaced").checked;
+      const message = document.getElementById("notifyMessage").value;
+
+      const recipientGroups = {
+        teeSheetPlayers: document.getElementById("recTeeSheetPlayers").checked,
+        unplacedGolfers: document.getElementById("recUnplacedGolfers").checked,
+        leagueAdmins: document.getElementById("recLeagueAdmins").checked,
+        clubStaff: document.getElementById("recClubStaff").checked
+      };
+
+      updateStatus("Sending notifications...", "info");
+
+      try {
+        const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/send-notifications`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientGroups,
+            includeTeeSheet,
+            includeUnplaced,
+            message
+          })
+        });
+
+        if (!res.ok) throw new Error("Failed to send notifications");
+
+        updateStatus("Notifications sent.", "success");
+        closeNotifyModal();
+
+      } catch (err) {
+        console.error(err);
+        updateStatus("Error sending notifications.", "error");
+      }
     });
   }
 
-});
+  });

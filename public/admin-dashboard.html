@@ -303,16 +303,20 @@ async function loadDashboard(session) {
 
 async function initPage() {
     try {
+        // MUST load nav first — prevents empty dashboard
+        await loadAdminNav();
+
         const session = await loadSession();
         await loadAdminIdentityBar(session);
         await loadDashboard(session);
+
     } catch (err) {
         console.error("Page initialization error:", err);
     }
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  initPage();
+document.addEventListener("DOMContentLoaded", () => {
+    initPage();
 });
 
 </script>

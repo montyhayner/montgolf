@@ -1,7 +1,7 @@
 //server.js
 console.log(">>> RUNNING SERVER.JS FROM:", __filename);
-require("dotenv").config();
 
+require("dotenv").config();
 
 const express = require("express");
 const session = require("express-session");
@@ -22,6 +22,11 @@ const generateTwoWeekReportText = require("./services/generateTwoWeekReportText"
 // ------------------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  console.log("REQUEST:", req.method, req.url);
+  next();
+});
 
 app.use(session({
     secret: "your-secret",
@@ -369,6 +374,20 @@ async function formatSqliteTimestamp() {
     console.error("Error - formatSqliteTimestamp()", err);
     return ("Server error");
   }
+}
+
+//--------------------------------------------------------------------
+//  Helper function to send an email to superAdmins
+// -------------------------------------------------------------------
+async function emailToSuperAdmins(subject, emailText) {
+  const superAdmins = db.prepare(`
+    SELECT email FROM users WHERE is_super_admin = 1
+  `).all();
+  await sendEmail({
+    to: superAdmins.map(a => a.email),
+    subject: subject,
+    text: emailText
+  });
 }
 
 // -------------------------------------------------------------------------------------
@@ -2066,6 +2085,10 @@ app.get("/admin-logout", (req, res) => {
 
 // -------------------------
 //  Cron jobs
+// =============================================================
+// call to async function emailToSuperAdmins(subject, emailText)
+//      to send email to superadmins.  can use on any cron job.
+// =============================================================
 // -------------------------
 
 const cron = require("node-cron");
@@ -2089,6 +2112,48 @@ cron.schedule("0 3 1 * *", async () => {
 cron.schedule("0 20 * * *", async () => {
   console.log("⏰ nightly running tee-sheet cron job (8 PM Eastern)...");
   await generateTeeSheet();   // nightly job for all leagues
+}, {
+  timezone: "America/New_York"
+});
+
+// -----------------------------------------------------------------
+// run job to extend dates on the calendar_dates table for 14 months
+// from today.
+// -----------------------------------------------------------------
+const { runExtendCalendarJob } = require("./jobs/runExtendCalendarJob");
+
+// ----------------------------------------------------------
+//  NEW: Extend calendar_dates table (4:25 AM Eastern)
+//  Runs on the 1st of each month BEFORE default playdates
+// ----------------------------------------------------------
+
+cron.schedule("25 4 1 * *", async () => {
+  console.log("⏰ Running extendCalendarDates job (4:25 AM Eastern)...");
+  await runExtendCalendarJob();
+}, {
+  timezone: "America/New_York"
+});
+
+// ----------------------------------------------------------
+//  NEW: Default next-month playdates (5:30 AM Eastern)
+//  Runs on: 1st, 14th, and last day of the month
+// ----------------------------------------------------------
+const { runDefaultPlaydatesJob } = require("./jobs/runDefaultPlaydatesJob");
+
+cron.schedule("30 5 1,14 * *", async () => {
+  runDefaultPlaydatesJob();
+}, {
+  timezone: "America/New_York"
+});
+
+// Last day of month at 5:30 AM Eastern
+cron.schedule("30 5 * * *", async () => {
+  const nowET = et.easternNow();
+  const tomorrowET = et.addDays(nowET, 1);
+
+  if (tomorrowET.getDate() === 1) {
+    runDefaultPlaydatesJob();
+  }
 }, {
   timezone: "America/New_York"
 });

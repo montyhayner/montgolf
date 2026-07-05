@@ -9,8 +9,10 @@ async function loadLatestTeeSheet() {
   }
 
   // Make data available to the preview modal
-  window.teeRows = data.teeSheet;
-  window.teeDate = data.longDate;
+  window.leagueId = data.league_id;      // needed for backend route
+  window.teeDate = data.tee_date;        // needed for backend route
+  window.longTeeDate = data.longDate;    // used for display only
+  window.teeRows = data.teeRows;         // needed for preview + HTML builder
   
   // Load header
   loadPageHeader("Latest Tee Sheet Report", data.longDate);

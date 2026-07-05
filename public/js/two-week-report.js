@@ -247,9 +247,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       guestsInReport: selfOnly ? [] : Array.from(guestsInReport)
     };
 
-    const response = await fetch("/admin/reports/two-week/email", {
+    const response = await fetch("/api/reports/two-week/email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(payload)
     });
 

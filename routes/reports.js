@@ -5,6 +5,8 @@
 // ============================================================================
 
 console.log("Reports router loaded");
+console.log("REPORTS ROUTER LOADED");
+
 
 const express = require("express");
 const router = express.Router();
@@ -169,6 +171,8 @@ router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
       teeDate,
       longDate,
       teeSheet,
+      teeRows: teeSheet,   // <-- ADD THIS
+      league_id: leagueId, // <-- ADD THIS (your frontend expects it)
       isAdmin
     });
 
@@ -462,9 +466,12 @@ const generateTwoWeekReportText = require("../services/generateTwoWeekReportText
 const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
 
 router.post("/two-week/email", requireLogin, async (req, res) => {
+
   try {
     const user = req.session.user;
     const leagueId = user.league_id;
+    console.log("USER SESSION:", req.session.user);
+    console.log("HIT TWO-WEEK EMAIL POST ROUTE");
 
     // Get league name
     const league = db.prepare(`
@@ -488,7 +495,6 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
       await sendEmail({
-        
         to: user.email,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         text: emptyText,
@@ -594,7 +600,7 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
 
     // Send email
     await sendEmail({
-      
+  
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: reportText,
@@ -604,6 +610,8 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
     res.json({ ok: true });
 
   } catch (err) {
+    console.error("MAILGUN ERROR DETAILS:", err);
+    console.log("catch error in two-week/email post err=", err);
     console.error("❌ Error sending two-week report:", err);
     res.status(500).json({ error: "Unable to send report email" });
   }
