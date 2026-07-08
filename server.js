@@ -2116,6 +2116,24 @@ cron.schedule("0 20 * * *", async () => {
   timezone: "America/New_York"
 });
 
+// Tee sheet REBUILD REBUILD REBUILD - this should be commented out except
+// for testing purposes.  It will rebuild the tee sheet based on the teeDate
+// the editor places in the second argument of 
+// generateTeeSheet(leagueId, teeDate, emailid)
+// COMMENT below code OUT AFTER RUNNING!!!
+cron.schedule("45 15 * * *", async () => {
+  console.log("⏰ tee sheet rebuild cron job to run based on editing");
+  const uid = 1;  // leagueId
+  const teeDate = "2026-07-08";  // date to rebuild
+  const emailId = "rlhayner@verizon.net"; 
+  await generateTeeSheet({
+        leagueId: Number(uid),
+        playDate: teeDate,
+        generatedBy: emailId}); 
+}, {
+  timezone: "America/New_York"
+});
+
 // -----------------------------------------------------------------
 // run job to extend dates on the calendar_dates table for 14 months
 // from today.
@@ -2148,8 +2166,9 @@ cron.schedule("30 5 1,14 * *", async () => {
 
 // Last day of month at 5:30 AM Eastern
 cron.schedule("30 5 * * *", async () => {
-  const nowET = et.easternNow();
-  const tomorrowET = et.addDays(nowET, 1);
+  const nowET = easternNow();                 // use the imported function
+  const tomorrowET = new Date(nowET);         // clone
+  tomorrowET.setDate(tomorrowET.getDate() + 1);
 
   if (tomorrowET.getDate() === 1) {
     runDefaultPlaydatesJob();

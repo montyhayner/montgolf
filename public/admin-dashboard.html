@@ -164,6 +164,9 @@
 
 <script>
 
+// -------------------------------------------------------
+// Safe JSON helper
+// -------------------------------------------------------
 async function safeJson(res) {
     const text = await res.text();
     try {
@@ -174,18 +177,15 @@ async function safeJson(res) {
 }
 
 function showError(message) {
-    const loading = document.getElementById("loading");
+    document.getElementById("loading").style.display = "none";
     const errorBox = document.getElementById("error-box");
-
-    loading.style.display = "none";
     errorBox.style.display = "block";
-
     document.getElementById("error-message").innerText = message;
 }
 
 // -------------------------------------------------------
-// Load Session variable values
-//--------------------------------------------------------
+// Load Session
+// -------------------------------------------------------
 async function loadSession() {
     const res = await fetch("/admin/session-info", { credentials: "include" });
     const session = await res.json();
@@ -195,23 +195,18 @@ async function loadSession() {
         leaguesLink.style.display = session.is_super_admin ? "inline-block" : "none";
     }
 
-    return session;   // ⭐ FIXED
+    return session;
 }
 
-// --------------------------------------------------------------------------
-//   Populate Identity bar (icon + role + name + color)
-// --------------------------------------------------------------------------
+// -------------------------------------------------------
+// Load Identity Bar
+// -------------------------------------------------------
 async function loadAdminIdentityBar(session) {
     const container = document.getElementById("admin-identity-container");
     if (!container) return;
 
-    // Load the HTML partial
     const html = await fetch("/partials/admin-identity.html").then(r => r.text());
     container.innerHTML = html;
-
-    // =========================
-    // session is passed in from initPage()
-    // =========================
 
     const bar = container.querySelector(".admin-identity");
     const icon = container.querySelector("#identity-icon");
@@ -231,67 +226,45 @@ async function loadAdminIdentityBar(session) {
     }
 }
 
+// -------------------------------------------------------
+// Load Dashboard
+// -------------------------------------------------------
 async function loadDashboard(session) {
     try {
-
-        // -----------------------------
-        // 1. Update nav user name safely
-        // -----------------------------
         const displayName =
             (session.first_name && session.last_name)
                 ? `${session.first_name} ${session.last_name}`
                 : session.email;
 
-        // Super Admin nav options
         if (session.is_super_admin) {
-            document.getElementById("nav-leagues-link").style.display = "inline";
+            const link = document.getElementById("nav-leagues-link");
+            if (link) link.style.display = "inline";
         }
-
-        // -----------------------------
-        // 2. Super Admin with no league selected → redirect
-        // -----------------------------
-        // if (session.is_super_admin && !session.league_id) {
-        //    window.location.href = "/auth/select-league";
-        //    return;
-        // }
 
         let league = null;
 
-        // -----------------------------
-        // 3. Load leagues (Super Admin only)
-        // -----------------------------
         if (session.is_super_admin) {
             const leaguesRes = await fetch("/admin/leagues/api", { credentials: "include" });
             const leagues = await safeJson(leaguesRes);
             league = leagues.find(l => l.id === session.league_id);
         } else {
-            // League Admin: fetch only their league
             const leagueRes = await fetch(`/admin/leagues/api/${session.league_id}`, {
                 credentials: "include"
             });
             league = await safeJson(leagueRes);
         }
 
-        // -----------------------------
-        // 4. Validate league
-        // -----------------------------
         if (!league) {
             showError("League not found.");
             return;
         }
 
-        // -----------------------------
-        // 5. Populate dashboard
-        // -----------------------------
         document.getElementById("league-name").innerText = league.league_name;
         document.getElementById("coordinator-name").innerText =
             `${league.first_name} ${league.last_name}`;
         document.getElementById("coordinator-email").innerText = league.email;
         document.getElementById("league-description").innerText = league.description;
 
-        // -----------------------------
-        // 6. Show dashboard content
-        // -----------------------------
         document.getElementById("loading").style.display = "none";
         document.getElementById("dashboard-wrapper").style.display = "block";
 
@@ -301,11 +274,15 @@ async function loadDashboard(session) {
     }
 }
 
+// -------------------------------------------------------
+// Corrected Init Sequence
+// -------------------------------------------------------
 async function initPage() {
     try {
-        // MUST load nav first — prevents empty dashboard
-        await loadAdminNav();
+        // ⭐ Load nav directly and wait for it
+        await loadNav();
 
+        // ⭐ Now nav exists — safe to continue
         const session = await loadSession();
         await loadAdminIdentityBar(session);
         await loadDashboard(session);
@@ -315,9 +292,7 @@ async function initPage() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initPage();
-});
+document.addEventListener("DOMContentLoaded", initPage);
 
 </script>
 

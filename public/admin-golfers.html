@@ -26,12 +26,19 @@
 
         .container {
             max-width: 1100px;
-            margin: 40px auto;
+            margin: 6px auto;
             background: white;
-            padding: 30px;
+            padding: 12px 24px;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+
+        .container h1 {
+            text-align: center;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
 
         table {
             width: 100%;
@@ -67,6 +74,17 @@
   justify-content: center;
   align-items: center;
   z-index: 3000;
+}
+
+/* Reduce top spacing above the Manage Golfers header */
+.page-header {
+    margin-top: 4px !important;
+    padding-top: 0 !important;
+}
+
+h1 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 .spinner {
@@ -106,12 +124,57 @@
             border: 1px solid #ccc;
             border-radius: 6px;
         }
+        /* Compact golfer table rows */
+        #golfer-table tbody tr {
+            height: 22px;                 /* half-height */
+        }
+
+        #golfer-table td {
+            padding: 4px 6px !important;  /* much tighter */
+            line-height: 1.1;             /* compact text */
+            font-size: 14px;              /* slightly smaller */
+        }
+
+        /* Compact header row too */
+        #golfer-table th {
+            padding: 6px 6px !important;
+            font-size: 14px;
+        }
+
+        /* Compact action buttons */
+        .btn-small {
+            padding: 2px 6px !important;
+            font-size: 12px !important;
+            line-height: 1.0 !important;
+        }
+
+        .sort-arrow {
+            font-size: 12px;
+            margin-left: 4px;
+            opacity: 0.6;
+        }
+
+        .sort-arrow.asc::after {
+            content: "▲";
+        }
+
+        .sort-arrow.desc::after {
+            content: "▼";
+        }
+
+        th.active-sort {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
     </style>
 </head>
 
 <body>
+    <div id="nav-container"></div>
+    <link id="nav-css" rel="stylesheet">
+    <script src="/js/nav-loader.js"></script>
 
-    <div id="admin-nav-container"></div>
     <div id="admin-identity-container"></div>
 
     <div class="container">
@@ -124,13 +187,27 @@
         <table id="golfer-table">
             <thead>
                 <tr>
-                    <th onclick="sortTable(0)">Last Name</th>
-                    <th onclick="sortTable(1)">First Name</th>
-                    <th onclick="sortTable(2)">Email</th>
-                    <th onclick="sortTable(3)">Admin</th>
-                    <th onclick="sortTable(4)">Member</th>
-                    <th onclick="sortTable(5)">Subgroup</th>
-                    <th onclick="sortTable(6)">#</th>
+                    <th onclick="sortGolfers('last_name')">
+                        Last Name<span class="sort-arrow" data-col="last_name"></span>
+                    </th>
+                    <th onclick="sortGolfers('first_name')">
+                        First Name<span class="sort-arrow" data-col="first_name"></span>
+                    </th>
+                    <th onclick="sortGolfers('email')">
+                        Email<span class="sort-arrow" data-col="email"></span>  
+                    </th>
+                    <th onclick="sortGolfers('is_admin')">
+                        Admin<span class="sort-arrow" data-col="is_admin"></span>
+                    </th>
+                    <th onclick="sortGolfers('is_member')">
+                        Member<span class="sort-arrow" data-col="is_member"></span>
+                    </th>
+                    <th onclick="sortGolfers('subgroup')">
+                        Subgroup<span class="sort-arrow" data-col="subgroup"></span>
+                    </th>
+                    <th onclick="sortGolfers('subgroup_number')">
+                        #<span class="sort-arrow" data-col="subgroup_number"></span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -292,40 +369,115 @@ async function loadAdminIdentity(session) {
     }
 }
 
-async function loadGolfers() {
-    const res = await fetch("/admin/golfers/api", { credentials: "include" });
-    const golfers = await res.json();
+// GLOBAL SORT STATE
+let currentSortColumn = null;
+let currentSortDirection = "asc";   // "asc" or "desc"
 
-    window.currentGolfers = golfers;   // ⭐ store globally
+// GENERIC SORT HANDLER
+function sortGolfers(column) {
+    // If clicking same column → flip direction
+    if (currentSortColumn === column) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+    } else {
+        currentSortColumn = column;
+        currentSortDirection = "asc";   // default on new column
+    }
 
-    console.log("GOLFERS RESPONSE:", golfers);  // ← ADD THIS
+    let golfers = [...window.currentGolfers];
 
+    // SPECIALTY SORT: subgroup + subgroup_number
+    if (column === "subgroup" || column === "subgroup_number") {
+        golfers.sort((a, b) => {
+            // Blank subgroup should sort last
+            const subA = a.subgroup || "ZZZ";
+            const subB = b.subgroup || "ZZZ";
+
+            if (subA < subB) return -1;
+            if (subA > subB) return 1;
+
+            // Same subgroup → sort subgroup_number ascending ALWAYS
+            return a.subgroup_number - b.subgroup_number;
+        });
+
+        // If user clicked twice → reverse whole list
+        if (currentSortDirection === "desc") {
+            golfers.reverse();
+        }
+
+    } else {
+        // NORMAL SORT
+        golfers.sort((a, b) => {
+            let valA = a[column];
+            let valB = b[column];
+
+            // Case-insensitive for strings
+            if (typeof valA === "string") valA = valA.toLowerCase();
+            if (typeof valB === "string") valB = valB.toLowerCase();
+
+            if (valA < valB) return currentSortDirection === "asc" ? -1 : 1;
+            if (valA > valB) return currentSortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
+    }
+    // Re-render table
+    renderGolfers(golfers);
+    // Update arrows
+    updateSortArrows();
+}
+
+function updateSortArrows() {
+    // 1. Remove arrows from ALL columns
+    document.querySelectorAll(".sort-arrow").forEach(arrow => {
+        arrow.classList.remove("asc", "desc");
+
+        // 2. Find the arrow whose data-col matches the column being sorted
+        const col = arrow.getAttribute("data-col");
+
+        // 3. Add the correct arrow class (asc or desc)
+        if (col === currentSortColumn) {
+            arrow.classList.add(currentSortDirection);
+        }
+    });
+}
+
+function renderGolfers(golfers) {
     const tbody = document.querySelector("#golfer-table tbody");
     tbody.innerHTML = "";
 
     golfers.forEach(g => {
         const tr = document.createElement("tr");
 
-    tr.innerHTML = `
-        <td>${g.last_name}</td>
-        <td>${g.first_name}</td>
-        <td>${g.email}</td>
-        <td>${g.is_admin ? "Yes" : "No"}</td>
-        <td>${g.is_member ? "Yes" : "No"}</td>
-        <td>${g.subgroup}</td>
-        <td>${g.subgroup_number}</td>
-        <td class="actions-cell">
-            <button class="btn btn-small" onclick="openEditModal(${g.id})">✏️ Edit</button>
-            <button class="btn btn-danger btn-small" onclick="deleteGolfer(${g.id})">🗑️ Delete</button>
-            <button class="btn btn-small" 
-                    onclick="openResetPasswordModal(${g.id}, '${g.first_name}', '${g.last_name}')">
-                  🔑 Reset
-           </button>
-        </td>
-             `;
+        tr.innerHTML = `
+            <td>${g.last_name}</td>
+            <td>${g.first_name}</td>
+            <td>${g.email}</td>
+            <td>${g.is_admin ? "Yes" : "No"}</td>
+            <td>${g.is_member ? "Yes" : "No"}</td>
+            <td>${g.subgroup}</td>
+            <td>${g.subgroup_number}</td>
+            <td class="actions-cell">
+                <button class="btn btn-small" onclick="openEditModal(${g.id})">✏️ Edit</button>
+                <button class="btn btn-danger btn-small" onclick="deleteGolfer(${g.id})">🗑️ Delete</button>
+                <button class="btn btn-small" 
+                        onclick="openResetPasswordModal(${g.id}, '${g.first_name}', '${g.last_name}')">
+                      🔑 Reset
+               </button>
+            </td>
+        `;
 
         tbody.appendChild(tr);
     });
+}
+
+async function loadGolfers() {
+    const res = await fetch("/admin/golfers/api", { credentials: "include" });
+    const golfers = await res.json();
+
+    window.currentGolfers = golfers;   // store globally
+
+    console.log("GOLFERS RESPONSE:", golfers);
+
+    renderGolfers(golfers);            // use new renderer
 }
 
 function openCreateModal() {
@@ -528,25 +680,9 @@ function openResetPasswordModal(id, first_name, last_name) {
 function closeResetPasswordModal() {
     document.getElementById("reset-password-modal").style.display = "none";
 }
-
-function sortTable(colIndex) {
-    const table = document.getElementById("golfer-table");
-    const rows = Array.from(table.rows).slice(1);
-
-    const sorted = rows.sort((a, b) => {
-        const A = a.cells[colIndex].innerText.toUpperCase();
-        const B = b.cells[colIndex].innerText.toUpperCase();
-        return A.localeCompare(B);
-    });
-
-    const tbody = table.querySelector("tbody");
-    tbody.innerHTML = "";
-    sorted.forEach(r => tbody.appendChild(r));
-}
-
 async function initPage() {
     try {
-        await loadAdminNav();
+        await loadNav();                     // now exists
         const session = await loadSession();
         await loadAdminIdentity(session);
         await loadGolfers();
@@ -555,18 +691,7 @@ async function initPage() {
     }
 }
 
-initPage();
-
-document.addEventListener("DOMContentLoaded", () => {
-  const current = window.location.pathname;
-  const links = document.querySelectorAll(".nav-links a");
-
-  links.forEach(link => {
-    if (link.getAttribute("href") === current) {
-      link.classList.add("active");
-    }
-  });
-});
+document.addEventListener("DOMContentLoaded", initPage);
 
 </script>
 

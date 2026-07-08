@@ -1704,6 +1704,7 @@ async function O14000SendTeeSheetEmail(leagueId, playDate) {
 // ------------------------------------------------------------------------------
 async function generateTeeSheet({ leagueId = 0, playDate = null, generatedBy = null } = {}) {
   // (1) nightly job: all leagues, two days hence
+  console.log(`generateTeeSheet called with leagueId=${leagueId}, playDate=${playDate}, generatedBy=${generatedBy}`); 
   if (!leagueId || leagueId === 0) {
     return A0000generateTeeSheetForAllLeagues();
   }

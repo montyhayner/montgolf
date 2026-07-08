@@ -1,8 +1,8 @@
-// ------------------------------------------------------------
-// Dynamic Navigation Loader (Admin + User)
-// ------------------------------------------------------------
+console.log("NAV LOADER: script loaded");
 
 async function loadNav() {
+  console.log("NAV LOADER: loadNav() called");
+
   const navContainer = document.getElementById("nav-container");
   const navCss = document.getElementById("nav-css");
 
@@ -12,13 +12,12 @@ async function loadNav() {
   }
 
   try {
-    // Get logged-in user
     const who = await fetch("/auth/whoami", { credentials: "include" });
     const user = await who.json();
+    console.log("NAV LOADER: user:", user, " user_mode:", user.user_mode);
 
     const isAdmin = user && user.user_mode === "admin";
 
-    // Choose correct nav + CSS
     const navFile = isAdmin
       ? "/partials/admin-nav.html"
       : "/partials/user-nav.html";
@@ -27,32 +26,44 @@ async function loadNav() {
       ? "/css/admin-nav.css"
       : "/css/user-nav.css";
 
-    // Load CSS
+    console.log("NAV LOADER: navfile:", navFile, " cssFile:", cssFile);
+
     navCss.href = cssFile;
 
-    // Load HTML
+    await new Promise(resolve => {
+      navCss.onload = resolve;
+      navCss.onerror = resolve;
+    });
+
+    console.log("NAV LOADER: fetching", navFile);
     const navHtml = await fetch(navFile).then(r => r.text());
     navContainer.innerHTML = navHtml;
 
-    // ⭐ FIRE EVENT HERE — SUCCESS PATH
+    console.log("NAV LOADER: navHtml loaded");
+
     document.dispatchEvent(new Event("navLoaded"));
+    return true;
 
   } catch (err) {
     console.error("NAV LOAD ERROR:", err);
 
-    // Fallback: user nav + user CSS
     navCss.href = "/css/user-nav.css";
 
-    fetch("/partials/user-nav.html")
-      .then(r => r.text())
-      .then(html => {
-        navContainer.innerHTML = html;
+    await new Promise(resolve => {
+      navCss.onload = resolve;
+      navCss.onerror = resolve;
+    });
 
-        // ⭐ FIRE EVENT HERE TOO — FALLBACK PATH
-        document.dispatchEvent(new Event("navLoaded"));
-      });
+    const html = await fetch("/partials/user-nav.html").then(r => r.text());
+    navContainer.innerHTML = html;
+
+    document.dispatchEvent(new Event("navLoaded"));
+    return true;
   }
 }
 
-// Auto-run on every page that includes this script
-document.addEventListener("DOMContentLoaded", loadNav);
+// ⭐ THIS MUST BE OUTSIDE THE CATCH ⭐
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("NAV LOADER: DOMContentLoaded fired — calling loadNav()");
+  loadNav();
+});

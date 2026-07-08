@@ -364,6 +364,8 @@ h1, h2, h3 {
 <link id="nav-css" rel="stylesheet">
 <script src="/js/nav-loader.js"></script>
 
+<div id="user-identity-container"></div>
+
 <h1 id="pageHeader"></h1>
 
 <div id="statusBannerWrapper">
@@ -418,6 +420,7 @@ h1, h2, h3 {
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Schedule JS running");
+
   // Wait a bit for nav-loader.js to finish inserting the nav
   setTimeout(() => {
     document.querySelectorAll(".nav-link").forEach(link => {
@@ -438,34 +441,43 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           onCancel: () => {}
         });
-
       });
     });
   }, 200);
 
-  document.getElementById("unsavedSave").addEventListener("click", async () => {
-    hideUnsavedChangesModal();
-    if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
-  });
+  // --- SAFE modal button bindings (prevents crash if modal not present) ---
+  const unsavedSaveBtn = document.getElementById("unsavedSave");
+  if (unsavedSaveBtn) {
+    unsavedSaveBtn.addEventListener("click", async () => {
+      hideUnsavedChangesModal();
+      if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
+    });
+  }
 
-  document.getElementById("unsavedContinue").addEventListener("click", () => {
-    hideUnsavedChangesModal();
-    if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
-  });
+  const unsavedContinueBtn = document.getElementById("unsavedContinue");
+  if (unsavedContinueBtn) {
+    unsavedContinueBtn.addEventListener("click", () => {
+      hideUnsavedChangesModal();
+      if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
+    });
+  }
 
-  document.getElementById("unsavedCancel").addEventListener("click", () => {
-    hideUnsavedChangesModal();
-    if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
-  });
+  const unsavedCancelBtn = document.getElementById("unsavedCancel");
+  if (unsavedCancelBtn) {
+    unsavedCancelBtn.addEventListener("click", () => {
+      hideUnsavedChangesModal();
+      if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
+    });
+  }
 
-
-  // loadNavBar(); --- code replaced by code immediately above
-  loadPageHeader()
+  // ---- Page initialization ----
+  loadPageHeader();
   configureMonthPickerLimits();
   wireUpEventListeners();
   initSchedulePage();
 });
 
+// ---- State ----
 let savedSchedule = null;
 let currentSchedule = null;
 let unsavedChanges = false;
@@ -476,41 +488,33 @@ let unsavedModalCallbacks = {
   onCancel: null
 };
 
+// ---- Modal helpers ----
 function showUnsavedChangesModal(callbacks) {
   unsavedModalCallbacks = callbacks;
-  document.getElementById("unsavedModal").style.display = "flex";
+  const modal = document.getElementById("unsavedModal");
+  if (!modal) {
+    console.warn("Unsaved modal not present on this page.");
+    return;
+  }
+  modal.style.display = "flex";
 }
 
 function hideUnsavedChangesModal() {
-  document.getElementById("unsavedModal").style.display = "none";
+  const modal = document.getElementById("unsavedModal");
+  if (!modal) return;
+  modal.style.display = "none";
 }
 
-document.getElementById("unsavedSave").addEventListener("click", async () => {
-  hideUnsavedChangesModal();
-  if (unsavedModalCallbacks.onSave) await unsavedModalCallbacks.onSave();
-});
-
-document.getElementById("unsavedContinue").addEventListener("click", () => {
-  hideUnsavedChangesModal();
-  if (unsavedModalCallbacks.onContinue) unsavedModalCallbacks.onContinue();
-});
-
-document.getElementById("unsavedCancel").addEventListener("click", () => {
-  hideUnsavedChangesModal();
-  if (unsavedModalCallbacks.onCancel) unsavedModalCallbacks.onCancel();
-});
-
-// ---- Helpers ----
-
+// ---- Unsaved changes gate ----
 function requireNoUnsavedChanges(callbacks) {
   if (!unsavedChanges) {
     callbacks.onContinue();
     return;
   }
-
   showUnsavedChangesModal(callbacks);
 }
 
+// ---- Helpers ----
 function showErrorBanner(msg) {
   const banner = document.getElementById("statusBanner");
   banner.textContent = msg;
@@ -534,7 +538,7 @@ function hideSaving() {
 
 function markUnsaved() {
   unsavedChanges = true;
-  refreshSaveUI()
+  refreshSaveUI();
 }
 
 function highlightInvalidDates(dates) {
