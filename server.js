@@ -1923,10 +1923,16 @@ app.put("/admin/golfers/api/:id", requireLeagueAdmin, async (req, res) => {
 
     try {
         const existing = await dbGet("SELECT league_id FROM users WHERE id = ?", [id]);
-        if (!existing || existing.league_id !== leagueId) {
+        console.log("existing =", existing, "existing.league_id =", existing?.league_id,
+                    "leagueId =", leagueId);
+        const eleagueIdStr = String(existing?.league_id);
+        const leagueIdStr = String(leagueId);
+        console.log("eleagueIdStr =", eleagueIdStr, "leagueIdStr =", leagueIdStr);
+        if (!existing || eleagueIdStr !== leagueIdStr) {
             return res.status(404).json({ error: "Golfer not found" });
         }
-
+        console.log("Updating golfer with id =", id, "first_name =", first_name, "last_name =", last_name, "email =", email,
+                    "is_admin =", is_admin, "is_member =", is_member, "subgroup =", subgroup, "subgroup_number =", subgroup_number);
         await dbRun(`
             UPDATE users
             SET first_name = ?, last_name = ?, email = ?,
@@ -1940,7 +1946,7 @@ app.put("/admin/golfers/api/:id", requireLeagueAdmin, async (req, res) => {
             subgroup_number === "" ? "" : Number(subgroup_number),
             id
         ]);
-
+        console.log("put route - Golfer updated successfully");
         res.json({ success: true });
 
     } catch (err) {
@@ -2121,18 +2127,18 @@ cron.schedule("0 20 * * *", async () => {
 // the editor places in the second argument of 
 // generateTeeSheet(leagueId, teeDate, emailid)
 // COMMENT below code OUT AFTER RUNNING!!!
-cron.schedule("45 15 * * *", async () => {
-  console.log("⏰ tee sheet rebuild cron job to run based on editing");
-  const uid = 1;  // leagueId
-  const teeDate = "2026-07-08";  // date to rebuild
-  const emailId = "rlhayner@verizon.net"; 
-  await generateTeeSheet({
-        leagueId: Number(uid),
-        playDate: teeDate,
-        generatedBy: emailId}); 
-}, {
-  timezone: "America/New_York"
-});
+//cron.schedule("45 15 * * *", async () => {
+//  console.log("⏰ tee sheet rebuild cron job to run based on editing");
+//  const uid = 1;  // leagueId
+//  const teeDate = "2026-07-08";  // date to rebuild
+//  const emailId = "rlhayner@verizon.net"; 
+//  await generateTeeSheet({
+//        leagueId: Number(uid),
+//        playDate: teeDate,
+//        generatedBy: emailId}); 
+//}, {
+//  timezone: "America/New_York"
+//});
 
 // -----------------------------------------------------------------
 // run job to extend dates on the calendar_dates table for 14 months
