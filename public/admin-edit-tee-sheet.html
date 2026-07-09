@@ -1796,7 +1796,9 @@ function setupButtonHandlers() {
     }
 
     if (includeTeeSheet) {
-      html += `<h3>Tee Sheet for ${teeDate}</h3>`;
+    //  html += `<h3>Tee Sheet for ${teeDate}</h3>`;
+      const longDate = document.getElementById("page-date").textContent;
+      html += `<h3>${longDate}</h3>`;
       html += buildTeeSheetHTML(teeRows);
     }
 
@@ -1866,6 +1868,12 @@ function setupButtonHandlers() {
       });
 
       if (!res.ok) throw new Error("Failed to send notifications");
+
+      const data = await res.json();
+
+      if (data.recipients) {
+        alert("Emails sent to:\n\n" + data.recipients.join("\n"));
+      }
 
       updateStatus("Notifications sent.", "success");
       window.notificationsSent = true;

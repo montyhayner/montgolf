@@ -391,6 +391,14 @@ async function emailToSuperAdmins(subject, emailText) {
 }
 
 // -------------------------------------------------------------------------------------
+// helper function to parse a date string in yyyy-mm-dd format into a Date object
+// -------------------------------------------------------------------------------------
+function parseLocalDate(dateStr) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// -------------------------------------------------------------------------------------
 // place added golfers into free slots (user_id-based)
 // -------------------------------------------------------------------------------------
 // AUTO‑PLACE GOLFERS (patched with tee sheet history logging)
@@ -1281,7 +1289,7 @@ app.post(
 );
 
 // -----------------------------------------------------------------------------
-// SEND NOTIFICATIONS
+// SEND NOTIFICATIONS — one email per recipient (Mailgun‑compatible)
 // -----------------------------------------------------------------------------
 app.post(
   "/admin/api/tee-sheet/:leagueId/:teeDate/send-notifications",
@@ -1333,7 +1341,6 @@ app.post(
       // ---------------------------------------------------------
       let recipients = new Set();
 
-      // Tee sheet players
       if (recipientGroups.teeSheetPlayers) {
         for (const row of teeRows) {
           [row.email1, row.email2, row.email3, row.email4].forEach(email => {
@@ -1342,14 +1349,12 @@ app.post(
         }
       }
 
-      // Unplaced golfers
       if (recipientGroups.unplacedGolfers) {
         unplaced.forEach(g => {
           if (g.email) recipients.add(g.email);
         });
       }
 
-      // League admins
       if (recipientGroups.leagueAdmins) {
         const admins = await dbAll(
           `SELECT email FROM users WHERE league_id = ? AND is_admin = 1`,
@@ -1360,7 +1365,6 @@ app.post(
         });
       }
 
-      // Club staff
       if (recipientGroups.clubStaff) {
         const staff = await dbAll(
           `SELECT email FROM club_staff WHERE league_id = ? AND is_active = 1`,
@@ -1371,10 +1375,9 @@ app.post(
         });
       }
 
-      // Always CC the admin
+      // Always include admin
       recipients.add(adminEmail);
 
-      // Convert to array
       const recipientList = Array.from(recipients).filter(Boolean);
 
       // ---------------------------------------------------------
@@ -1387,7 +1390,12 @@ app.post(
       }
 
       if (includeTeeSheet) {
-        html += `<h2>Tee Sheet for ${teeDate}</h2>`;
+        const dateObj = parseLocalDate(teeDate);
+        let longDateStr = 
+          `${dateObj.toLocaleDateString("en-US", { weekday: "long" })}, ` +
+          dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+        html += `<h2>Tee Sheet for ${longDateStr}</h2>`;
         html += `<table border="1" cellpadding="6" cellspacing="0">`;
         html += `<tr><th>Tee Time</th><th>Nine</th><th>Players</th></tr>`;
 
@@ -1422,28 +1430,25 @@ app.post(
       }
 
       // ---------------------------------------------------------
-      // 5. Send ONE email with all recipients
+      // 5. Send ONE email per recipient (Mailgun‑compatible)
       // ---------------------------------------------------------
       const subject = `Tee Sheet – ${teeDate}`;
+      let verticalRecipientList = "" + recipientList.join("\n") + "\n";
 
-      const toList = recipientList.filter(e => e !== adminEmail);
-      const ccList = [adminEmail];
-
-      if (toList.length === 0) {
-        console.warn("No TO recipients — falling back to admin only");
-        toList.push(adminEmail);
+      for (const recipient of recipientList) {
+        await sendEmail({
+          to: recipient,
+          subject,
+          html
+        });
       }
 
-      await sendEmail({
-        to: toList.join(","),
-        cc: ccList.join(","),
-        subject,
-        html
-      });
+      console.log(`Sent notifications to ${recipientList} for league ${leagueId} on ${teeDate}`);
 
       res.json({
         status: "SENT",
-        count: recipientList.length
+        count: recipientList.length,
+        recipients: recipientList
       });
 
     } catch (err) {
@@ -2127,18 +2132,18 @@ cron.schedule("0 20 * * *", async () => {
 // the editor places in the second argument of 
 // generateTeeSheet(leagueId, teeDate, emailid)
 // COMMENT below code OUT AFTER RUNNING!!!
-//cron.schedule("45 15 * * *", async () => {
-//  console.log("⏰ tee sheet rebuild cron job to run based on editing");
-//  const uid = 1;  // leagueId
-//  const teeDate = "2026-07-08";  // date to rebuild
-//  const emailId = "rlhayner@verizon.net"; 
-//  await generateTeeSheet({
-//        leagueId: Number(uid),
-//        playDate: teeDate,
-//        generatedBy: emailId}); 
-//}, {
-//  timezone: "America/New_York"
-//});
+//    cron.schedule("22 22 * * *", async () => {
+//    console.log("⏰ tee sheet rebuild cron job to run based on editing");
+//    const uid = 1;  // leagueId
+//    const teeDate = "2026-07-10";  // date to rebuild
+//    const emailId = "rlhayner@verizon.net"; 
+//    await generateTeeSheet({
+//          leagueId: Number(uid),
+//          playDate: teeDate,
+//          generatedBy: emailId}); 
+//    }, {
+//      timezone: "America/New_York"
+//    });
 
 // -----------------------------------------------------------------
 // run job to extend dates on the calendar_dates table for 14 months
