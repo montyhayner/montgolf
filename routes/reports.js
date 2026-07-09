@@ -465,14 +465,18 @@ router.post("/user-two-week/email", requireLogin, async (req, res) => {
 const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
 const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
 
-router.post("/two-week/email", requireLogin, async (req, res) => {
+// ============================================================================
+// USER — Email Two-Week Golfers Report to Logged-In User
+// POST /api/reports/admin-two-week/email
+// ============================================================================
+router.post("/admin-two-week/email", requireLogin, async (req, res) => {
 
   try {
     const user = req.session.user;
     const leagueId = user.league_id;
+    console.log("HIT ADMIN-TWO-WEEK/EMAIL POST ROUTE");
     console.log("USER SESSION:", req.session.user);
-    console.log("HIT TWO-WEEK EMAIL POST ROUTE");
-
+    
     // Get league name
     const league = db.prepare(`
       SELECT league_name
@@ -598,22 +602,34 @@ router.post("/two-week/email", requireLogin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
+    // ✔ USE ONLY THIS — the Node-side email builder
+    const html = buildUserTwoWeekEmailHTML(
+      { dates, players, totals },
+      allocatedTeeTimes
+    );
+
     // Send email
     await sendEmail({
   
       to: finalRecipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
-      text: reportText,
-      html: htmlReport
+      html
     });
 
-    res.json({ ok: true });
+    console.log("post - /admin-two-week/email route");
+    console.log("Two-week report email sent to:", finalRecipients); 
+
+    // ❌ REMOVE THESE — they call browser-only functions
+    // const golfersTableHTML = buildTwoWeekTableHTML({ dates, players, totals });
+    // const allocatedHTML = buildAllocatedTeeTimesHTML(allocatedTeeTimes);
+
+    // ✔ USE ONLY THIS — the Node-side email builder
+
+    res.json({ success: true });
 
   } catch (err) {
-    console.error("MAILGUN ERROR DETAILS:", err);
-    console.log("catch error in two-week/email post err=", err);
-    console.error("❌ Error sending two-week report:", err);
-    res.status(500).json({ error: "Unable to send report email" });
+    console.error("Error sending user two-week report:", err);
+    res.status(500).json({ error: "Failed to send report." });
   }
 });
 

@@ -25,8 +25,8 @@ function generateTwoWeekReportHTML(dates, players, totals, allocatedTeeTimes, le
       <table style="width:100%; border-collapse: collapse; max-width: 700px; margin: 0 auto;">
         <thead>
           <tr style="background:#e6ffe6;">
-            <th style="padding: 8px; border:1px solid #ccc; text-align:left;">Date</th>
-            <th style="padding: 8px; border:1px solid #ccc; text-align:left;">Tee Times</th>
+            <th style="padding: 8px; border:1px solid #ccc; text-align:center;">Date</th>
+            <th style="padding: 8px; border:1px solid #ccc; text-align:center;">Tee Times</th>
           </tr>
         </thead>
         <tbody>
