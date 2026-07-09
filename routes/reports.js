@@ -608,24 +608,23 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       allocatedTeeTimes
     );
 
-    // Send email
-    await sendEmail({
-  
-      to: finalRecipients.join(", "),
-      subject: `Two-Week Golfers Report - ${leagueName}`,
-      html
-    });
+    // Send email to each recipient individually to avoid exposing emails
+
+    for (const recipient of finalRecipients) {
+      await sendEmail({  
+        to: recipient,
+        subject: `Two-Week Golfers Report - ${leagueName}`,
+        html
+      });
+    }
 
     console.log("post - /admin-two-week/email route");
     console.log("Two-week report email sent to:", finalRecipients); 
 
-    // ❌ REMOVE THESE — they call browser-only functions
-    // const golfersTableHTML = buildTwoWeekTableHTML({ dates, players, totals });
-    // const allocatedHTML = buildAllocatedTeeTimesHTML(allocatedTeeTimes);
-
-    // ✔ USE ONLY THIS — the Node-side email builder
-
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      recipients: finalRecipients
+     });
 
   } catch (err) {
     console.error("Error sending user two-week report:", err);

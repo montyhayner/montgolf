@@ -233,6 +233,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       body: JSON.stringify(payload)
     });
 
+    const data = await response.json();
+
+    if (data.recipients) {
+      alert("Emails sent to:\n\n" + data.recipients.join("\n"));
+    }
+
     if (response.ok) {
       alert("Report sent successfully");
       modal.classList.add("hidden");
