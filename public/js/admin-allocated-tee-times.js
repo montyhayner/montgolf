@@ -26,36 +26,53 @@ async function loadAdminNav() {
   });
 }
 
+// --------------------------------------------------------------------------
+//   Populate Identity bar (icon + role + name + color)
+// --------------------------------------------------------------------------
 async function loadAdminIdentity(session) {
-  const container = document.getElementById("admin-identity-container");
-  if (!container) return;
+    const container = document.getElementById("admin-identity-container");
+    if (!container) return;
 
-  const html = await fetch("/partials/admin-identity.html").then(r => r.text());
-  container.innerHTML = html;
+    const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+    container.innerHTML = html;
 
-  const bar = container.querySelector(".admin-identity");
-  const icon = container.querySelector("#identity-icon");
-  const name = container.querySelector("#identity-name");
-  const role = container.querySelector("#identity-role");
-  const leagueSpan = container.querySelector("#identity-league");
+    const bar = container.querySelector(".admin-identity");
+    const icon = container.querySelector("#identity-icon");
+    const role = container.querySelector("#identity-role");
+    const name = container.querySelector("#identity-name");
+    const leagueBadge = container.querySelector("#identity-league");
 
-  name.innerText = `${session.first_name} ${session.last_name}`;
+    // Always show admin's name
+    name.innerText = `${session.first_name} ${session.last_name}`;
 
-  if (session.is_super_admin) {
-    bar.classList.add("super-admin");
-    icon.innerText = "⭐";
-    role.innerText = "Super Admin";
-  } else {
-    bar.classList.add("league-admin");
-    icon.innerText = "🏌️";
-    role.innerText = "League Admin";
-  }
+    if (session.is_super_admin) {
+        // Super Admin styling
+        bar.classList.add("super-admin");
+        icon.innerText = "⭐";
+        role.innerText = "Super Admin";
 
-  const leagueRes = await fetch("/user/selected-league");
-  const leagueData = await leagueRes.json();
-  if (leagueData.league) {
-    leagueSpan.innerText = `— ${leagueData.league.league_name}`;
-  }
+        // Show league with prefix
+        if (session.league_name) {
+            leagueBadge.innerText = `Current League: ${session.league_name}`;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+
+    } else {
+        // League Admin styling
+        bar.classList.add("league-admin");
+        icon.innerText = "🏌️";
+        role.innerText = "League Admin";
+
+        // Show league name without prefix
+        if (session.league_name) {
+            leagueBadge.innerText = session.league_name;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+    }
 }
 
 async function loadSession() {
@@ -88,7 +105,8 @@ async function initPage() {
 document.addEventListener("DOMContentLoaded", async () => {
   // DOM ELEMENTS
   const playDateInput = document.getElementById("playDateInput");
-  const first_nine = document.getElementById("firstNineSelect").value;
+  const firstNineSelect = document.getElementById("firstNineSelect");
+
 
   const loadBtn = document.getElementById("loadBtn");
 
@@ -114,6 +132,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   let lastRequestId = 0;
 
   loadNines();
+
+function hideBlocks() {
+  existingBlock.style.display = "none";
+  generateBlock.style.display = "none";
+}
+
+playDateInput.addEventListener("click", hideBlocks);
+playDateInput.addEventListener("change", hideBlocks);
+
+document.getElementById("firstNineSelect").addEventListener("click", hideBlocks);
+document.getElementById("firstNineSelect").addEventListener("change", hideBlocks);
 
 async function loadTeeTimes() {
   if (!currentPlayDate) {
@@ -296,8 +325,18 @@ saveModalBtn.addEventListener("click", async () => {
 
   modal.style.display = "none";
   await loadTeeTimes();
-});
 
+  // ⭐ SUCCESS MESSAGE ⭐
+  const dt = new Date(currentPlayDate);
+  const longDate = dt.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  alert(`Saved Allocated Tee Times for ${longDate}.`);
+});
 
   // -----------------------------
   // Init

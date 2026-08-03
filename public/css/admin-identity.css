@@ -38,12 +38,12 @@
 
 .identity-league {
     margin-left: 12px;
-    padding: 4px 10px;
+    padding: 2px 4px;
     background: #eef4ff;
     color: #2a4a8a;
     border: 1px solid #c7d6f7;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
     display: none;
 }

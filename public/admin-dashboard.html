@@ -14,7 +14,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 10px auto;
             background: white;
             padding: 10px 14px;
@@ -54,6 +54,8 @@
             text-decoration: none;
             display: inline-block;
             margin-top: 20px;
+            min-width: 150px;
+            text-align: center;
         }
 
        .info-grid {
@@ -153,9 +155,11 @@
     				gap: 10px;
    				 margin-top: 10px;
 			 ">
- 		   <a class="btn" href="/admin/golfers">👥 Manage Golfers</a>
-                   <a class="btn" href="/admin/leagues">🏆 Manage Leagues</a>
-                   <a class="btn" href="/admin/reports">📊 View Reports</a>
+            <a class="btn" href="/admin/allocated-tee-times">🕒 Allocate Tee Times</a>
+            <a class="btn" href="/admin/tee-sheet">📝 Edit Tee Sheet</a>
+            <a class="btn" href="/admin/reports">📊 View Reports</a>
+            <a class="btn" href="/admin/golfers">👥 Manage Golfers</a>
+            <a class="btn" href="/admin/leagues">🏆 Manage Leagues</a>
 		</div>
 
             </div>
@@ -198,10 +202,10 @@ async function loadSession() {
     return session;
 }
 
-// -------------------------------------------------------
-// Load Identity Bar
-// -------------------------------------------------------
-async function loadAdminIdentityBar(session) {
+// --------------------------------------------------------------------------
+//   Populate Identity bar (icon + role + name + color)
+// --------------------------------------------------------------------------
+async function loadAdminIdentity(session) {
     const container = document.getElementById("admin-identity-container");
     if (!container) return;
 
@@ -210,19 +214,40 @@ async function loadAdminIdentityBar(session) {
 
     const bar = container.querySelector(".admin-identity");
     const icon = container.querySelector("#identity-icon");
-    const name = container.querySelector("#identity-name");
     const role = container.querySelector("#identity-role");
+    const name = container.querySelector("#identity-name");
+    const leagueBadge = container.querySelector("#identity-league");
 
+    // Always show admin's name
     name.innerText = `${session.first_name} ${session.last_name}`;
 
     if (session.is_super_admin) {
+        // Super Admin styling
         bar.classList.add("super-admin");
         icon.innerText = "⭐";
         role.innerText = "Super Admin";
+
+        // Show league with prefix
+        if (session.league_name) {
+            leagueBadge.innerText = `Current League: ${session.league_name}`;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
+
     } else {
+        // League Admin styling
         bar.classList.add("league-admin");
         icon.innerText = "🏌️";
         role.innerText = "League Admin";
+
+        // Show league name without prefix
+        if (session.league_name) {
+            leagueBadge.innerText = session.league_name;
+            leagueBadge.style.display = "inline-block";
+        } else {
+            leagueBadge.style.display = "none";
+        }
     }
 }
 
@@ -284,7 +309,7 @@ async function initPage() {
 
         // ⭐ Now nav exists — safe to continue
         const session = await loadSession();
-        await loadAdminIdentityBar(session);
+        await loadAdminIdentity(session);
         await loadDashboard(session);
 
     } catch (err) {

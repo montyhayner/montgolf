@@ -10,6 +10,16 @@
   <link rel="stylesheet" href="/css/admin-identity.css">
   
   <style>
+
+    /* Reduce vertical space above page title */
+    #admin-nav-container {
+      margin-bottom: 4px !important;
+    }
+
+    #admin-identity-container {
+      margin-bottom: 4px !important;
+    }
+
     .tee-time-row {
       display: flex;
       gap: 12px;
@@ -24,13 +34,34 @@
     }
     .container {
         max-width: 1100px;
-        margin: 40px auto;
+        margin: 10px auto !important;   /* was 40px */
+        padding: 15px !important;       /* was 30px */
         text-align: center;
         background: white;
-        padding: 30px;
         border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+    
+    .date-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;     /* centers the whole block */
+      gap: 8px;                /* spacing between the two rows */
+    }
+
+    /* Each label/value pair becomes a centered horizontal row */
+    .date-row label,
+    .date-row input,
+    .date-row select {
+      font-size: 16px;
+    }
+
+    .date-row .field-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
 </style>
 
 </head>
@@ -44,13 +75,20 @@
     <h2>Allocate Tee Times</h2>
 
     <!-- PLAY DATE INPUT -->
-
 <div class="date-row">
-    <label for="playDateInput">Play Date:</label>
-    <input type="date" id="playDateInput">    
-    <label for="firstNineInput">First Nine:</label>
-    <select id="firstNineSelect"></select> 
+
+    <div class="field-row">
+        <label for="playDateInput">Play Date:</label>
+        <input type="date" id="playDateInput">
+    </div>
+
+    <div class="field-row">
+        <label for="firstNineSelect">First Nine:</label>
+        <select id="firstNineSelect"></select>
+    </div>
+
 </div>
+
 <div>
     <button id="loadBtn">Load</button>
 </div>
@@ -59,7 +97,6 @@
 
     <!-- EXISTING TEE TIMES TABLE -->
     <div id="existingBlock" style="display:none;">
-      <h3>Existing Tee Times</h3>
       <table class="admin-table">
         <thead>
           <tr>

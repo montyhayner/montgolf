@@ -1970,8 +1970,12 @@ app.delete("/admin/golfers/api/:id", requireLeagueAdmin, async (req, res) => {
 
     try {
         const existing = await dbGet("SELECT league_id FROM users WHERE id = ?", [id]);
-        if (!existing || existing.league_id !== leagueId) {
-            return res.status(404).json({ error: "Golfer not found" });
+
+        const eleagueIdStr = String(existing?.league_id);
+        const leagueIdStr = String(leagueId);
+
+        if (!existing || eleagueIdStr !== leagueIdStr) {
+            return res.status(404).json({ error: "Golfer not found. user id: " + id });
         }
 
         await dbRun("DELETE FROM users WHERE id = ?", [id]);
@@ -1979,7 +1983,19 @@ app.delete("/admin/golfers/api/:id", requireLeagueAdmin, async (req, res) => {
         res.json({ success: true });
 
     } catch (err) {
-        console.error(err);
+        console.error("DELETE golfer error:", err);
+
+        // ⭐ Detect FK constraint failure
+        if (err.code === "SQLITE_CONSTRAINT" || err.code === "SQLITE_CONSTRAINT_TRIGGER") {
+            return res.status(409).json({
+                error:
+                    "This golfer cannot be deleted because they have existing play history " +
+                    "(user_play_days or user_play_months). Please contact the DBA to remove " +
+                    "all dependent records before deleting this golfer."
+            });
+        }
+
+        // Generic fallback
         res.status(500).json({ error: "Error deleting golfer" });
     }
 });
