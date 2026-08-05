@@ -126,25 +126,26 @@ function dbRun(sql, params = []) {
 // Middleware
 // ------------------------------
 
-
 function requireAdmin(req, res, next) {
-    console.log(">>> server.js line 123 REQUIRE ADMIN CHECK:", req.session.user);
-    if (!req.session.user) {
+    console.log(">>> REQUIRE ADMIN CHECK:", req.session.user);
+
+    const u = req.session.user;
+
+    if (!u) {
         if (req.originalUrl.includes("/api")) {
             return res.status(401).json({ error: "Not logged in" });
         }
         return res.redirect("/admin-login");
     }
 
-    // ⭐ SUPER ADMINS ALWAYS PASS
-    if (req.session.user.is_super_admin) {
-        return next();
-    }
+    const isSuper = u.is_super_admin === true || u.is_super_admin === 1;
+    const isAdmin = u.is_admin === true || u.is_admin === 1;
 
-    // ⭐ REGULAR ADMINS WITH LEAGUE PASS
-    if (req.session.user.is_admin && req.session.user.league_id) {
-        return next();
-    }
+    // ⭐ SUPER ADMINS ALWAYS PASS
+    if (isSuper) return next();
+
+    // ⭐ LEAGUE ADMINS ALWAYS PASS (league_id NOT required for API)
+    if (isAdmin) return next();
 
     // ⭐ API REQUESTS GET JSON ERRORS
     if (req.originalUrl.includes("/api")) {
@@ -1500,6 +1501,7 @@ app.get("/admin/leagues", requireSuperAdmin, (req, res) => {
 app.get("/admin/session-info", requireLogin, async (req, res) => {
     try {
         const user = req.session.user;
+        console.log("→ GET /admin/session-info - SESSION:", req.session);
 
         let leagueName = null;
         if (user.league_id) {
@@ -1508,6 +1510,7 @@ app.get("/admin/session-info", requireLogin, async (req, res) => {
                 [user.league_id]
             );
             leagueName = row ? row.league_name : null;
+            console.log("→ GET /admin/session-info - leagueName:", leagueName);
         }
 
         res.json({

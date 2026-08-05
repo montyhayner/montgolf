@@ -1,5 +1,4 @@
 // middleware/auth.js
-
 // ============================================================================
 // REQUIRE LOGIN
 // ============================================================================
@@ -37,8 +36,9 @@ function requireAdmin(req, res, next) {
     return res.redirect("/admin-login");
   }
 
-  const isAdmin = user.is_admin === 1;
-  const isSuper = user.is_super_admin === 1;
+  // Normalize values (accept true/false OR 1/0)
+  const isAdmin = user.is_admin === true || user.is_admin === 1;
+  const isSuper = user.is_super_admin === true || user.is_super_admin === 1;
 
   // ⭐ SUPER ADMIN ALWAYS PASSES
   if (isSuper) {
@@ -46,7 +46,7 @@ function requireAdmin(req, res, next) {
     return next();
   }
 
-  // ⭐ REGULAR ADMIN PASSES
+  // ⭐ REGULAR ADMIN ALWAYS PASSES (league_id NOT required for API routes)
   if (isAdmin) {
     req.user = user;
     return next();
@@ -71,8 +71,8 @@ function requireAdminOrSelf(req, res, next) {
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  const isAdmin = user.is_admin === 1;
-  const isSuper = user.is_super_admin === 1;
+  const isAdmin = user.is_admin === true || user.is_admin === 1;
+  const isSuper = user.is_super_admin === true || user.is_super_admin === 1;
   const targetUserId = parseInt(req.params.userId);
 
   // ⭐ SUPER ADMIN ALWAYS ALLOWED

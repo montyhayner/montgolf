@@ -5,8 +5,6 @@
 // ============================================================================
 
 console.log("Reports router loaded");
-console.log("REPORTS ROUTER LOADED");
-
 
 const express = require("express");
 const router = express.Router();
@@ -466,7 +464,6 @@ const generateTwoWeekReportText = require("../services/generateTwoWeekReportText
 const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
 
 // ============================================================================
-// USER — Email Two-Week Golfers Report to Logged-In User
 // POST /api/reports/admin-two-week/email
 // ============================================================================
 router.post("/admin-two-week/email", requireLogin, async (req, res) => {
@@ -726,7 +723,7 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
       `;
 
       return html;
-};
+    };
 
     const htmlReport = buildHTML(teeSheet);
 
@@ -800,6 +797,211 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error sending latest tee sheet:", err);
+    res.status(500).json({ error: "Unable to send latest tee sheet email" });
+  }
+});
+
+// ============================================================================
+// ADMIN — SEND LATEST TEE SHEET REPORT (email)
+// POST /api/reports/admin-latest-tee-sheet/email
+// ============================================================================
+router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const leagueId = user.league_id;
+    console.log("HIT ADMIN-LATEST-TEE-SHEET/EMAIL POST ROUTE"); 
+    console.log("USER SESSION:", req.session.user);
+    console.log("REQ BODY:", req.body);
+
+    // ---------------------------------------------------------
+    // Get league name
+    // ---------------------------------------------------------
+    const league = db.prepare(`
+      SELECT league_name
+      FROM leagues
+      WHERE id = ?
+    `).get(leagueId);
+
+    const leagueName = league?.league_name || "";
+    console.log("League Name:", leagueName);
+    // ---------------------------------------------------------
+    // Get latest tee sheet date
+    // ---------------------------------------------------------
+    const row = await dbGet(`
+      SELECT MAX(tee_date) AS latest_date
+      FROM tee_sheet
+      WHERE league_id = ?
+    `, [leagueId]);
+
+    if (!row || !row.latest_date) {
+      return res.status(400).json({ error: "No tee sheet available" });
+    }
+
+    const teeDate = row.latest_date;
+
+    // ---------------------------------------------------------
+    // Fetch tee sheet rows
+    // ---------------------------------------------------------
+    const teeSheet = await dbAll(`
+      SELECT *
+      FROM tee_sheet
+      WHERE league_id = ?
+        AND tee_date = ?
+      ORDER BY tee_time, starting_nine
+    `, [leagueId, teeDate]);
+
+    // ---------------------------------------------------------
+    // Build HTML (same structure as user version)
+    // ---------------------------------------------------------
+    const buildHTML = rows => {
+      const [year, month, day] = teeDate.split("-");
+      const localDate = new Date(year, month - 1, day);
+
+      const formattedDate = localDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+
+      let html = `
+        <div style="text-align:center; margin-bottom:10px;">
+          <div style="font-size:24px; font-weight:bold; color:#333;">
+            Latest Tee Sheet Report
+          </div>
+          <div style="font-size:16px; color:#555; margin-top:4px;">
+            ${formattedDate}
+          </div>
+        </div>
+
+        <div style="text-align:center;">
+          <table border="1" bordercolor="#000000" cellpadding="6" cellspacing="0"
+            style="border-collapse:collapse; margin:auto; border:1px solid #000;">
+            <tr style="background:#e6ffe6;">
+              <th style="padding:6px;">Tee Time</th>
+              <th style="padding:6px;">Starting Nine</th>
+              <th style="padding:6px;">Players</th>
+            </tr>
+      `;
+
+      rows.forEach(r => {
+        const players = [
+          r.first_name1 && `${r.first_name1} ${r.last_name1}`,
+          r.first_name2 && `${r.first_name2} ${r.last_name2}`,
+          r.first_name3 && `${r.first_name3} ${r.last_name3}`,
+          r.first_name4 && `${r.first_name4} ${r.last_name4}`
+        ].filter(Boolean).join(", ");
+
+        html += `
+            <tr>
+              <td style="padding:6px;">${r.tee_time}</td>
+              <td style="padding:6px;">${r.starting_nine}</td>
+              <td style="padding:6px;">${players}</td>
+            </tr>
+        `;
+      });
+
+      html += `
+          </table>
+        </div>
+      `;
+      console.log("Generated HTML Report:");
+      console.log(html);
+      return html;
+    };
+
+    const htmlReport = buildHTML(teeSheet);
+
+    // ---------------------------------------------------------
+    // Recipient logic (same pattern as admin-two-week/email)
+    // ---------------------------------------------------------
+    const {
+      includePlayers,
+      includeAdmins,
+      includeStaff,
+      includeSelf,
+      selfOnly,
+      playersInReport = []
+    } = req.body;
+
+    const recipients = new Set();
+    console.log("Recipient selection options:", {
+      includePlayers,
+      includeAdmins,
+      includeStaff,
+      includeSelf,
+      selfOnly,
+      playersInReport
+    });
+
+    // Always include logged-in admin
+    if (includeSelf && user.email) {
+      recipients.add(user.email);
+      console.log("Added logged-in admin to recipients:", user.email);
+    }
+
+    // Players in report
+    if (!selfOnly && includePlayers && playersInReport.length > 0) {
+      const placeholders = playersInReport.map(() => "?").join(",");
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE id IN (${placeholders})
+          AND league_id = ?
+      `).all(...playersInReport, leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Admins
+    if (!selfOnly && includeAdmins) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM users
+        WHERE league_id = ?
+          AND is_admin = 1
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    // Staff
+    if (!selfOnly && includeStaff) {
+      const rows = db.prepare(`
+        SELECT email
+        FROM club_staff
+        WHERE league_id = ?
+      `).all(leagueId);
+
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
+
+    const finalRecipients = Array.from(recipients);
+    console.log("Final Recipients:", finalRecipients);
+
+    if (finalRecipients.length === 0) {
+      return res.status(400).json({ error: "No recipients selected" });
+    }
+
+    // ---------------------------------------------------------
+    // Send email to each recipient individually
+    // ---------------------------------------------------------
+    for (const recipient of finalRecipients) {
+      console.log(`Sending latest tee sheet email to: ${recipient}`);
+      await sendEmail({
+        to: recipient,
+        subject: `Latest Tee Sheet - ${leagueName}`,
+        html: htmlReport
+      });
+    }
+
+    res.json({
+      success: true,
+      recipients: finalRecipients
+    });
+
+  } catch (err) {
+    console.error("❌ Error sending admin latest tee sheet:", err);
     res.status(500).json({ error: "Unable to send latest tee sheet email" });
   }
 });

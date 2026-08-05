@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Latest Tee Sheet Report</title>
+
+  <!-- ADMIN CSS -->
+  <link rel="stylesheet" href="/css/reports.css">
+  <link rel="stylesheet" href="/css/admin-nav.css">
+  <link rel="stylesheet" href="/css/admin-identity.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  
+  <style>
+    #pageHeader {
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      padding: 2px 0 4px 0;
+      border-bottom: 1px solid #ddd;
+      line-height: 1.2;
+      margin-top: 0;
+    }
+
+    /* ============================================================
+       MODAL
+       ============================================================ */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .modal.hidden { display: none; }
+
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      width: 420px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.2);
+    }
+
+    .recipient-section label {
+      display: block;
+      margin: 8px 0;
+      font-size: 1rem;
+    }
+
+    .modal-buttons {
+      margin-top: 20px;
+      text-align: right;
+    }
+
+    .modal-buttons button {
+      margin-left: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ADMIN NAV BAR -->
+  <div id="admin-nav-container"></div>
+
+  <!-- ADMIN IDENTITY BAR -->
+  <div id="admin-identity-container"></div>
+
+  <!-- PAGE HEADER -->
+  <h1 id="pageHeader">Latest Tee Sheet Report</h1>
+
+  <!-- REPORT CONTENT -->
+  <div class="page">
+    <table id="teeSheetTable" class="report-table">
+      <thead>
+        <tr>
+          <th>Tee Time</th>
+          <th>Nine</th>
+          <th>Players</th>
+        </tr>
+      </thead>
+      <tbody id="teeSheetBody"></tbody>
+    </table>
+
+    <div class="button-row">
+      <button id="btnPrintLatest" class="secondary-action-btn">Print Report</button>
+      <button id="btnSendLatest" class="primary-action-btn">Send Report</button>
+    </div>
+  </div>
+
+  <!-- SEND REPORT MODAL -->
+  <div id="sendReportModal" class="modal hidden">
+    <div class="modal-content">
+
+      <h2>Send Latest Tee Sheet Report</h2>
+
+      <div class="recipient-section">
+
+        <!-- ADMIN-ONLY OPTIONS -->
+        <div id="adminRecipientOptions">
+          <label><input type="checkbox" id="chkSelectAll"> Select All</label>
+          <label><input type="checkbox" id="chkPlayers"> Players in this report</label>
+          <label><input type="checkbox" id="chkAdmins"> League admins</label>
+          <label><input type="checkbox" id="chkStaff"> Club staff</label>
+        </div>
+
+        <!-- ALWAYS VISIBLE -->
+        <label><input type="checkbox" id="chkSelf" checked disabled> Me (always included)</label>
+        <label><input type="checkbox" id="chkSelfOnly"> Send to Myself Only</label>
+
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnSendReport" class="primary" type="button">SEND</button>
+        <button id="btnCancelSend" class="secondary" type="button">CANCEL</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ADMIN NAV LOADER -->
+  <script>
+    async function loadAdminNav() {
+      const navContainer = document.getElementById("admin-nav-container");
+      const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+      const html = await res.text();
+      navContainer.innerHTML = html;
+
+      const path = window.location.pathname;
+      document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href === path || (href !== "/" && path.startsWith(href))) {
+          link.classList.add("active");
+        }
+      });
+    }
+
+    async function loadSession() {
+      const res = await fetch("/admin/session-info", { credentials: "include" });
+      const session = await res.json();
+
+      const leaguesLink = document.getElementById("nav-leagues-link");
+      if (leaguesLink) {
+        leaguesLink.style.display = session.is_super_admin ? "inline-block" : "none";
+      }
+
+      return session;
+    }
+
+    async function loadAdminIdentity(session) {
+      const container = document.getElementById("admin-identity-container");
+      const html = await fetch("/partials/admin-identity.html").then(r => r.text());
+      container.innerHTML = html;
+
+      const bar = container.querySelector(".admin-identity");
+      const icon = container.querySelector("#identity-icon");
+      const role = container.querySelector("#identity-role");
+      const name = container.querySelector("#identity-name");
+      const leagueBadge = container.querySelector("#identity-league");
+
+      name.innerText = `${session.first_name} ${session.last_name}`;
+
+      if (session.is_super_admin) {
+        bar.classList.add("super-admin");
+        icon.innerText = "⭐";
+        role.innerText = "Super Admin";
+        leagueBadge.innerText = session.league_name ? `Current League: ${session.league_name}` : "";
+      } else {
+        bar.classList.add("league-admin");
+        icon.innerText = "🏌️";
+        role.innerText = "League Admin";
+        leagueBadge.innerText = session.league_name || "";
+      }
+    }
+
+    async function initPage() {
+      await loadAdminNav();
+      const session = await loadSession();
+      await loadAdminIdentity(session);
+    }
+
+    document.addEventListener("DOMContentLoaded", initPage);
+  </script>
+
+  <!-- PAGE HEADER SCRIPT -->
+  <script src="/js/page-header.js"></script>
+
+  <!-- Tee sheet HTML builder -->
+  <script src="/js/build-tee-sheet-HTML.js"></script>
+
+  <!-- ADMIN VERSION MAIN LOGIC -->
+  <script src="/js/admin-latest-tee-sheet.js"></script>
+
+</body>
+</html>
