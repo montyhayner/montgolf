@@ -679,7 +679,6 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
         month: "long",
         day: "numeric"
       });
-
       let html = `
         <div style="text-align:center; margin-bottom:10px;">
           <div style="font-size:24px; font-weight:bold; color:#333;">
@@ -691,14 +690,13 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
         </div>
 
         <div style="text-align:center;">
-          <table border="1" bordercolor="#000000" cellpadding="6" cellspacing="0"
-            style="border-collapse:collapse; margin:auto; border:1px solid #000;">
+          <table style="border-collapse:collapse; margin:auto; border:1px solid #000;">
             <tr style="background:#e6ffe6;">
-              <th style="padding:6px;">Tee Time</th>
-              <th style="padding:6px;">Starting Nine</th>
-              <th style="padding:6px;">Players</th>
+              <th style="padding:6px; border:1px solid #000;">Tee Time</th>
+              <th style="padding:6px; border:1px solid #000;">Starting Nine</th>
+              <th style="padding:6px; border:1px solid #000;">Players</th>
             </tr>
-      `;
+`;
 
       rows.forEach(r => {
         const players = [
@@ -707,14 +705,13 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
           r.first_name3 && `${r.first_name3} ${r.last_name3}`,
           r.first_name4 && `${r.first_name4} ${r.last_name4}`
         ].filter(Boolean).join(", ");
-
         html += `
             <tr>
-              <td style="padding:6px;">${r.tee_time}</td>
-              <td style="padding:6px;">${r.starting_nine}</td>
-              <td style="padding:6px;">${players}</td>
+              <td style="padding:6px; border:1px solid #000;">${r.tee_time}</td>
+              <td style="padding:6px; border:1px solid #000;">${r.starting_nine}</td>
+              <td style="padding:6px; border:1px solid #000;">${players}</td>
             </tr>
-        `;
+          `;
       });
 
       html += `
@@ -878,9 +875,9 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
           <table border="1" bordercolor="#000000" cellpadding="6" cellspacing="0"
             style="border-collapse:collapse; margin:auto; border:1px solid #000;">
             <tr style="background:#e6ffe6;">
-              <th style="padding:6px;">Tee Time</th>
-              <th style="padding:6px;">Starting Nine</th>
-              <th style="padding:6px;">Players</th>
+              <th style="padding:6px; border:1px solid #000;">Tee Time</th>
+              <th style="padding:6px; border:1px solid #000;">Starting Nine</th>
+              <th style="padding:6px; border:1px solid #000;">Players</th>
             </tr>
       `;
 
@@ -894,9 +891,9 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
 
         html += `
             <tr>
-              <td style="padding:6px;">${r.tee_time}</td>
-              <td style="padding:6px;">${r.starting_nine}</td>
-              <td style="padding:6px;">${players}</td>
+              <td style="padding:6px; border:1px solid #000;">${r.tee_time}</td>
+              <td style="padding:6px; border:1px solid #000;">${r.starting_nine}</td>
+              <td style="padding:6px; border:1px solid #000;">${players}</td>
             </tr>
         `;
       });

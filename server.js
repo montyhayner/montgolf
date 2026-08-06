@@ -1395,10 +1395,22 @@ app.post(
         let longDateStr = 
           `${dateObj.toLocaleDateString("en-US", { weekday: "long" })}, ` +
           dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-
-        html += `<h2>Tee Sheet for ${longDateStr}</h2>`;
-        html += `<table border="1" cellpadding="6" cellspacing="0">`;
-        html += `<tr><th>Tee Time</th><th>Nine</th><th>Players</th></tr>`;
+        
+        html += `
+          <div style="text-align:center; margin-bottom:10px;">
+            <div style="font-size:24px; font-weight:bold; color:#333;">
+              Tee Sheet for ${longDateStr}
+            </div>
+          </div>
+        `;
+        html += `
+          <table style="border-collapse:collapse; margin:auto; border:1px solid #000;">
+            <tr style="background:#e6ffe6;">
+              <th style="padding:6px; border:1px solid #000;">Tee Time</th>
+              <th style="padding:6px; border:1px solid #000;">Nine</th>
+              <th style="padding:6px; border:1px solid #000;">Players</th>
+            </tr>
+        `;
 
         for (const row of teeRows) {
           const players = [
@@ -1412,9 +1424,9 @@ app.post(
 
           html += `
             <tr>
-              <td>${row.tee_time}</td>
-              <td>${row.starting_nine}</td>
-              <td>${players}</td>
+              <td style="padding:6px; border:1px solid #000;">${row.tee_time}</td>
+              <td style="padding:6px; border:1px solid #000;">${row.starting_nine}</td>
+              <td style="padding:6px; border:1px solid #000;">${players}</td>
             </tr>
           `;
         }
