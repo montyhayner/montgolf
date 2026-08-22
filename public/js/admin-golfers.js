@@ -68,13 +68,24 @@ async function loadGolfers() {
                 <td>${g.subgroup || ""}</td>
                 <td>${g.subgroup_number || ""}</td>
                 <td>
-                    <button class="btn-small" onclick="openEditUserModal(${g.id})">Edit</button>
-                    <button class="btn-small" onclick="openResetPasswordModal(${g.id})">Reset PW</button>
-                    <button class="btn-small btn-danger" onclick="openDeleteUserModal(${g.id})">Delete</button>
+                    <button class="btn-small" onclick="openEditUserModal(${g.id})">✏️ Edit</button>
+                    <button class="btn-small btn-danger" onclick="openDeleteUserModal(${g.id})">🗑️ Delete</button>
+                    <button class="btn-small" onclick="openResetPasswordModal(${g.id})">🔑 Reset PW</button>
+                    <button class="btn-small btn-reschedule" data-user-id="${g.id}">🗓️ Reschedule</button>
                 </td>
             `;
 
             tbody.appendChild(tr);
+        });
+
+        // ------------------------------
+        // Bind Reschedule Buttons
+        // ------------------------------
+        document.querySelectorAll(".btn-reschedule").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const userId = btn.dataset.userId;
+                window.location.href = `/admin/schedule/${userId}`;
+            });
         });
 
     } catch (err) {
@@ -116,7 +127,6 @@ async function addGolfer() {
         subgroup_number: document.getElementById("add_subgroup_number").value || null
     };
 
-    // Validation
     if (!data.first_name || !data.last_name || !data.email || !data.password) {
         showToast("All fields except subgroup are required", "error");
         return;

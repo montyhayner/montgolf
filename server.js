@@ -16,6 +16,7 @@ const { easternNow } = require("./utils/easternTime");
 const latestApplyResultMap = {};
 const { sendEmail } = require("./services/mailer");
 const generateTwoWeekReportText = require("./services/generateTwoWeekReportText");
+const { saveScheduleHandler } = require("./routes/user");
 
 // ------------------------------
 // Express Setup
@@ -81,6 +82,9 @@ app.use("/auth", require("./routes/auth"));
 
 // USER
 app.use("/user", require("./routes/user"));
+
+// SCHEDULE but for admin editing of another user's schedule
+app.use("/schedule", require("./routes/schedule"));
 
 // GUESTS API
 const guestsRouter = require("./routes/guests");
@@ -312,70 +316,6 @@ app.get("/logout", (req, res) => {
 app.get("/edit-profile", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "user-edit-profile.html"));
 });
-
-// ----------------------------------------------------------------------------------------------
-// Produce the CURRENT TIMESTAMP in yyyy-mm-dd hh:mn:ss 
-// format and return to calling code.
-// ----------------------------------------------------------------------------------------------
-async function formatSqliteTimestamp() {
-// ----------------------------------------------------------------------------------
-// determine whether to subtract 4 hours or 5 hours from
-// the db timestamp depending on whether today's
-// date is EDT (eastern daylight savings time) or EST
-// (eastern standard time).  EDT is between 2nd Sunday
-// in March and the first Sunday in November.
-// ----------------------------------------------------------------------------------
-  const currYear = new Date().getFullYear();
-  console.log("currYear=", currYear);
-
-//  get first Eastern Daylight savings Time date (first sunday in Nov)...
-  const march1 = new Date(currYear, 2, 1);  // 2 is March
-  const marchDay = march1.getDay(); // 0=Sun ... 6=Sat 
-  const firstSundayDate = 1 + ((7 - marchDay) % 7);
-  const secondSundayDate = firstSundayDate + 7;
-  const firstEDTDate = new Date(currYear, 2, secondSundayDate);
-  console.log("firstEDTDate=", firstEDTDate);
-
-//  now get first Eastern Standard Time date (first sunday in Nov)...
-  const nov1 = new Date(currYear, 10, 1);
-  const novDay = nov1.getDay(); // 0=Sunday ... 6=Saturday
-  const firstSunDate = 1 + ((7 - novDay) % 7);
-  const firstESTDate = new Date(currYear, 10, firstSunDate);
-  console.log("firstESTDate=", firstESTDate);
-
-  const currDate = new Date();
-  console.log("formatSqliteTimestamp() function - javascript currDate=", currDate);
-  let league;
- try {
-  if (currDate >= firstEDTDate && currDate < firstESTDate) { 
-       league = await dbGet(
-           `SELECT datetime(CURRENT_TIMESTAMP, '-4 hours') AS eastern_timestamp
-                 FROM leagues 
-             WHERE id in
-                                  (SELECT MIN(id) 
-                                        FROM leagues)`,
-              []);
-      
-  } else {
-          league = await dbGet(
-          `SELECT datetime(CURRENT_TIMESTAMP, '-5 hours') AS eastern_timestamp
-                FROM leagues 
-            WHERE id in
-                                 (SELECT MIN(id) 
-                                       FROM leagues)`,
-               []);
-  } 
-     if (!league) {
-        return ("Error - sql failure in function formatSqliteTimestamp()");
-      } 
-   const easternTS =  league.eastern_timestamp;
-   console.log("function formatSqliteTimestamp()  eastern timestamp=", easternTS);
-   return easternTS;
-  } catch (err) {
-    console.error("Error - formatSqliteTimestamp()", err);
-    return ("Server error");
-  }
-}
 
 //--------------------------------------------------------------------
 //  Helper function to send an email to superAdmins
@@ -840,6 +780,194 @@ app.get("/admin/tee-sheet", requireAdmin, async (req, res) => {
         console.error("Error loading tee sheet:", err);
         res.status(500).send("Server error");
     }
+});
+
+// =====================================================
+// ADMIN OVERRIDE: INITIAL MONTH LOAD (SQLite)
+// =====================================================
+app.get("/admin/schedule/init/:targetUserId/:month", (req, res) => {
+  console.log("🔥 ADMIN INIT ROUTE HIT");
+  console.log("🔥 SESSION =", req.session);
+
+  try {
+    const adminUserId = req.session.user?.id;
+    const targetUserId = req.params.targetUserId;
+    const month = req.params.month;
+    const easternTS = easternNow();
+    console.log("🔥 adminUserId =", adminUserId);
+    console.log("🔥 targetUserId =", targetUserId);
+    console.log("🔥 month =", month);
+
+    // --- Verify admin privileges ---
+    const adminRow = db.prepare(
+      "SELECT id, is_admin FROM users WHERE id = ?"
+    ).get(adminUserId);
+
+    console.log("🔥 adminRow =", adminRow);
+
+    if (!adminRow) {
+      console.log("🔥 403 — adminRow is null");
+      return res.status(403).json({ error: "Admin not found." });
+    }
+
+    if (adminRow.is_admin !== 1) {
+      console.log("🔥 403 — adminRow.is_admin !== 1");
+      return res.status(403).json({ error: "Admin privileges required." });
+    }
+
+    // --- Verify target user exists ---
+    const userRow = db.prepare(
+      `SELECT users.id, first_name, last_name, in_town, league_id
+       FROM  users 
+          ,  user_play_months
+       WHERE users.id = user_play_months.user_id
+       AND   user_play_months.month = ?
+       AND   users.id = ?`
+    ).get(month, targetUserId);
+
+    console.log("🔥 GET /admin/schedule/init/:targetUserId/:month userRow =", userRow);
+
+    if (!userRow) {
+      console.log("🔥 GET /admin/schedule/init/:targetUserId/:month - 404 — target user not found");
+      return res.status(404).json({ error: "Target user not found." });
+    }
+
+    // --- Load league play days (CRITICAL FIX) ---
+    const leaguePlayDays = db.prepare(
+      `SELECT day_of_week
+         FROM league_play_days
+        WHERE league_id = ?
+          AND is_play_day = 1`
+    ).all(userRow.league_id).map(r => r.day_of_week);
+
+    console.log("🔥 GET /admin/schedule/init/:targetUserId/:month - leaguePlayDays =", leaguePlayDays);
+
+    // --- Determine current year/month ---
+    const now = new Date();
+    const year = now.getFullYear();
+
+    console.log("🔥 GET /admin/schedule/init/:targetUserId/:month -year =", year, "month =", month);
+
+    // --- Load current month's schedule for the target user ---
+    const rows = db.prepare(
+      `SELECT date, is_playing
+       FROM schedule
+       WHERE user_id = ?
+         AND strftime('%Y', date) = ?
+         AND strftime('%m', date) = ?
+       ORDER BY date`
+    ).all(targetUserId, String(year), String(month).padStart(2, "0"));
+
+    console.log("🔥 GET /admin/schedule/init/:targetUserId/:month -rows =", rows);
+
+    const scheduleObj = {};
+    rows.forEach(r => {
+      scheduleObj[r.date] = r.is_playing === 1;
+    });
+
+    console.log("🔥 GET /admin/schedule/init/:targetUserId/:month - SUCCESS — returning JSON");
+
+    return res.json({
+      status: "ok",
+      user: userRow,
+      year,
+      month,
+      schedule: scheduleObj,
+      leaguePlayDays,        // ⭐ CRITICAL FIX
+      origInTown: userRow.in_town,
+      easternTS: easternTS
+    });
+
+  } catch (err) {
+    console.error("🔥 GET /admin/schedule/init/:targetUserId/:month - ADMIN INIT ERROR:", err);
+    return res.status(500).json({ error: "Server error loading initial schedule." });
+  }
+});
+
+// =====================================================
+// ADMIN OVERRIDE: LOAD TARGET USER SCHEDULE (SQLite)
+// =====================================================
+app.get("/admin/schedule/:targetUserId/:year/:month", (req, res) => {
+  try {
+    const adminUserId = req.session.user?.id;
+    console.log("ADMIN ROUTE - /admin/schedule/:targetUserId/:year/:month — adminUserId =", adminUserId);
+
+    const { targetUserId, year, month } = req.params;
+
+    // --- Validate input ---
+    if (!targetUserId || !year || !month) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    // --- Verify admin privileges ---
+    const adminRow = db.prepare(
+      "SELECT id, is_admin FROM users WHERE id = ?"
+    ).get(adminUserId);
+
+    console.log("🔥 /admin/schedule/:targetUserId/:year/:month - adminRow =", adminRow);
+
+    if (!adminRow || adminRow.is_admin !== 1) {
+      return res.status(403).json({ error: "Admin privileges required." });
+    }
+
+    // --- Verify target user exists ---
+    const userRow = db.prepare(
+      `SELECT users.id, first_name, last_name, in_town, league_id
+       FROM  users
+          ,  user_play_months
+       WHERE user_play_months.user_id = users.id
+       AND   users.id = ?`
+    ).get(targetUserId);
+
+    console.log("🔥 userRow =", userRow);
+
+    if (!userRow) {
+      return res.status(404).json({ error: "Target user not found." });
+    }
+    // --- Load league play days (CRITICAL FIX) ---
+    const leaguePlayDays = db.prepare(
+      `SELECT day_of_week
+       FROM league_play_days
+       WHERE league_id = ?
+         AND is_play_day = 1`
+    ).all(userRow.league_id).map(r => r.day_of_week);
+
+    console.log("🔥 /admin/schedule/:targetUserId/:year/:month - leaguePlayDays =", leaguePlayDays);
+
+    // --- Load schedule for the month ---
+    const rows = db.prepare(
+      `SELECT date, is_playing
+       FROM schedule
+       WHERE user_id = ?
+         AND strftime('%Y', date) = ?
+         AND strftime('%m', date) = ?
+       ORDER BY date`
+    ).all(targetUserId, String(year), String(month).padStart(2, "0"));
+
+    console.log("🔥 rows =", rows);
+
+    const scheduleObj = {};
+    rows.forEach(r => {
+      scheduleObj[r.date] = r.is_playing === 1;
+    });
+
+    // --- Return everything schedule.html needs ---
+    return res.json({
+      status: "ok",
+      user: {
+        id: userRow.id,
+        first_name: userRow.first_name,
+        last_name: userRow.last_name,
+        in_town: userRow.in_town
+      },
+      schedule: scheduleObj,
+      leaguePlayDays        // ⭐ CRITICAL FIX
+    });
+
+  } catch (err) {
+    console.error("Admin override GET error:", err);
+    return res.status(500).json({ error: "Server error loading schedule." });
+  }
 });
 
 // ----------------------------------------------------------------------------------
@@ -1513,8 +1641,7 @@ app.get("/admin/leagues", requireSuperAdmin, (req, res) => {
 app.get("/admin/session-info", requireLogin, async (req, res) => {
     try {
         const user = req.session.user;
-        console.log("→ GET /admin/session-info - SESSION:", req.session);
-
+        console.log("→ GET /admin/session-info - SESSION:", req.session, " user:", user, " user.id:", user.id);
         let leagueName = null;
         if (user.league_id) {
             const row = await db.getAsync(
@@ -1652,6 +1779,7 @@ app.get("/user/selected-league", requireLogin, async (req, res) => {
   }
 });
 
+
 app.put("/admin/leagues/api/:id", requireAdmin, async (req, res) => {
     const id = req.params.id;
     const { league_name, first_name, last_name, email, description } = req.body;
@@ -1669,6 +1797,342 @@ app.put("/admin/leagues/api/:id", requireAdmin, async (req, res) => {
         console.error("PUT /admin/leagues/api/:id ERROR:", err);
         res.json({ error: "Database error" });
     }
+});
+
+// =======================================
+// ADMIN OVERRIDE: SAVE SCHEDULE (SQLite)
+// =======================================
+app.put("/admin/schedule/save/:origInTownStatus/:sessionStartTS", async (req, res) => {
+  try {
+    const adminUserId = req.session.user?.id;
+    const { target_user_id, year, month, schedule } = req.body;
+    const { origInTownStatus, sessionStartTS } = req.params;
+    const source = "ADMIN";
+
+    let golfingThisMonth = 0;
+
+    console.log(">>>> DEBUG: /admin/schedule/save -", {
+      target_user_id,
+      adminUserId,
+      year,
+      month,
+      schedule,
+      origInTownStatus,
+      sessionStartTS
+    });
+
+    // --- Validate input ---
+    if (!target_user_id || !year || !month || !schedule) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    // --- Verify admin privileges ---
+    const adminRow = db.prepare(
+      "SELECT is_admin, email, league_id FROM users WHERE id = ?"
+    ).get(adminUserId);
+
+    if (!adminRow || adminRow.is_admin !== 1) {
+      return res.status(403).json({ error: "Admin privileges required." });
+    }
+
+    const adminEmail = adminRow.email;
+    const leagueId = adminRow.league_id;
+
+    // --- Verify target user exists ---
+    const userRow = db.prepare(
+      "SELECT id FROM users WHERE id = ?"
+    ).get(target_user_id);
+
+    if (!userRow) {
+      return res.status(404).json({ error: "Target user not found." });
+    }
+
+    // -------------------------------------------------------------------------
+    // VALIDATION: Ensure user is only selecting days allowed by the league
+    // -------------------------------------------------------------------------
+    const leagueDaysRows = await dbAll(
+      `SELECT day_of_week
+         FROM league_play_days
+        WHERE league_id = ?
+          AND is_play_day = 1`,
+      [leagueId]
+    );
+
+    const allowedDays = leagueDaysRows.map(r => r.day_of_week);
+    const invalidSelections = [];
+
+    for (const [date, isPlaying] of Object.entries(schedule)) {
+      if (!isPlaying) continue;
+
+      const [y, m, d] = date.split("-");
+      const dow = new Date(y, m - 1, d).getDay();
+
+      if (!allowedDays.includes(dow)) {
+        invalidSelections.push(date);
+      }
+    }
+
+    if (invalidSelections.length > 0) {
+      return res.status(400).json({
+        error: "Invalid days selected",
+        invalidDates: invalidSelections
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // LOAD EXISTING SCHEDULE FOR THIS USER + MONTH
+    // -------------------------------------------------------------------------
+    const pad = n => String(n).padStart(2, "0");
+    const prefix = `${year}-${pad(month)}-`;
+
+    const existingRows = await dbAll(
+      `SELECT date, is_playing
+         FROM schedule
+        WHERE user_id = ?
+          AND date LIKE ?`,
+      [target_user_id, `${prefix}%`]
+    );
+
+    const existingMap = {};
+    for (const row of existingRows) {
+      existingMap[row.date] = row.is_playing;
+    }
+
+    // -------------------------------------------------------------------------
+    // WRITE CHANGES TO schedule_history (UPSERT)
+    // -------------------------------------------------------------------------
+    const historyStmt = db.prepare(`
+      INSERT INTO schedule_history (
+          user_id,
+          league_id,
+          play_date,
+          old_is_playing,
+          new_is_playing,
+          changed_by,
+          changed_at,
+          source,
+          before_state,
+          after_state
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, league_id, play_date, changed_at)
+      DO UPDATE SET
+          new_is_playing = excluded.new_is_playing,
+          changed_by     = excluded.changed_by,
+          source         = excluded.source,
+          after_state    = excluded.after_state
+    `);
+
+    for (const [date, newVal] of Object.entries(schedule)) {
+      const oldVal = existingMap[date] ?? 0;
+      const newInt = newVal ? 1 : 0;
+
+      if (oldVal !== newInt) {
+        historyStmt.run(
+          target_user_id,
+          leagueId,
+          date,
+          oldVal,
+          newInt,
+          adminEmail,
+          sessionStartTS,
+          source,
+          JSON.stringify({ is_playing: oldVal }),
+          JSON.stringify({ is_playing: newInt })
+        );
+      }
+    }
+    // -------------------------------------------------------------------------
+    // DELETE schedule rows where after prior UPSERT caused new_is_playing to be
+    // equal to old_is_playing as that would indicate no change ... and we onlye
+    // want to keep the history rows where there is a change.
+    // -------------------------------------------------------------------------
+    db.prepare(
+      `DELETE FROM schedule_history
+        WHERE user_id = ?
+          AND play_date LIKE ?
+          AND new_is_playing = old_is_playing`
+    ).run(target_user_id, `${prefix}%`);
+    // -------------------------------------------------------------------------
+    // DELETE EXISTING SCHEDULE FOR THIS MONTH
+    // -------------------------------------------------------------------------
+    db.prepare(
+      `DELETE FROM schedule
+        WHERE user_id = ?
+          AND date LIKE ?`
+    ).run(target_user_id, `${prefix}%`);
+
+    // -------------------------------------------------------------------------
+    // INSERT NEW SCHEDULE ROWS
+    // -------------------------------------------------------------------------
+    const insertStmt = db.prepare(
+      `INSERT INTO schedule (user_id, date, is_playing)
+       VALUES (?, ?, ?)`
+    );
+
+    console.log("admin save route ... schedule=", schedule)
+
+    for (const [dateStr, isPlaying] of Object.entries(schedule)) {
+      console.log(`admin save route ... INSERT INTO schedule (${target_user_id}
+                   ${dateStr}, ${isPlaying})`);
+      insertStmt.run(target_user_id, dateStr, isPlaying ? 1 : 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // RETURN UPDATED SCHEDULE + DETERMINE IN-TOWN STATUS
+    // -------------------------------------------------------------------------
+    const rows = db.prepare(
+      `SELECT date, is_playing
+         FROM schedule
+        WHERE user_id = ?
+          AND date LIKE ?
+        ORDER BY date`
+    ).all(target_user_id, `${prefix}%`);
+
+    const scheduleObj = {};
+    rows.forEach(r => {
+      scheduleObj[r.date] = r.is_playing === 1;
+      if (r.is_playing === 1) golfingThisMonth = 1;
+    });
+
+    // -------------------------------------------------------------------------
+    // UPDATE user_play_months.in_town
+    // -------------------------------------------------------------------------
+    if (golfingThisMonth === 1) {
+      db.prepare(`
+        UPDATE user_play_months
+           SET in_town = 1
+         WHERE user_id = ?
+           AND month = ?
+      `).run(target_user_id, month);
+    } else {
+      db.prepare(`
+        UPDATE user_play_months
+           SET in_town = ?
+         WHERE user_id = ?
+           AND month = ?
+      `).run(origInTownStatus, target_user_id, month);
+    }
+
+    return res.json({
+      status: "saved",
+      schedule: scheduleObj
+    });
+
+  } catch (err) {
+    console.error("Admin override save error:", err);
+    return res.status(500).json({ error: "Server error saving schedule." });
+  }
+});
+
+// ===========================================
+// ADMIN OVERRIDE: GENERATE DEFAULT SCHEDULE
+// ===========================================
+app.post("/admin/schedule/default/", async (req, res) => {
+  try {
+    const target_user_id = req.body.target_user_id ?? req.query.target_user_id;
+    const year  = Number(req.body.year  ?? req.query.year);
+    const month = Number(req.body.month ?? req.query.month);
+    const adminUserId = req.session.user?.id;
+
+    console.log(`>>> DEBUG: /admin/schedule/default/ - target_user_id: ${target_user_id},
+       adminUserId: ${adminUserId}, year: ${year}, month: ${month}`);
+
+    if (!target_user_id || !year || !month) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const adminRow = db.prepare(
+      "SELECT is_admin FROM users WHERE id = ?"
+    ).get(adminUserId);
+
+    if (!adminRow || adminRow.is_admin !== 1) {
+      return res.status(403).json({ error: "Admin privileges required." });
+    }
+
+    // --- Build default schedule (no DB writes) ---
+    const dayRows = await dbAll(
+      `SELECT day_of_week
+         FROM user_play_days
+        WHERE user_id = ? 
+          AND is_play_day = 1`,
+      [target_user_id]
+    );
+
+    const allowedDays = dayRows.map(r => r.day_of_week);
+
+    const endDate = new Date(year, month, 0).getDate();
+    const schedule = {};
+
+    for (let d = 1; d <= endDate; d++) {
+      const dow = new Date(year, month - 1, d).getDay();
+      const fullDate = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      schedule[fullDate] = allowedDays.includes(dow);
+    }
+
+    return res.json({
+      status: "default",
+      schedule
+    });
+
+  } catch (err) {
+    console.error("Admin override default error:", err);
+    return res.status(500).json({ error: "Server error generating default schedule." });
+  }
+});
+
+// **********************************************************************************************************
+// Schedule - CLEAR - but without saving schedule nor saving schedule_history
+//***********************************************************************************************************
+app.post("/admin/schedule/clear/", (req, res) => {
+  try {
+    const adminUserId = req.session.user?.id;
+    const { target_user_id, year, month } = req.body;
+
+    const source = "ADMIN";
+
+    console.log(`>>> DEBUG: /admin/schedule/clear/ - 
+       target_user_id: ${target_user_id},
+       adminUserId: ${adminUserId}, year: ${year}, month: ${month}`);
+
+    // --- Validate input ---
+    if (!target_user_id || !year || !month) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    // --- Verify admin privileges ---
+    const adminRow = db.prepare(
+      "SELECT is_admin, email FROM users WHERE id = ?"
+    ).get(adminUserId);
+
+    if (!adminRow || adminRow.is_admin !== 1) {
+      return res.status(403).json({ error: "Admin privileges required." });
+    }
+
+    // --- Verify target user exists ---
+    const userRow = db.prepare(
+      "SELECT id FROM users WHERE id = ?"
+    ).get(target_user_id);
+
+    if (!userRow) {
+      return res.status(404).json({ error: "Target user not found." });
+    }
+
+    // --- Return empty schedule to frontend ---
+    return res.json({
+      status: "CLEARED",
+      schedule: {}   // empty month
+    });
+
+  } catch (err) {
+    console.error("Admin override clear error:", err);
+    return res.status(500).json({ error: "Server error clearing schedule." });
+  }
+});
+
+// ADMIN OVERRIDE ENTRY POINT — serve schedule.html
+app.get("/admin/schedule/:targetUserId", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "schedule.html"));
 });
 
 app.post("/admin/leagues/api", requireSuperAdmin, async (req, res) => {
@@ -1888,12 +2352,13 @@ app.post("/admin/golfers/api", requireLeagueAdmin, async (req, res) => {
                 VALUES (?, ?, 1)
             `, [newUserId, m]);
         }
-	// ⭐ NEW: Initialize weekly play days based on league defaults
+	      // ⭐ NEW: Initialize weekly play days based on league defaults
         // Load league play days (0–6 where league plays)
         const leagueDays = await dbAll(
           `SELECT day_of_week
            FROM league_play_days
-           WHERE league_id = ? AND is_play_day = 1`,
+           WHERE league_id = ? 
+           ORDER BY day_of_week ASC`,
           [leagueId]
         );
 

@@ -148,6 +148,28 @@ h1 {
             line-height: 1.0 !important;
         }
 
+        .btn-reschedule {
+            background-color: #e67e22 !important;
+            color: white !important;
+            border-radius: 4px !important;
+            border: 1px solid #d35400 !important;
+            padding: 2px 6px !important;
+            font-size: 12px !important;
+            line-height: 1.0 !important;
+        }
+
+        .btn-reschedule:hover {
+            background-color: #d35400 !important;
+        }
+
+        .actions-cell button {
+            margin-right: 4px;
+        }
+
+        .actions-cell button:last-child {
+            margin-right: 0;
+        }
+
         .sort-arrow {
             font-size: 12px;
             margin-left: 4px;
@@ -462,12 +484,20 @@ function renderGolfers(golfers) {
                         onclick="openResetPasswordModal(${g.id}, '${g.first_name}', '${g.last_name}')">
                       🔑 Reset
                </button>
+               <button class="btn btn-small btn-reschedule" data-user-id="${g.id}">🗓️ Reschedule</button>
             </td>
         `;
 
         tbody.appendChild(tr);
     });
 }
+
+document.addEventListener("click", function (e) {
+    if (e.target.classList.contains("btn-reschedule")) {
+        const userId = e.target.getAttribute("data-user-id");
+        window.location.href = `/admin/schedule/${userId}`;
+    }
+});
 
 async function loadGolfers() {
     const res = await fetch("/admin/golfers/api", { credentials: "include" });

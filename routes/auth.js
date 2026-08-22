@@ -239,10 +239,10 @@ router.post("/admin-login", async (req, res) => {
     // 4. BUILD SESSION OBJECT
     // ---------------------------------------------------------
     req.session.user = {
-      id: isSuper ? superRecord.id : leagueRecord.id,
+      id: leagueRecord.id,
       email: email,
-      first_name: isSuper ? superRecord.first_name : leagueRecord.first_name,
-      last_name: isSuper ? superRecord.last_name : leagueRecord.last_name,
+      first_name: leagueRecord.first_name,
+      last_name: leagueRecord.last_name,
 
       // ⭐ BOTH FLAGS ARE SET CORRECTLY
       is_super_admin: isSuper,
@@ -253,6 +253,9 @@ router.post("/admin-login", async (req, res) => {
 
       user_mode: "admin"
     };
+
+    console.log("LOGIN — leagueRecord.id =", leagueRecord.id);
+    console.log("LOGIN — setting session.user.id =", req.session.user.id);
 
     return req.session.save(() => {
       console.log("🔥 ADMIN LOGIN SUCCESS: User logged in successfully.  Sent to select-league");

@@ -417,35 +417,86 @@ h1, h2, h3 {
 
 <script>
 // ==========================
+// global variables
+// ========================== 
+let targetUserId = null;
+let isAdminMode = false;
+let defaultJustRan = false;
+let origInTownStatus = 1;   //default to 1 (in town) until we fetch the real value from the server
+let leaguePlayDays = [];
+let sessionStartTS = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Schedule JS running");
 
+  function detectAdminOverride() {
+    const parts = window.location.pathname.split("/");
+    console.log(">>> DEBUG: file=schedule.html - URL parts:", parts);
+    if (parts[1] === "admin" && parts[2] === "schedule") {
+      targetUserId = parseInt(parts[3]);
+      isAdminMode = true;
+      console.log("Admin override schedule page for userId:", targetUserId);
+    } else {
+      isAdminMode = false;
+      console.log("Normal user schedule page");
+    }
+  }
+  
+  detectAdminOverride();   // ⭐ REQUIRED ⭐
+
   // Wait a bit for nav-loader.js to finish inserting the nav
   setTimeout(() => {
+
+    // ⭐ ADMIN MODE: Replace user nav bar with admin override nav bar
+    if (isAdminMode) {
+      const nav = document.getElementById("nav-container");
+
+      nav.innerHTML = `
+        <div class="nav-bar" style="display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#2b7cff; color:white;">
+          <div class="nav-left" style="font-size:20px; font-weight:bold;">
+            Golf Scheduler
+          </div>
+          <div class="nav-right">
+            <a href="/admin/golfers" class="nav-link" style="color:white; font-size:16px; text-decoration:none;">
+              Return to Manage Golfers
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    // ⭐ USER MODE: Keep existing nav-link modal protection
     document.querySelectorAll(".nav-link").forEach(link => {
       link.addEventListener("click", (e) => {
+        // ⭐ Skip modal for Clear and Default buttons
+        if (link.id === "clearBtn" || link.id === "defaultBtn") {
+          return;
+        }
+
         if (!unsavedChanges) return;
 
         e.preventDefault();
 
         requireNoUnsavedChanges({
           onSave: async () => {
+            console.log(">>> DEBUG: nav link clicked - onSave callback");
             await saveSchedule();
             window.onbeforeunload = null;
             window.location = link.href;
           },
           onContinue: () => {
             window.onbeforeunload = null;
+            console.log(">>> DEBUG: nav link clicked - onContinue callback");
             window.location = link.href;
           },
           onCancel: () => {}
         });
       });
     });
+
   }, 200);
 
-  // --- SAFE modal button bindings (prevents crash if modal not present) ---
+  // --- SAFE modal button bindings (unchanged) ---
   const unsavedSaveBtn = document.getElementById("unsavedSave");
   if (unsavedSaveBtn) {
     unsavedSaveBtn.addEventListener("click", async () => {
@@ -551,6 +602,12 @@ function highlightInvalidDates(dates) {
 }
 
 function refreshSaveUI() {
+  console.log(">>> DEBUG: refreshSaveUI() called.");
+    // ⭐ Prevent unwanted reload after Default runs
+  // if (isAdminMode && defaultJustRan) {
+  //   console.log(">>> DEBUG: Skipping refreshSaveUI because default just ran");
+  //   return;
+  //  }
   const saveBtn = document.getElementById("saveBtn");
   const ind = document.getElementById("unsavedIndicator");
 
@@ -611,6 +668,13 @@ function loadNavBar() {
 }
 
 function updateStatusBanner(status) {
+
+  // ⭐ Prevent unwanted reload after Default runs
+  // if (isAdminMode && defaultJustRan) {
+  //   console.log(">>> DEBUG: Skipping updateStatusBanner because default just ran");
+  //   return;
+  // }
+
   const banner = document.getElementById("statusBanner");
   const text = document.getElementById("statusText");
   const infoIcon = document.getElementById("statusInfo");
@@ -669,11 +733,14 @@ if (status === "default") {
   banner.style.display = "inline-block";
   text.textContent = "Default schedule loaded. Review and Save.";
   infoIcon.style.display = "none";
+  console.log(">>> DEBUG: within [if (status ===  default)...] block of updateStatusBanner");
   return;
 }
 
 // 7. Fallback: hide banner
   banner.style.display = "none";
+
+  console.log(">>> DEBUG: updateStatusBanner COMPLETED");
 }
 
 function getMonthParts() {
@@ -725,6 +792,8 @@ for (let d = 1; d <= totalDays; d++) {
 
   // ⭐ Disable invalid league days
   const dow = new Date(year, month - 1, d).getDay();
+  cell.dataset.dow = dow;
+  
   if (!leaguePlayDays.includes(dow)) {
     cell.classList.add("disabled-day");
     cell.setAttribute("data-tooltip", "League does not play on this day");
@@ -785,7 +854,7 @@ for (let d = 1; d <= totalDays; d++) {
 
   calendar.appendChild(cell);
 }
-
+  console.log("renderCalendar schedule =", schedule);
   container.appendChild(calendar);
 }
 
@@ -798,6 +867,7 @@ async function saveSchedule() {
 
   console.log("saveSchedule() fired");
 
+  // Build schedule object from calendar
   const schedule = {};
   document.querySelectorAll(".day-cell").forEach(cell => {
     if (!cell.dataset.date) return;
@@ -811,59 +881,111 @@ async function saveSchedule() {
   // ⭐ Force browser to repaint BEFORE fetch begins
   await new Promise(requestAnimationFrame);
 
-  const res = await fetch(`/user/schedule/${year}/${month}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ schedule })
-  });
+  // ⭐ Determine correct URL + payload based on mode
+  let url;
+  let payload;
 
-  // ❌ If backend returns 400, stop here
-  if (!res.ok) {
-    const data = await res.json();
-    showErrorBanner(data.error);
+  if (isAdminMode) {
+    // ⭐ ADMIN OVERRIDE SAVE ROUTE
+    url = `/admin/schedule/save/${origInTownStatus}/${sessionStartTS}`;
 
-    if (data.invalidDates) {
-      highlightInvalidDates(data.invalidDates);
-    }
+    payload = {
+      target_user_id: targetUserId,
+      year,
+      month,
+      schedule
+    };
 
-    hideSaving();
-    return;
+  } else {
+    // ⭐ NORMAL USER SAVE ROUTE
+    url = `/user/schedule/${year}/${month}`;
+
+    payload = {
+      schedule,
+      sessionStartTS   // sent in body, not URL
+    };
   }
 
-  // ✔ Success path
+  console.log("SAVE payload:", payload);
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
   const data = await res.json();
-  savedSchedule = data.schedule;
-  currentSchedule = data.schedule;
+
+  // Update UI
+  currentSchedule = data.schedule || {};
   unsavedChanges = false;
-  refreshSaveUI()
-  updateStatusBanner("saved");
+
+  renderCalendar(currentSchedule);
+  refreshSaveUI();
+  updateStatusBanner(data.status);
 
   hideSaving();
 }
 
-// DEFAULT
-// ----------------------
 function regenerateDefaultSchedule() {
+  console.log(">>> DEBUG: regenerateDefaultSchedule() called");
   const { year, month } = getMonthParts();
 
-  fetch(`/user/schedule/default/${year}/${month}`, {
-    method: "POST"
+  let url;
+  let headers = {};
+  let body;
+
+  if (isAdminMode) {
+    url = `/admin/schedule/default`;
+    headers = { "Content-Type": "application/json" };
+
+    body = JSON.stringify({
+        target_user_id: targetUserId,
+        year,
+        month
+    });
+    
+  } else {
+    url = `/user/schedule/default/${year}/${month}`;
+    body = undefined;
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers,
+    body
   })
   .then(res => res.json())
   .then(data => {
 
-    // --- CASE 1: User is OUT OF TOWN ---
     if (data.status === "out_of_town") {
       showOutOfTownPrompt(year, month);
       updateStatusBanner("out_of_town");
       return;
     }
-
-    // --- CASE 2: Normal default behavior ---
+    console.log(">>> DEBUG: regenerateDefaultSchedule - fetch completed, url=", url, ", data =", data);
+    // ⭐ Update BOTH current and saved schedule
+    
     currentSchedule = data.schedule || {};
+    savedSchedule = currentSchedule;
+    console.log(">>> DEBUG: regenerateDefaultSchedule - after updating currentSchedule and savedSchedule=", currentSchedule);
+
+    // ⭐ Paint calendar grid
     renderCalendar(currentSchedule);
+    console.log(">>> DEBUG: regenerateDefaultSchedule - renderCalendar COMPLETED");
+
+    // ⭐ Admin mode MUST paint green days AFTER renderCalendar
+    if (isAdminMode) {
+      applyScheduleToCalendar(currentSchedule, leaguePlayDays);
+      console.log(">>> DEBUG: regenerateDefaultSchedule - applyScheduleToCalendar COMPLETED");
+    }
+
     markUnsaved();
+    console.log(">>> DEBUG: regenerateDefaultSchedule - markUnsaved COMPLETED");
     updateStatusBanner(data.status);
+    console.log(">>> DEBUG: regenerateDefaultSchedule - updateStatusBanner COMPLETED");
+    // ⭐ Prevent the month loader from overwriting the default schedule
+    return;
   });
 }
 
@@ -890,8 +1012,26 @@ function showOutOfTownPrompt(year, month) {
 
 // DEFAULT helper logic - clear the monthly schedule for user
 function clearMonthSchedule(year, month) {
-  fetch(`/user/schedule/clear/${year}/${month}`, {
-    method: "POST"
+  console.log(">>> DEBUG: clearMonthSchedule() called for", year, month);
+  let url;
+  let headers = {};
+  let body;
+
+  if (isAdminMode) {
+    // ⭐ Correct admin override clear route
+    url = `/admin/schedule/clear/`;
+    headers = { "Content-Type": "application/json" };
+    body = JSON.stringify({ target_user_id: targetUserId, year, month });
+  } else {
+    // ⭐ Normal user route
+    url = `/user/schedule/clear/${year}/${month}`;
+    body = undefined;
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers,
+    body
   })
   .then(res => res.json())
   .then(data => {
@@ -904,12 +1044,27 @@ function clearMonthSchedule(year, month) {
 }
 
 // DEFAULT helper logic - change in_town column from 0 to 1
-// (making current month an in-town month)
-// then populate month based user's 
-// day-of-week play days.
 function regenerateDefaultScheduleForceInTown(year, month) {
-  fetch(`/user/schedule/default/${year}/${month}?forceInTown=1`, {
-    method: "POST"
+  console.log(">>> DEBUG: regenerateDefaultScheduleForceInTown() called for", year, month);
+  let url;
+  let headers = {};
+  let body;
+
+  if (isAdminMode) {
+    // ⭐ Correct admin override force-in-town route
+    url = `/admin/schedule/default/`;
+    headers = { "Content-Type": "application/json" };
+    body = JSON.stringify({ target_user_id: targetUserId, year, month });
+  } else {
+    // ⭐ Normal user route
+    url = `/user/schedule/default/${year}/${month}`;
+    body = undefined;
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers,
+    body
   })
   .then(res => res.json())
   .then(data => {
@@ -920,12 +1075,32 @@ function regenerateDefaultScheduleForceInTown(year, month) {
   });
 }
 
+// ----------------------
 // CLEAR
 // ----------------------
 function clearSchedule() {
+  console.log(">>> DEBUG: clearSchedule() called");
   const { year, month } = getMonthParts();
-  fetch(`/user/schedule/clear/${year}/${month}`, {
-    method: "POST"
+
+  let url;
+  let headers = {};
+  let body;
+
+  if (isAdminMode) {
+    // ⭐ Correct admin override clear route
+    url = `/admin/schedule/clear/`;
+    headers = { "Content-Type": "application/json" };
+    body = JSON.stringify({ target_user_id: targetUserId, year, month });
+  } else {
+    // ⭐ Normal user route
+    url = `/user/schedule/clear/${year}/${month}`;
+    body = undefined;
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers,
+    body
   })
   .then(res => res.json())
   .then(() => {
@@ -937,6 +1112,7 @@ function clearSchedule() {
 }
 
 function wireUpEventListeners() {
+  console.log(">>> DEBUG: wireUpEventListeners() called");
   const picker = document.getElementById("monthPicker");
   picker.addEventListener("change", (e) => {
   const newValue = e.target.value;
@@ -946,11 +1122,13 @@ function wireUpEventListeners() {
       await saveSchedule();
       window.onbeforeunload = null;
       picker.value = newValue;
+      console.log(">>> DEBUG: wireUpEventListeners - onSave calling loadScheduleForCurrentMonth");
       loadScheduleForCurrentMonth();
     },
     onContinue: () => {
       window.onbeforeunload = null;
       picker.value = newValue;
+      console.log(">>> DEBUG: wireUpEventListeners - onContinue calling loadScheduleForCurrentMonth");
       loadScheduleForCurrentMonth();
     },
     onCancel: () => {
@@ -961,7 +1139,6 @@ function wireUpEventListeners() {
   });
 });
 
-
   document.getElementById("saveBtn").addEventListener("click", () => {
     if (!currentMonthInTown && userHasSelectedPlayDays()) {
       showOutOfTownSaveModal();
@@ -971,33 +1148,14 @@ function wireUpEventListeners() {
   });
 
 document.getElementById("defaultBtn").addEventListener("click", () => {
-  requireNoUnsavedChanges({
-    onSave: async () => {
-      await saveSchedule();
-      regenerateDefaultSchedule();
-      window.onbeforeunload = null;
-    },
-    onContinue: () => {
-      regenerateDefaultSchedule();
-      window.onbeforeunload = null;
-    },
-    onCancel: () => {}
-  });
+  defaultJustRan = true;   // ⭐ Prevent reload overwrite
+  regenerateDefaultSchedule();
+  window.onbeforeunload = null;
 });
 
 document.getElementById("clearBtn").addEventListener("click", () => {
-  requireNoUnsavedChanges({
-    onSave: async () => {
-      await saveSchedule();
-      clearSchedule();
-      window.onbeforeunload = null;
-    },
-    onContinue: () => {
-      clearSchedule()
-      window.onbeforeunload = null;
-    },
-    onCancel: () => {}
-  });
+  clearSchedule();
+  window.onbeforeunload = null;
 });
 
  wireUpJumpToday();
@@ -1010,65 +1168,169 @@ function userHasSelectedPlayDays() {
 }
 
 async function loadPageHeader() {
+  console.log(">>> DEBUG: loadPageHeader() called");
   try {
-  // Load user + league info and build header
-   const [userInfo, leagueInfo] = await Promise.all([
-     fetch("/user/info").then(r => r.json()),
-     fetch("/user/selected-league").then(r => r.json())
-  ]);
-  const user = userInfo.user;
-  const league = leagueInfo.league;
-  const userName = `${user.first_name} ${user.last_name}`;
-  const leagueName = league.league_name;
-  document.getElementById("pageHeader").textContent =
-  `My Schedule – ${userName} – ${leagueName}`;
+    // Load admin user + league info
+    const [userInfo, leagueInfo] = await Promise.all([
+      fetch("/user/info").then(r => r.json()),
+      fetch("/user/selected-league").then(r => r.json())
+    ]);
+
+    const adminUser = userInfo.user;
+    const league = leagueInfo.league;
+    const adminName = `${adminUser.first_name} ${adminUser.last_name}`;
+    const leagueName = league.league_name;
+
+    let pageHeaderText = "";
+
+    if (isAdminMode) {
+      // ⭐ Load target golfer info using the correct admin INIT route
+      const dateNow = new Date();
+      const MonthNum = dateNow.getMonth() + 1;
+      const initData = await fetch(`/admin/schedule/init/${targetUserId}/${MonthNum}`).then(r => r.json());
+      const targetUser = initData.user;
+      // populate global variables with json data returned from init route
+      leaguePlayDays = initData.leaguePlayDays;
+      origInTownStatus = initData.origInTown;  // ⭐ Store original in_town status
+      sessionStartTS = initData.easternTS;
+
+      console.log(`>>> DEBUG: loadPageHeader - GET /admin/schedule/init/${targetUserId}/${MonthNum}
+                  called targetUser  =", targetUser`);
+
+      const targetUserName = `${targetUser.first_name} ${targetUser.last_name}`;
+
+      pageHeaderText =
+        `Editing Schedule for ${targetUserName} — Admin: ${adminName} — League: ${leagueName}`;
+    } else {
+      // Normal user mode
+      pageHeaderText =
+        `My Schedule – ${adminName} – ${leagueName}`;
+      const initUserData = await fetch(`/user/schedule/init`).then(r => r.json());
+      sessionStartTS = initUserData.easternTS;
+      console.log("schedule.html - loadPageHeader - sessionStartTS=", sessionStartTS)
+    }
+    document.getElementById("pageHeader").textContent = pageHeaderText;
+
   } catch (err) {
     console.error("Error loading schedule page header:", err);
   }
 }
 
 // ---- Load initial month (session-aware) ----
-
 async function initSchedulePage() {
-  const res = await fetch("/user/schedule");
+  console.log(">>> DEBUG: initSchedulePage() called");
+  const dateNow = new Date();
+  const MonthNum = dateNow.getMonth() + 1;
+      
+  const url = isAdminMode
+    ? `/admin/schedule/init/${targetUserId}/${MonthNum}`
+    : `/user/schedule`;
+
+  const res = await fetch(url);
   const data = await res.json();
 
   document.getElementById("monthPicker").value =
     `${data.year}-${String(data.month).padStart(2, "0")}`;
-
+  console.log(">>>> DEBUG: initSchedulePage monthPicker = ",
+              `${data.year}-${String(data.month).padStart(2, "0")}`, 
+              " about to call: loadScheduleForCurrentMonth");
   await loadScheduleForCurrentMonth();
 }
 
+// ---- Apply schedule to calendar cells (used in admin mode only
+function applyScheduleToCalendar(scheduleObj, leaguePlayDays) {
+  console.log(">>> DEBUG: applyScheduleToCalendar called");
+
+  const cells = document.querySelectorAll(".day-cell");
+
+  cells.forEach(cell => {
+    const dateString = cell.dataset.date;
+    const dow = parseInt(cell.dataset.dow);
+
+    // Skip leading blank cells
+    if (!dateString) return;
+
+    // Disable non-play days
+    if (!leaguePlayDays.includes(dow)) {
+      cell.classList.add("disabled-day");
+      cell.dataset.tooltip = "League does not play on this day";
+      return;
+    }
+
+    // Paint playing days
+    if (scheduleObj[dateString]) {
+      cell.classList.add("playing");
+    }
+  });
+}
+
 async function loadScheduleForCurrentMonth() {
+  // ⭐ Prevent overwrite after Default runs
+  console.log(">>> DEBUG: ENTER loadScheduleForCurrentMonth");
+  // if (isAdminMode && defaultJustRan) {
+  //     console.log(">>> DEBUG: Skipping reload because default just ran");
+  //     return;   // ⭐ Do NOT reset here
+  // }
+
   const { year, month } = getMonthParts();
 
-  // Persist last viewed month
+  // ⭐ Persist last viewed month (ALWAYS user route)
   await fetch("/user/set-last-month", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ year, month })
   });
 
-  const res = await fetch(`/user/schedule/${year}/${month}`);
+  // ⭐ Choose correct schedule load URL
+  const url = isAdminMode
+    ? `/admin/schedule/${targetUserId}/${year}/${month}`
+    : `/user/schedule/${year}/${month}`;
+
+  const res = await fetch(url);
+  console.log(">>> DEBUG: schedule.html - url=", url, " - schedule load response status =", res.status);
   const data = await res.json();
 
   console.log(">>> DEBUG: schedule load response =", data);
+if (isAdminMode) {
+    console.log(">>> DEBUG: ADMIN MODE — applying scheduleObj and leaguePlayDays");
 
-  // ⭐ NEW: store league play days for disabling invalid dates
+    const scheduleObj = data.schedule || {};
+
+    // ⭐ CRITICAL — set global BEFORE renderCalendar()
+    leaguePlayDays = data.leaguePlayDays || [];
+
+    currentMonthInTown = data.user.in_town === 1;
+
+    console.log(">>> DEBUG: - loadScheduleForCurrentMonth - scheduleObj =", scheduleObj);
+    console.log(">>> DEBUG: BEFORE renderCalendar - leaguePlayDays =", leaguePlayDays);
+
+    renderCalendar(scheduleObj);
+
+    console.log(">>> DEBUG: AFTER renderCalendar - leaguePlayDays =", leaguePlayDays);
+
+    applyScheduleToCalendar(scheduleObj, leaguePlayDays);
+
+    savedSchedule = scheduleObj;
+    currentSchedule = scheduleObj;
+
+    return;   // ⭐ MUST BE HERE
+}
+
+  // ⭐ Store league play days
   leaguePlayDays = data.leaguePlayDays || [];
 
-  // Always update in-town state
+  // ⭐ Update in-town state
   currentMonthInTown = data.in_town === 1;
-  // Reset unsaved state FIRST
+
+  // ⭐ Reset unsaved state FIRST
   unsavedChanges = false;
   refreshSaveUI();
 
-  // THEN update banner
+  // ⭐ Update banner
   updateStatusBanner(data.status);
 
-  // Interpret backend status cleanly
+  // ⭐ Interpret backend status
   switch (data.status) {
-
     case "out_of_town":
       savedSchedule = null;
       currentSchedule = {};
@@ -1079,9 +1341,8 @@ async function loadScheduleForCurrentMonth() {
       savedSchedule = null;
       currentSchedule = data.schedule;
       renderCalendar(data.schedule);
-      // ⭐ Treat default-generated schedule as UNSAVED
       unsavedChanges = true;
-      refreshSaveUI()
+      refreshSaveUI();
       return;
 
     case "cleared":
@@ -1105,6 +1366,7 @@ async function loadScheduleForCurrentMonth() {
 }
 
 function configureMonthPickerLimits() {
+  console.log(">>> DEBUG: configureMonthPickerLimits() called");
   const monthPicker = document.getElementById("monthPicker");
   const now = new Date();
 
@@ -1134,33 +1396,39 @@ function configureMonthPickerLimits() {
 }
 
 function showOutOfTownSaveModal() {
-  showModal({
-    title: "This month is marked as Out of Town",
-    message: "You selected play days. What would you like to do?",
-    buttons: [
-      {
-        label: "Clear Month",
-        class: "danger",
-        action: () => clearMonthAndReload()
-      },
-      {
-        label: "Mark In Town + Save",
-        class: "primary",
-        action: () => {
-          markMonthInTown().then(() => saveSchedule());
-        }
-      },
-      {
-        label: "Cancel",
-        class: "secondary",
-        action: hideModal
-      }
-    ]
-  });
+  const modal = document.getElementById("outOfTownModal");
+  modal.style.display = "flex";
+
+  // Replace modal text for SAVE scenario
+  modal.querySelector("h2").textContent = "Out of Town";
+  modal.querySelector("p").textContent =
+    "You selected play days. What would you like to do?";
+
+  // Clear Month
+  document.getElementById("clearMonthBtn").onclick = () => {
+    modal.style.display = "none";
+    const { year, month } = getMonthParts();
+    clearMonthSchedule(year, month);
+    console.log(">>> DEBUG: clearMonthBtn calling loadScheduleForCurrentMonth");
+    loadScheduleForCurrentMonth();
+  };
+
+  // Mark In Town + Save
+  document.getElementById("markInTownBtn").onclick = async () => {
+    modal.style.display = "none";
+    const { year, month } = getMonthParts();
+    regenerateDefaultScheduleForceInTown(year, month);
+    await saveSchedule();
+  };
+
+  // Cancel
+  document.getElementById("cancelOutOfTownBtn").onclick = () => {
+    modal.style.display = "none";
+  };
 }
 
-
 function wireUpJumpToday() {
+  console.log(">>> DEBUG: wireUpJumpToday() called");
   const btn = document.getElementById("jumpToday");
   if (!btn) return;
 
@@ -1172,7 +1440,7 @@ function wireUpJumpToday() {
 
     const picker = document.getElementById("monthPicker");
     picker.value = `${year}-${month}`;
-
+    console.log(">>> DEBUG: monthPicker CHANGE triggered loadScheduleForCurrentMonth");
     // Reload schedule
     await loadScheduleForCurrentMonth();
 

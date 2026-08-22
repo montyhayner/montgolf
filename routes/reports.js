@@ -891,9 +891,9 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
 
         html += `
             <tr>
-              <td style="padding:6px; border:1px solid #000;">${r.tee_time}</td>
-              <td style="padding:6px; border:1px solid #000;">${r.starting_nine}</td>
-              <td style="padding:6px; border:1px solid #000;">${players}</td>
+              <th style="padding:6px; border:1px solid #000;">${r.tee_time}</th>
+              <th style="padding:6px; border:1px solid #000;">${r.starting_nine}</th>
+              <th style="padding:6px; border:1px solid #000;">${players}</th>
             </tr>
         `;
       });
