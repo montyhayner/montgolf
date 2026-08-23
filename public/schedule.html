@@ -272,6 +272,30 @@ h1, h2, h3 {
   100% { background-color: transparent; }
 }
 
+#pageBusyOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+#pageBusyOverlay .spinner {
+  width: 48px;
+  height: 48px;
+  border: 6px solid #ccc;
+  border-top-color: #2a7ae2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+} 
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Modal (unchanged) */
 .modal-overlay {
   position: fixed;
@@ -401,6 +425,10 @@ h1, h2, h3 {
   <div id="unsavedIndicator">• Unsaved changes</div>
 </div>
 
+<div id="pageBusyOverlay">
+    <div class="spinner"></div>
+</div>
+
 <div id="calendarContainer"></div>
 
 <div id="calendarLegend" class="calendar-legend">
@@ -425,6 +453,23 @@ let defaultJustRan = false;
 let origInTownStatus = 1;   //default to 1 (in town) until we fetch the real value from the server
 let leaguePlayDays = [];
 let sessionStartTS = null;
+
+function showBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "flex";
+}
+
+function hideBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "none";
+}
+
+async function runWithBusy(asyncFn) {
+  showBusy();
+  try {
+    await asyncFn();
+  } finally {
+    hideBusy();
+  }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Schedule JS running");
@@ -579,12 +624,12 @@ function focusDay(dayNumber) {
   if (target) target.focus();
 }
 
-function showSaving() {
-  document.getElementById("savingIndicator").style.display = "inline";
+function showBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "flex";
 }
 
-function hideSaving() {
-  document.getElementById("savingIndicator").style.display = "none";
+function hideBusy() {
+  document.getElementById("pageBusyOverlay").style.display = "none";
 }
 
 function markUnsaved() {
@@ -864,7 +909,9 @@ for (let d = 1; d <= totalDays; d++) {
 // ----------------------
 async function saveSchedule() {
   const { year, month } = getMonthParts();
-
+  showBusy();
+  // ⭐ Force browser to repaint BEFORE fetch begins
+  await new Promise(requestAnimationFrame);
   console.log("saveSchedule() fired");
 
   // Build schedule object from calendar
@@ -876,10 +923,7 @@ async function saveSchedule() {
     schedule[fullDate] = isPlaying;
   });
 
-  showSaving();
 
-  // ⭐ Force browser to repaint BEFORE fetch begins
-  await new Promise(requestAnimationFrame);
 
   // ⭐ Determine correct URL + payload based on mode
   let url;
@@ -924,12 +968,14 @@ async function saveSchedule() {
   refreshSaveUI();
   updateStatusBanner(data.status);
 
-  hideSaving();
+  hideBusy();
 }
 
-function regenerateDefaultSchedule() {
+async function regenerateDefaultSchedule() {
   console.log(">>> DEBUG: regenerateDefaultSchedule() called");
   const { year, month } = getMonthParts();
+  showBusy();
+  await new Promise(requestAnimationFrame)
 
   let url;
   let headers = {};
@@ -987,6 +1033,7 @@ function regenerateDefaultSchedule() {
     // ⭐ Prevent the month loader from overwriting the default schedule
     return;
   });
+      hideBusy();
 }
 
 // DEFAULT helper logic - Prompt for action when current month shows user is OUT OF TOWN -
@@ -1078,7 +1125,9 @@ function regenerateDefaultScheduleForceInTown(year, month) {
 // ----------------------
 // CLEAR
 // ----------------------
-function clearSchedule() {
+async function clearSchedule() {
+  showBusy(); 
+  await new Promise(requestAnimationFrame);
   console.log(">>> DEBUG: clearSchedule() called");
   const { year, month } = getMonthParts();
 
@@ -1109,6 +1158,7 @@ function clearSchedule() {
     markUnsaved();
     updateStatusBanner("cleared");
   });
+  hideBusy();
 }
 
 function wireUpEventListeners() {
