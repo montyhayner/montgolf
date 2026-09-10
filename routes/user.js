@@ -117,7 +117,7 @@ async function saveScheduleHandler(req, res) {
     }
 
     // -------------------------------------------------------------------------
-    // DETECT CHANGES AND WRITE TO schedule_history
+    // DETECT CHANGES AND WRITE TO schedule_history and TO schedule
     // -------------------------------------------------------------------------
     const historyStmt = db.prepare(`
       INSERT INTO schedule_history (
@@ -141,6 +141,15 @@ async function saveScheduleHandler(req, res) {
           after_state    = excluded.after_state
     `);
 
+    const scheduleStmt = db.prepare(`
+      INSERT INTO schedule (user_id, date, is_playing, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, date)
+      DO UPDATE SET
+          is_playing = excluded.is_playing,
+          updated_at = excluded.updated_at
+    `);
+
     for (const [date, newVal] of Object.entries(schedule)) {
       const oldVal = existingMap[date] ?? 0;
       const newInt = newVal ? 1 : 0;
@@ -158,6 +167,13 @@ async function saveScheduleHandler(req, res) {
           JSON.stringify({ is_playing: oldVal }),
           JSON.stringify({ is_playing: newInt })
         );
+        
+        scheduleStmt.run(
+          targetUserId,
+          date,
+          newInt,
+          sessionStartTS
+        );
       }
     }
 
@@ -172,33 +188,15 @@ async function saveScheduleHandler(req, res) {
     ).run(targetUserId, `${prefix}%`);
 
     // -------------------------------------------------------------------------
-    // SAVE LOGIC
-    // -------------------------------------------------------------------------
-    await db.runAsync(
-      `DELETE FROM schedule
-        WHERE user_id = ?
-          AND date LIKE ?`,
-      [targetUserId, `${prefix}%`]
-    );
-
-    const stmt = db.prepare(`
-      INSERT INTO schedule (user_id, date, is_playing, updated_at)
-      VALUES (?, ?, ?, ?)
-    `);
-
-    for (const [date, isPlaying] of Object.entries(schedule)) {
-      stmt.run(targetUserId, date, isPlaying ? 1 : 0, sessionStartTS);
-    }
-
-    // -------------------------------------------------------------------------
     // UPDATE user_play_months.in_town
     // -------------------------------------------------------------------------
+    const numOne = 1;
     await db.runAsync(
       `INSERT INTO user_play_months (user_id, month, in_town, updated_at)
-       VALUES (?, ?, 1, ?)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(user_id, month)
        DO UPDATE SET in_town = 1, updated_at = excluded.updated_at`,
-      [targetUserId, month, sessionStartTS]
+      [targetUserId, month, numOne, sessionStartTS]
     );
 
     return res.json({
@@ -480,8 +478,9 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
     // 1. Load in-town status
     const monthRow = await dbGet(
       `SELECT in_town
-       FROM user_play_months
-       WHERE user_id = ? AND month = ?`,
+         FROM user_play_months
+        WHERE user_id = ? 
+          AND month = ?`,
       [userId, month]
     );
 
@@ -490,8 +489,9 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
     // 2. Load league play days
     const leagueRows = await dbAll(
       `SELECT day_of_week
-       FROM league_play_days
-       WHERE league_id = ? AND is_play_day = 1`,
+         FROM league_play_days
+        WHERE league_id = ? 
+          AND is_play_day = 1`,
       [req.session.user.league_id]
     );
 
@@ -500,9 +500,9 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
     // 3. Load saved schedule rows
     const rows = await dbAll(
       `SELECT date, is_playing
-       FROM schedule
-       WHERE user_id = ?
-         AND date LIKE ?`,
+         FROM schedule
+        WHERE user_id = ?
+          AND date LIKE ?`,
       [userId, `${prefix}%`]
     );
 
@@ -585,8 +585,9 @@ router.get("/availability", requireLogin, async (req, res) => {
     // 1. Load league play days
     const leagueDaysRows = await dbAll(
       `SELECT day_of_week
-       FROM league_play_days
-       WHERE league_id = ? AND is_play_day = 1`,
+         FROM league_play_days
+        WHERE league_id = ? 
+          AND is_play_day = 1`,
       [leagueId]
     );
 
@@ -597,16 +598,18 @@ router.get("/availability", requireLogin, async (req, res) => {
 
     // 2. Load user rows
     let playDaysRows = await dbAll(
-      `SELECT day_of_week, is_play_day
-       FROM user_play_days
-       WHERE user_id = ?`,
+      `SELECT day_of_week
+            , is_play_day
+         FROM user_play_days
+        WHERE user_id = ?`,
       [userId]
     );
 
     let playMonthsRows = await dbAll(
-      `SELECT month, in_town
-       FROM user_play_months
-       WHERE user_id = ?`,
+      `SELECT month
+            , in_town
+         FROM user_play_months
+        WHERE user_id = ?`,
       [userId]
     );
 
@@ -621,12 +624,15 @@ router.get("/availability", requireLogin, async (req, res) => {
         );
       }
       playDaysRows = await dbAll(
-        `SELECT day_of_week, is_play_day
-         FROM user_play_days
-         WHERE user_id = ?`,
+        `SELECT day_of_week
+              , is_play_day
+           FROM user_play_days
+          WHERE user_id = ?`,
         [userId]
       );
     }
+
+    isInTown = 1;
 
     if (playMonthsRows.length < 12) {
         const existingMonths = new Set(playMonthsRows.map(r => r.month));
@@ -635,16 +641,17 @@ router.get("/availability", requireLogin, async (req, res) => {
           if (!existingMonths.has(m)) {
             await dbRun(
               `INSERT INTO user_play_months (user_id, month, in_town)
-               VALUES (?, ?, 1)`,
-              [userId, m]
+               VALUES (?, ?, ?)`,
+              [userId, m, isInTown]
             );
           }
         }
 
       playMonthsRows = await dbAll(
-        `SELECT month, in_town
-         FROM user_play_months
-         WHERE user_id = ?`,
+        `SELECT month
+              , in_town
+           FROM user_play_months
+          WHERE user_id = ?`,
         [userId]
       );
     }

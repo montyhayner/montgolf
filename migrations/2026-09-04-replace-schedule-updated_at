@@ -1,0 +1,36 @@
+     -- delete schedule_history rows for same user and play_date ... only keeping last
+     -- entry for the date.
+     delete
+      from schedule_history 
+     where play_date >= '2026-08-01'
+       and changed_at >= '2026-08-01'
+	   and exists 
+	       (select *
+		      from schedule_history sh2
+			 where sh2.play_date = schedule_history.play_date
+			   and substr(sh2.changed_at,1,8) = substr(schedule_history.changed_at,1,8)
+			   and sh2.changed_at > schedule_history.changed_at);
+     -- for schedule rows with updated_at null, set updated_at to value of corresponding
+     -- schedule_history row (matching on user and date)
+     update schedule 
+        set updated_at = 
+            (select changed_at
+               from schedule_history sh
+              where sh.changed_at >= "2026-08-01" 
+                and sh.play_date = schedule.date
+                and sh.league_id = 1)
+      where schedule.updated_at is null
+        and schedule.is_playing = 1
+        and schedule.date >= '2026-08-01';
+
+-- As a check:  below select sql should return 0 rows (no update_at is null rows should
+-- be left.)
+    select s.*, sh.changed_at
+    from schedule s
+        , schedule_history sh
+    where sh.changed_at >= "2026-08-01" 
+    and s.updated_at is null
+    and s.is_playing = 1
+    and sh.play_date = s.date
+    and sh.league_id = 1
+    order by user_id, date,changed_at; 

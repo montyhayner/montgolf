@@ -7,38 +7,522 @@
    <link rel="stylesheet" href="/css/admin-identity.css">
 </head>
 <style>
-/* -------------------------------------------------------
-   BASE PAGE LAYOUT
-------------------------------------------------------- */
+/* ======================================================
+   GLOBAL PAGE LAYOUT — GRID STRUCTURE
+====================================================== */
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 0;
   padding: 0;
   background: #f5f5f5;
+
+  /* Three-row grid:
+     1. Top nav
+     2. Identity bar
+     3. Two-pane content area
+  */
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.page {
-  max-width: 1100px;
-  margin: 20px auto;
-  padding: 16px 20px 40px;
-  background: #fff;
+/* ======================================================
+   TOP NAV BAR — FULL WIDTH
+====================================================== */
+#top-nav-container {
+  grid-row: 1;
+  grid-column: 1 / span 2;
+  width: 100%;
+}
+
+/* ======================================================
+   ADMIN IDENTITY BAR — FULL WIDTH
+====================================================== */
+#admin-identity-container {
+  grid-row: 2;
+  grid-column: 1 / span 2;
+  width: 100%;
+  padding: 8px 16px;
+  background: #fff7d6;
+  border-bottom: 1px solid #e6c76f;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Unified status banner */
+#status-banner {
+  display: none;                /* hidden until shown */
+  margin: 4px auto 2px auto;  /* centered under title */
+  padding: 4px 5px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  font-size: 1.15rem;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+  max-width: 100%;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
 }
 
-.tee-sheet-container {
+/* Success */
+#status-banner.success {
+  background-color: #d4edda;
+  border: 2px solid #28a745;
+  color: #155724;
+}
+
+#status-banner.warning {
+  background-color: #f7f764;
+  border: 2px solid #28a745;
+  color: #0c3115;
+}
+
+/* Error */
+#status-banner.error {
+  background-color: #f8d7da;
+  border: 2px solid #dc3545;
+  color: #721c24;
+}
+
+/* Info */
+#status-banner.info {
+  background-color: #cce5ff;
+  border: 2px solid #004085;
+  color: #004085;
+}
+
+
+.system-message {
+  padding: 10px 14px;
+  margin: 10px 0;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.system-message.error {
+  background-color: #ffe5e5;
+  color: #b30000;
+  border: 1px solid #ff9999;
+}
+
+.system-message.success {
+  background-color: #e6ffe6;
+  color: #006600;
+  border: 1px solid #99ff99;
+}
+
+/* ======================================================
+   LEFT PANE — CHANGES HISTORY
+====================================================== */
+#leftPane {
+  grid-row: 3;
+  grid-column: 1;
+  width: 260px;
+  background: #f9fafb;
+  border-right: 2px solid #ddd;
+  overflow-y: auto;
+  padding: 20px;
+  flex-shrink: 0;
+}
+
+.changes-pane {
+  padding: 10px;
+}
+
+.changes-title {
+  color: #111827;
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Sections */
+.changes-section {
+  margin-bottom: 24px;
+}
+
+.changes-section-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 0.95rem;   /* smaller */
+  margin-bottom: 4px;
+}
+
+.changes-section-header.added {
+  color: #0a7c0a;
+}
+
+.changes-section-header.removed {
+  color: #b30000;
+}
+
+/* Change rows */
+.change-row {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  padding: 3px 0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  white-space: nowrap;        /* prevents wrapping */
+}
+
+.change-icon {
+  margin-right: 8px;
+  font-size: 1.1rem;
+  width: 20px;
+}
+
+.change-row.placed {
+  background: #b7e4b7;
+  border-left: 4px solid #0a7c0a;
+}
+
+.change-row.dropped {
+  background: #e2c5c5;
+  border-left: 4px solid #b30000;
+}
+
+.change-row.unplaced {
+  background: #f7f764;
+  border-left: 4px solid #f3f185;
+}
+
+.change-row.placed .change-icon {
+  color: #0a7c0a;
+}
+
+.change-row.dropped .change-icon {
+  color: #b30000;
+}
+
+.change-row.unplaced .change-icon {
+  color: #b45309;
+}
+
+.change-name {
+  flex: 1 1 auto;             /* allow name to grow */
+  font-weight: 500;
+  flex-grow: 1;
+  margin-left: 3px;
+  overflow: visible;          /* prevent truncation */
+}
+
+.change-detail {
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.80rem;
+  color: #444;
+  flex: 0 0 auto;             /* fixed width for right column */
+  margin-left: 3px;
+  min-width: 110px;           /* enough room for “1d 14h 47m ago” */
+  white-space: nowrap;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;   /* spread buttons evenly */
+  gap: 12px;                        /* spacing between buttons */
+}
+
+.modal-buttons button {
+  flex: 1;                          /* each button same width */
+  padding: 10px 0;
+  font-size: 0.9rem;
+}
+
+/* Explanation for unplaced golfers */
+.unplaced-explanation {
+  font-size: 0.9rem;
+  color: #444;
+  margin-bottom: 12px;
+  background: #f7f764;
+  padding: 8px;
+  border-radius: 6px;
+  border-left: 4px solid #b45309;
+}
+
+/* Allocate Tee Times button */
+.allocate-btn {
+  width: 100%;
+  padding: 10px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.allocate-btn:hover {
+  background: #1d4ed8;
+}
+
+
+/* FULLSCREEN OVERLAY FOR ALL MODALS */
+.modal-overlay,
+.leave-overlay,
+.send-notifications-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* UNIFIED MODAL WINDOW */
+.modal-content,
+.leave-window,
+.send-notifications-window {
+  background: #fff;
+  padding: 28px 36px;
+  border-radius: 10px;
+  width: 520px;
+  max-width: 90%;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: center; /* ⭐ Centers the title and text */
+}
+
+#notifyModal {
+  position: fixed;
+}
+/* ======================================================
+   RESTORE SEND NOTIFICATIONS MODAL FORMATTING
+====================================================== */
+
+/* Overlay behavior (production-style show/hide) */
+.notify-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  display: none;                 /* hidden by default */
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.notify-overlay.show {
+  display: flex;
+}
+
+/* Main modal window */
+.notify-modal-window {
+  background: linear-gradient(#ffffff, #f7faff);
   width: 72%;
+  max-width: 600px;
+  min-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 28px;
+  border-radius: 10px;
   margin: 0 auto;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  animation: popIn 0.18s ease-out;
 }
 
-/* -------------------------------------------------------
+/* Modal title */
+.notify-modal-window h2 {
+  margin-top: 0;
+  margin-bottom: 18px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  padding-bottom: 10px;
+  background: #4a90e2;
+  border-radius: 6px;
+  color: white;
+}
+
+/* Fix Optional Message textarea height */
+.notify-modal-window textarea,
+#notifyMessage {
+  min-height: 120px;     /* ensures a comfortable writing area */
+  height: 120px;         /* prevents collapse */
+  resize: vertical;      /* still allows user expansion */
+}
+
+/* Make the textarea full width and proper height */
+#notifyMessage,
+.notify-modal-window textarea {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  min-height: 140px;   /* matches production feel */
+  height: 140px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  font-size: 14px;
+  box-sizing: border-box;   /* prevents shrinking */
+}
+
+/* Ensure the entire Email Body section stays full width */
+.notify-section {
+  width: 100%;
+}
+
+/* Make the label appear ABOVE the textarea */
+.notify-modal-window label[for="notifyMessage"] {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Two-column layout for options */
+.notify-sections-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.notify-section {
+  padding: 4px 6px;
+  background: #f7faff;
+  border-radius: 4px;
+  border: 1px solid #e0e6ef;
+  flex: 1;
+  margin-bottom: 20px;
+}
+
+/* Checkbox group */
+.notify-checkbox-group label {
+  display: block;
+  margin: 6px;
+}
+
+/* Preview window */
+.notify-preview {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 15px;
+  max-height: 60vh;
+  overflow-y: auto;
+  white-space: normal;
+}
+
+/* Bottom buttons */
+.send-notifications-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.send-notifications-buttons button {
+  flex: 1;
+  padding: 10px 0;
+  font-size: 0.9rem;
+}
+
+/* ======================================================
+   FIX UNSAVED NOTIFICATIONS MODAL (LEAVE WARNING)
+====================================================== */
+
+/* Restore production overlay behavior */
+.leave-warning-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  display: none;                 /* hidden until JS shows it */
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.leave-warning-overlay.show {
+  display: flex;
+}
+
+/* Restore production modal window formatting */
+.leave-warning-window {
+  background: #ffffff;
+  width: 420px;                  /* production width */
+  padding: 24px 28px;            /* production spacing */
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  animation: popIn 0.18s ease-out;
+  text-align: center;            /* centers title + text */
+}
+
+/* Title */
+.leave-warning-window .modal-title {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #222;
+}
+
+/* Body text */
+.leave-warning-window .modal-text {
+  font-size: 15px;
+  color: #444;
+  margin-bottom: 22px;
+  line-height: 1.45;
+}
+
+/* Buttons */
+.leave-warning-window .modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.leave-warning-window .modal-buttons button {
+  flex: 1;
+  padding: 10px 0;
+  font-size: 0.9rem;
+}
+
+/* ======================================================
+   MAIN CONTENT — TEE SHEET EDITOR
+====================================================== */
+#mainContent {
+  grid-row: 3;
+  grid-column: 2;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 30px;
+}
+
+#mainContent .page {
+  margin: 0 auto;
+  max-width: 1100px;
+}
+
+/* ======================================================
    HEADER
-------------------------------------------------------- */
+====================================================== */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 4px;
+  margin-top: 0;
   margin-bottom: 8px;
   padding-bottom: 4px;
   border-bottom: 1px solid #ccc;
@@ -60,7 +544,7 @@ body {
   font-weight: 600;
 }
 
-.page-date {
+#page-title {
   margin-top: 4px;
   font-size: 1.25rem;
   font-weight: 500;
@@ -73,9 +557,9 @@ body {
   line-height: 1.3;
 }
 
-/* -------------------------------------------------------
+/* ======================================================
    BUTTONS
-------------------------------------------------------- */
+====================================================== */
 .primary-action-btn {
   background-color: #0078d4;
   color: white;
@@ -87,7 +571,7 @@ body {
 }
 
 .primary-action-btn:hover {
-  background-color: #2f6fc2;  
+  background-color: #2f6fc2;
 }
 
 .primary-action-btn:disabled {
@@ -109,15 +593,22 @@ body {
   background-color: #d5d5d5;
 }
 
-.has-changes::after {
-  content: "●";
-  color: #d00;
-  margin-left: 6px;
-  font-size: 0.9rem;
-  vertical-align: middle;
+.secondary-action-btn.dirty {
+  background-color: #e0e0e0;   /* lighter gray */
+  border-color: #3f3f3f;
+  cursor: pointer;
+  opacity: 1;
 }
 
-/* Centered button row */
+.secondary-action-btn.dirty:hover {
+  background-color: #d5d5d5;
+}
+
+.secondary-action-btn:disabled {
+  background-color: #e6e6e6;
+  cursor: not-allowed;
+}
+
 .button-row {
   display: flex;
   justify-content: center;
@@ -125,47 +616,9 @@ body {
   margin-bottom: 20px;
 }
 
-.change-add-row {
-  background: #e8f7e8;
-  border-left: 4px solid #0a7a0a;
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-
-.change-drop-row {
-  background: #fde8e8;
-  border-left: 4px solid #b00020;
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-
-.jump-btn {
-  padding: 2px 6px;
-  font-size: 0.75rem;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  background: #f3f4f6;
-  cursor: pointer;
-}
-
-.jump-btn:hover {
-  background: #e5e7eb;
-}
-
-.highlight-jump {
-  animation: jumpHighlight 1.5s ease-out;
-}
-
-@keyframes jumpHighlight {
-  from { background: #fff3cd; }
-  to   { background: transparent; }
-}
-
-/* -------------------------------------------------------
+/* ======================================================
    TABLE
-------------------------------------------------------- */
+====================================================== */
 table.tee-sheet {
   width: 75%;
   border-collapse: collapse;
@@ -228,650 +681,239 @@ table.tee-sheet th {
   outline-offset: 2px;
 }
 
-.subgroup-tag {
-  font-size: 11px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-/* -------------------------------------------------------
-   STATUS BAR
-------------------------------------------------------- */
-.header .status-bar {
-  margin-top: 4px;
-  margin-bottom: 4px;
-  font-size: 0.95rem;
-  text-align: center;
-  color: #4b5563;
-}
-
-.header .status-bar span {
-  margin-right: 12px;
-}
-
-.header .status-bar .dirty {
-  color: #b45309;
-  font-weight: 600;
-}
-
-/* -------------------------------------------------------
-   SYSTEM MESSAGE
-------------------------------------------------------- */
-#system-message {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-  display: none;
-}
-
-#system-message.success {
-  display: block;
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-#system-message.error {
-  display: block;
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-/* -------------------------------------------------------
-   BUSY OVERLAY
-------------------------------------------------------- */
-#pageBusyOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(2px);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-}
-
-#pageBusyOverlay .spinner {
-  width: 48px;
-  height: 48px;
-  border: 6px solid #ccc;
-  border-top-color: #2a7ae2;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* -------------------------------------------------------
-   PLACEMENT HIGHLIGHTS
-------------------------------------------------------- */
-.placed {
-  background-color: #d4edda !important;
-}
-
-.unplaced {
-  background-color: #f8d7da !important;
-}
-
-.changes-section-header {
-  font-weight: bold;
-  margin-top: 15px;
-  margin-bottom: 5px;
-  font-size: 1.1em;
-}
-
-.changes-section-header.added {
-  color: #0a7c0a;
-}
-
-.changes-section-header.removed {
-  color: #b30000;
-}
-
-.change-row {
-  display: flex;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.change-icon {
-  font-size: 1.2em;
-  margin-right: 10px;
-}
-
-.change-icon.added {
-  color: #0a7c0a;
-}
-
-.change-icon.removed {
-  color: #b30000;
-}
-
-.change-name {
-  flex: 1;
+.change-count {
   font-weight: 500;
+  color: #555;
+  margin-left: 6px;
 }
 
-.change-detail {
-  color: #666;
-  font-size: 0.9em;
-}
-
-/* -------------------------------------------------------
-   MODALS
-------------------------------------------------------- */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 8px;
-  padding: 16px 20px;
-  max-width: 520px;
-  width: 100%;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
-  font-size: 14px;
-}
-
-.modal h2 {
-  margin-top: 0;
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #111827;
-}
-
-.modal p {
-  font-size: 15px;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 12px;
-}
-
-.modal pre {
-  font-size: 13px;
-  font-weight: 600;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  padding: 10px;
+.placed-highlight {
+  background-color: #c8f7c5;   /* soft green */
+  border: 2px solid #4caf50;   /* strong green border */
   border-radius: 6px;
-  max-height: 200px;
-  overflow: auto;
+}
+  
+#changesPane {
+  width: 35%;   /* was 25% — now 10% wider */
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
-.modal-footer button {
-  padding: 8px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  cursor: pointer;
+#changesPane .change-row {
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
-.modal-footer .primary {
-  background: #2563eb;
-  color: white;
-  border-color: #1d4ed8;
+#mainPane {
+  width: 65%;   /* shrinks by same amount */
 }
 
-.modal-footer .primary:hover {
-  background: #1d4ed8;
-}
+/* ======================================================
+   FIX ADMIN IDENTITY BAR HEIGHT
+====================================================== */
 
-/* Unified modal overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
+#admin-identity-container {
+  padding: 1px 10px !important;     /* reduce vertical padding */
+  line-height: 1.1 !important;      /* tighten text height */
+  gap: 4px !important;              /* reduce spacing between lines */
+  background: #fff7d6;
+  border-bottom: 1px solid #e6c76f;
   display: flex;
-  align-items: center;
+  flex-direction: column;           /* stack lines cleanly */
   justify-content: center;
-  z-index: 5000;
-  animation: fadeIn 0.15s ease-out;
-  backdrop-filter: blur(3px);
-}
-
-/* Base hidden overlay */
-.notify-overlay,
-.leave-warning-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  backdrop-filter: blur(3px);
-  display: none;                 /* HIDDEN BY DEFAULT */
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  z-index: 5000;
-  animation: fadeIn 0.15s ease-out;
-}
-
-/* When JS wants to show it */
-.notify-overlay.show,
-.leave-warning-overlay.show {
-  display: flex;
 }
 
 
-.notify-modal-window {
-  background: linear-gradient(#ffffff, #f7faff);
-  width: 72%;
-  max-width: 600px;
-  min-width: 420px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 24px 28px;
-  border-radius: 10px;
-  margin: 0 auto;                /* ensures horizontal centering */
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  animation: popIn 0.18s ease-out;
-}
-
-/* Optional: make form sections look clean */
-.notify-modal-window h2, 
-.preview-modal-window h2 {
-  margin-top: 0;
-  margin-bottom: 18px;
-  text-align: center;
-  font-size: 20px;
-  font-weight: 600;
-  padding-bottom: 10px;
-  color: white;
-  background: #4a90e2;      /* soft professional blue */ 
-  border-radius: 6px; color: black; 
-}
-
-.notify-modal-window label,
-.notify-modal-window .section-title {
-  font-weight: 600;
-  margin-top: 18px;
-  display: block;
-  color: #333;
-}
-
-.notify-modal-window textarea {
-  width: 100%;
-  min-height: 60px;
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  resize: vertical;
-  font-size: 14px;
-}
-
-.modal-overlay.hide {
-  animation: fadeOut 0.15s ease-out forwards;
-}
-
-@keyframes fadeOut {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-
-.modal-content {
-  background: #fff;
-  padding: 24px 28px;
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  max-width: 480px;
-  width: 90%;
-  animation: popIn 0.18s ease-out;
-}
-
-.modal-content h2 {
-  margin-top: 0;
-  margin-bottom: 12px;
-  font-size: 1.4rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-/* ------------------------------
-   LEAVE WARNING MODAL
------------------------------- */
-
-.modal-overlay.leave-warning {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.45);
-  backdrop-filter: blur(3px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 5000;
-  animation: fadeIn 0.15s ease-out;
-}
-
-.leave-warning-window {
-  background: #ffffff;
-  width: 420px;
-  padding: 24px 28px;
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  animation: popIn 0.18s ease-out;
-}
-
-.modal-title {
-  margin-top: 0;
-  margin-bottom: 12px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #222;
-}
-
-.modal-text {
-  font-size: 15px;
-  color: #444;
-  margin-bottom: 22px;
-  line-height: 1.45;
-}
-
-.modal-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-}
-
-/* Smooth fade + pop animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes popIn {
-  from { transform: scale(0.92); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
-
-#changesList li {
-  margin-bottom: 8px;
-  font-size: 1rem;
-  line-height: 1.3;
-}
-
-.change-add {
-  color: #0a7a0a;
-  font-weight: 600;
-}
-
-.change-drop {
-  color: #b00020;
-  font-weight: 600;
-}
-
-.notify-modal {
-  width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-#notifyRecipientList {
-  border: 1px solid #ccc;
-  padding: 10px;
-  max-height: 250px;
-  overflow-y: auto;
-  background: #fafafa;
-}
-
-.notify-row {
-  display: flex;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.notify-row input {
-  margin-right: 10px;
-}
-
-.notify-row .notify-name {
-  flex: 1;
-}
-
-#notifyMessage {
-  width: 100%;
-  height: 120px;
-  resize: vertical;
-}
-
-#notifyPreviewBody h3 {
-  text-align: center;
-  margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.notify-sections-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 20px;
-}
-
-.notify-section {
-  padding: 4px 6px;
-  background: #f7faff;
-  border-radius: 4px;
-  border: 1px solid #e0e6ef;
-  flex: 1;
-  margin-bottom: 20px;
-}
-
-.notify-checkbox-group label {
-  display: block;
-  margin: 6px;
-}
-
-.notify-preview {
-  background: #fff;
-  border: 1px solid #ccc;
-  padding: 15px;
-  max-height: 60vh;
-  overflow-y: auto;
-  white-space: normal;
-}
-
-.modal-content .modal-footer,
-.modal-content .modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes popIn {
-  from { transform: scale(0.92); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
-
-/* Cancel button */
-#modal-cancel {
-  background: #e5e7eb;
-  color: #111827;
-  border-color: #d1d5db;
-}
-
-#modal-cancel:hover {
-  background: #d1d5db;
-}
 </style>
-
 <body>
-  <div id="admin-nav-container"></div>
+
+  <!-- ========================================= -->
+  <!-- FULL-WIDTH TOP NAV BAR (nav-loader.js)    -->
+  <!-- ========================================= -->
+  <div id="top-nav-container"></div>
+
+  <!-- ========================================= -->
+  <!-- FULL-WIDTH ADMIN IDENTITY BAR             -->
+  <!-- ========================================= -->
   <div id="admin-identity-container"></div>
 
-  <div class="page">
+  <div id="system-message" class="system-message" style="display:none;"></div>
 
-    <div class="header">
-      <div class="header-left"></div>
+  <!-- ========================================= -->
+  <!-- TWO-PANE LAYOUT (LEFT PANE + MAIN CONTENT) -->
+  <!-- ========================================= -->
+  <div id="leftPane">
 
-      <div class="header-center">
-        <h1 id="page-title">Tee Sheet Editor</h1>
-        <div class="status-bar">
-          <span id="status-dirty"></span>
-          <span id="status-message"></span>
+    <div class="changes-pane">
+
+      <h2 class="changes-title">Tee Sheet Changes</h2>
+ 
+      <!-- Dropped Golfers -->
+      <div id="changesDroppedSection" class="changes-section">
+        <h3 class="changes-section-header removed">
+          Dropped Golfers <span id="countDropped" class="change-count">(0)</span>
+        </h3>
+        <div id="changesDroppedList"></div>
+      </div>
+
+      <!-- Placed Golfers -->
+      <div id="changesPlacedSection" class="changes-section">
+        <h3 class="changes-section-header added">
+          Placed Golfers <span id="countPlaced" class="change-count">(0)</span>
+        </h3>
+        <div id="changesPlacedList"></div>
+      </div>
+
+      <!-- Unplaced Golfers -->
+      <div id="changesUnplacedSection" class="changes-section">
+        <h3 class="changes-section-header unplaced">
+          Unplaced Golfers <span id="countUnplaced" class="change-count">(0)</span>
+        </h3>
+
+        <div id="changesUnplacedList"></div>
+
+        <button id="btnGoAllocate" class="allocate-btn">
+          Allocate Tee Times
+        </button>
+
+        <div id="unplaced-explanation"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================= -->
+  <!-- MAIN CONTENT (TEE SHEET EDITOR)           -->
+  <!-- ========================================= -->
+  <div id="mainContent">
+
+    <div class="page">
+
+      <!-- HEADER -->
+      <div class="header">
+
+        <div class="header-left"></div>
+
+        <div class="header-center">
+          <h1 id="page-title">Tee Sheet Editor</h1>
+
+            <div id="status-banner"></div>   <!-- ⭐ NEW unified banner -->
+
+            <div class="status-bar">
+              <span id="status-dirty"></span>
+            </div>
+
+          <div id="page-date" class="page-date"></div>
         </div>
-        <div id="page-date" class="page-date"></div>
+
+        <div class="meta">
+          <div id="meta-league"></div>
+          <div id="meta-permissions"></div>
+        </div>
+
       </div>
 
+      <!-- BUTTON ROW -->
+      <div class="button-row">
+        <button id="btn-save" class="primary-action-btn" disabled
+                title="Save all edits made to the tee sheet.">
+          Save Changes
+        </button>
 
-      <div class="meta">
-        <div id="meta-league"></div>
-        <div id="meta-permissions"></div>
+        <button id="btn-revert" class="secondary-action-btn" disabled
+                title="Undo all unsaved edits and restore the live tee sheet.">
+          Revert
+        </button>
+
+        <button id="btn-rebuild" class="primary-action-btn"
+                title="Rebuild the tee sheet using current league golfer schedules and guests.">
+          Rebuild Tee Sheet
+        </button>
+
+        <button id="btn-sendNotifications" class="primary-action-btn"
+                title="Email golfers and staff about the updated tee sheet.">
+          Send Notifications
+        </button>
       </div>
-    </div>
 
-    <div class="button-row">
-      <button id="btn-save" title="Save all edits made to the tee sheet."
-           class="primary-action-btn" disabled>Save Changes</button>
-      <button id="btn-revert" title="Undo all unsaved edits and restore the live tee sheet."
-           class="secondary-action-btn">Revert</button>
-      <button id="btn-rebuild" title="Rebuild the tee sheet using current league golfer schedules and guests."
-           class="primary-action-btn">Rebuild Tee Sheet</button>
-      <button id="btn-lateChanges" title="View golfers who requested to play or who dropped out."
-           class="secondary-action-btn">Show Changes</button>
-      <button id="btn-applyChanges" title="Apply Adds/Drops to the tee sheet before arranging players."
-           class="primary-action-btn">Apply Changes</button>
-      <button id="btn-sendNotifications" title="Email golfers and staff about the updated tee sheet."
-           class="primary-action-btn">Send Notifications</button>
-    </div>
+      <!-- TEE SHEET TABLE -->
+      <table class="tee-sheet">
+        <thead>
+          <tr>
+            <th style="width: 90px;">Tee Time</th>
+            <th style="width: 80px;">Nine</th>
+            <th>Slot 1</th>
+            <th>Slot 2</th>
+            <th>Slot 3</th>
+            <th>Slot 4</th>
+          </tr>
+        </thead>
+        <tbody id="tee-sheet-body"></tbody>
+      </table>
 
-    <table class="tee-sheet">
-      <thead>
-        <tr>
-          <th style="width: 90px;">Tee Time</th>
-          <th style="width: 80px;">Nine</th>
-          <th>Slot 1</th>
-          <th>Slot 2</th>
-          <th>Slot 3</th>
-          <th>Slot 4</th>
-        </tr>
-      </thead>
-      <tbody id="tee-sheet-body"></tbody>
-    </table>
+    </div> <!-- END .page -->
 
-  </div> <!-- END .page -->
-
-  <div id="modal-backdrop" class="modal-backdrop">
-    <div class="modal">
-      <h2>Confirm Changes</h2>
-      <p>The following changes will be applied to the tee sheet:</p>
-      <pre id="modal-diff"></pre>
-      <div class="modal-footer">
-        <button id="modal-cancel">Cancel</button>
-        <button id="modal-confirm" class="primary">Confirm Save</button>
-      </div>
-    </div>
-  </div>
+  </div> <!-- END #mainContent -->
 
 
-<div id="changesModal" class="modal-overlay" style="display:none;">
-  <div class="modal-content">
-    <h2>Changes Since Last Update</h2>
-
-    <div id="changesSummary"
-         style="text-align:center; margin-bottom:12px; font-weight:600;"></div>
-
-    <div id="changesList"></div>
-
-    <div style="margin-top:16px; font-size:0.9rem; color:#555; text-align:center;">
-      These changes will be applied when you click <strong>Apply Changes</strong>.
-    </div>
-
-    <div class="modal-actions">
-      <button id="closeChangesModal" class="btn btn-secondary">Close</button>
-      <button id="applyChangesFromModal" class="primary-action-btn">Apply Changes</button>
-    </div>
-  </div>
-</div>
+  <!-- ========================================= -->
+  <!-- MODALS (unchanged)                        -->
+  <!-- ========================================= -->
 
   <div id="notifyModal" class="notify-overlay" style="display:none;">
-  <div class="notify-modal-window">
+    <div class="notify-modal-window">
 
-    <!-- STEP 1 -->
-    <div id="notifyStep1">
-      <h2>Send Notifications</h2>
+      <!-- STEP 1 -->
+      <div id="notifyStep1">
+        <h2>Send Notifications</h2>
 
-      <div class="notify-sections-row">
+        <div class="notify-sections-row">
 
-        <div class="notify-section">
-          <label><strong>Recipients:</strong></label>
-          <div class="notify-checkbox-group">
-            <label><input type="checkbox" id="recTeeSheetPlayers"> Tee sheet players</label>
-            <label><input type="checkbox" id="recUnplacedGolfers"> Unplaced golfers</label>
-            <label><input type="checkbox" id="recLeagueAdmins"> League admins</label>
-            <label><input type="checkbox" id="recClubStaff"> Club staff</label>
+          <div class="notify-section">
+            <label><strong>Recipients:</strong></label>
+            <div class="notify-checkbox-group">
+              <label><input type="checkbox" id="recTeeSheetPlayers"> Tee sheet players</label>
+              <label><input type="checkbox" id="recUnplacedGolfers"> Unplaced golfers</label>
+              <label><input type="checkbox" id="recLeagueAdmins"> League admins</label>
+              <label><input type="checkbox" id="recClubStaff"> Club staff</label>
+            </div>
           </div>
+
+          <div class="notify-section">
+            <label><strong>Email Body:</strong></label>
+            <div class="notify-checkbox-group">
+              <label><input type="checkbox" id="bodyIncludeTeeSheet"> Include full tee sheet</label>
+              <label><input type="checkbox" id="bodyIncludeUnplaced"> Include unplaced golfers</label>
+            </div>
+          </div>
+
         </div>
 
         <div class="notify-section">
-          <label><strong>Email Body:</strong></label>
-          <div class="notify-checkbox-group">
-            <label><input type="checkbox" id="bodyIncludeTeeSheet"> Include full tee sheet</label>
-            <label><input type="checkbox" id="bodyIncludeUnplaced"> Include unplaced golfers</label>
-          </div>
+          <label><strong>Optional message:</strong></label>
+          <textarea id="notifyMessage" placeholder="Enter an optional message..."></textarea>
         </div>
 
+        <div class="modal-buttons">
+          <button id="btnPreviewEmail" class="primary-btn" type="button">Preview Email</button>
+          <button type="button" onclick="closeNotifyModal()">Cancel</button>
+        </div>
       </div>
 
-      <div class="notify-section">
-        <label><strong>Optional message:</strong></label>
-        <textarea id="notifyMessage" placeholder="Enter an optional message..."></textarea>
+      <!-- STEP 2 -->
+      <div id="notifyStep2" style="display:none;">
+        <h2>Preview Email</h2>
+
+        <div id="notifyPreviewBody" class="notify-preview"></div>
+
+        <div class="modal-buttons">
+          <button id="btnSendEmail" class="primary-btn">Send Email</button>
+          <button id="btnBackToOptions">Back</button>
+        </div>
       </div>
 
-      <div class="modal-buttons">
-        <button id="btnPreviewEmail" class="primary-btn" type="button">Preview Email</button>
-        <button type="button" onclick="closeNotifyModal()">Cancel</button>
-      </div>
     </div>
-
-    <!-- STEP 2 -->
-    <div id="notifyStep2" style="display:none;">
-      <h2>Preview Email</h2>
-
-      <div id="notifyPreviewBody" class="notify-preview"></div>
-
-      <div class="modal-buttons">
-        <button id="btnSendEmail" class="primary-btn">Send Email</button>
-        <button id="btnBackToOptions">Back</button>
-      </div>
-    </div>
-
   </div>
-</div>
 
   <div id="unsavedModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:420px;">
@@ -893,7 +935,6 @@ table.tee-sheet th {
     <div class="spinner"></div>
   </div>
 
-  <!-- Leave Warning Modal -->
   <div id="leaveWarningModal" class="leave-warning-overlay" style="display:none;">
     <div class="leave-warning-window">
       <h3 class="modal-title">Unsaved Notifications</h3>
@@ -903,25 +944,15 @@ table.tee-sheet th {
       </p>
 
       <div class="modal-buttons">
-        <button id="leaveSendNotifications" class="primary-action-btn">
-          Send Notifications
-        </button>
-
-        <button id="leaveWithoutSending" class="secondary-action-btn">
-          Leave Without Sending
-        </button>
-
-        <button id="leaveCancel" class="secondary-action-btn">
-          Cancel
-        </button>
+        <button id="leaveSendNotifications" class="primary-action-btn">Send Notifications</button>
+        <button id="leaveWithoutSending" class="secondary-action-btn">Leave Without Sending</button>
+        <button id="leaveCancel" class="secondary-action-btn">Cancel</button>
       </div>
     </div>
   </div>
 
-<script src="/js/build-tee-sheet-HTML.js"></script>
-<script src="/js/notify-modal.js"></script>
-
 <script>
+console.log("INLINE SCRIPT: starting execution");  
 // -------------------------------------------------------
 // GLOBAL CONFIG & STATE
 // -------------------------------------------------------
@@ -937,12 +968,33 @@ let teeRows = [];
 let originalRows = [];
 let unsavedChanges = false;
 let currentPermissions = "Coordinator only";
+let unplacedGolfersCount = 0;
 
 let unsavedModalCallbacks = {
   onSave: null,
   onContinue: null,
-  onCancel: null
+  onCancel: null  
 };
+
+// Convert an ISO timestamp to a relative time (i.e. 1d 14h 43m 15s ago)
+function timeAgo(ts) {
+  const now = Date.now();
+  const then = new Date(ts).getTime();
+  let diff = Math.floor((now - then) / 1000);
+
+  const d = Math.floor(diff / 86400); diff %= 86400;
+  const h = Math.floor(diff / 3600); diff %= 3600;
+  const m = Math.floor(diff / 60);
+  const s = diff % 60;
+
+  let parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0) parts.push(`${s}s`);
+
+  return parts.join(" ") + " ago";
+}
 
 // -------------------------------------------------------
 // DATE INITIALIZATION
@@ -959,25 +1011,6 @@ document.getElementById("page-date").textContent =
 
 document.getElementById("meta-league").textContent = "League ID: " + leagueId;
 document.getElementById("meta-permissions").textContent = "Permissions: " + currentPermissions;
-
-// -------------------------------------------------------
-// ADMIN NAVIGATION
-// -------------------------------------------------------
-async function initAdminNav() {
-  const navContainer = document.getElementById("admin-nav-container");
-  const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
-  const html = await res.text();
-  navContainer.innerHTML = html;
-
-  const path = window.location.pathname;
-
-  document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
-    const href = link.getAttribute("href");
-    if (href === path || (href !== "/" && path.startsWith(href))) {
-      link.classList.add("active");
-    }
-  });
-}
 
 function attachNavGuard() {
   document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
@@ -1017,6 +1050,23 @@ const statusDirty = document.getElementById("status-dirty");
 const statusMessage = document.getElementById("status-message");
 const tbody = document.getElementById("tee-sheet-body");
 
+function updateSaveButtonState() {
+  const btnSave = document.getElementById("btn-save"); // FIXED ID
+
+  if (!btnSave) {
+    console.warn("Save button not found");
+    return;
+  }
+
+  btnSave.disabled = !window.unsavedChanges;
+
+  if (window.unsavedChanges) {
+    btnSave.classList.add("dirty");
+  } else {
+    btnSave.classList.remove("dirty");
+  }
+}
+
 // -------------------------------------------------------
 // SESSION & IDENTITY
 // -------------------------------------------------------
@@ -1044,6 +1094,7 @@ async function initAdminIdentity(session) {
   const role = container.querySelector("#identity-role");
   const name = container.querySelector("#identity-name");
   const leagueBadge = container.querySelector("#identity-league");
+
 
   name.innerText = `${session.first_name} ${session.last_name}`;
 
@@ -1076,6 +1127,31 @@ function hideBusy() {
   document.getElementById("pageBusyOverlay").style.display = "none";
 }
 
+function openNotifyModal() {
+  const modal = document.getElementById("notifyModal");
+  if (!modal) return;
+
+  // Reset steps
+  const step1 = document.getElementById("notifyStep1");
+  const step2 = document.getElementById("notifyStep2");
+
+  if (step1) step1.style.display = "block";
+  if (step2) step2.style.display = "none";
+
+  modal.style.display = "flex";   // ⭐ REQUIRED
+}
+
+window.closeNotifyModal = function closeNotifyModal() {
+  const modal = document.getElementById("notifyModal");
+  if (modal) modal.style.display = "none";
+
+  const step1 = document.getElementById("notifyStep1");
+  const step2 = document.getElementById("notifyStep2");
+
+  if (step1) step1.style.display = "block";
+  if (step2) step2.style.display = "none";
+};
+
 async function runWithBusy(asyncFn) {
   showBusy();
   try {
@@ -1106,58 +1182,108 @@ function showLeaveWarning(targetUrl) {
   };
 }
 
-function clearChangesBadge() {
-  const btn = document.getElementById("btn-lateChanges");
-  if (btn) {
-    btn.classList.remove("has-changes");
-    btn.title = "Show Changes";
+function showSystemMessage(text, type = "info") {
+  const msg = document.getElementById("system-message");
+  if (!msg) {
+    console.warn("system-message element missing:", text);
+    return;
+  }
+
+  msg.textContent = text;
+
+  msg.className = `system-message ${type === "error" ? "error" : "success"}`;
+  msg.style.display = "block";
+
+  // setTimeout(() => {
+  //   msg.style.display = "none";
+  // }, 16000);
+}
+// validate the data on the tee_sheet_working table against the schedule and guests
+// tables.  Save adds as added and deletes as removed.
+async function validateTeeSheetWorkingData() {
+  try {
+    // If added golfers count is greater than zero, Check for unplaced golfers.
+    let unplacedData;
+    unplacedData = { unplaced: [] };
+    unplacedGolfersCount = 0;
+
+    if (added.length > 0) {
+      const resUnplaced = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/unplaced`);
+      if (resUnplaced.ok) {
+        // /unplaced route returns     res.json({ unplaced })
+        unplacedData = await resUnplaced.json();
+        unplacedGolfersCount = resUnplaced.unplacedData.length;
+      }
+    }
+    const unplaced = unplacedData.unplaced || [];
+    console.log(`validateTeeSheetWorkingData unplaced= ${unplaced}`);
+
+    // 3. If added/removed changes exist, show info message
+    if (total > 0) {
+      showSystemMessage(
+        `${total} change${total !== 1 ? "s" : ""} pending in the tee sheet.`,
+        "info"
+      );
+    }
+
+    // 4. Dirty-state rules:
+    // Save must be active if:
+    //   - admin made changes (unsavedChanges === true)
+    //   - OR there are unplaced golfers
+    const shouldBeDirty = unsavedChanges || unplaced.length > 0;
+
+    markDirty(shouldBeDirty);
+    // updateSaveButtonState();
+
+    // 5. Clear old banners
+    updateStatus("", "info");
+
+  } catch (err) {
+    console.error("Error checking pending changes:", err);
   }
 }
 
-function showSystemMessage(text, type = "info") {
-  const msg = document.getElementById("system-message");
-  msg.textContent = text;
-
-  msg.className = type === "error" ? "error" : "success";
-  msg.style.display = "block";
-
-  setTimeout(() => {
-    msg.style.display = "none";
-  }, 6000);
-}
-
+// get the changes (adds and deletes) made since the last save of the tee sheet whether
+// by automation (8pm cron job) or be prior save on "Edit Tee Sheet" page.
 async function checkForPendingChangesOnLoad() {
   try {
+    // 1. Check added/removed changes
     const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/changes`);
-    if (!res.ok) return;
-
-    const data = await res.json();
+    const data = res.ok ? await res.json() : { added: [], removed: [] };
+    // data returned by /changes route is  res.json({
+    //                                       added,
+    //                                       removed
     const added = data.added || [];
     const removed = data.removed || [];
+    window.latestChanges = { added, removed };
+
     const total = added.length + removed.length;
+    console.log(`checkForPendingChangesOnLoad added= ${added} 
+                 removed= ${removed} total= ${total}`);
 
-    if (total === 0) return;
+    // 2. If added golfers count is greater than zero, Check for unplaced golfers.
+    let unplacedData;
+    unplacedData = { unplaced: [] };
+    unplacedGolfersCount = 0;
 
-    // Add badge to Show Changes button
-    const btnLateChanges = document.getElementById("btn-lateChanges");
-    if (btnLateChanges) {
-      btnLateChanges.classList.add("has-changes");
-      btnLateChanges.title = `There are ${total} pending changes`;
+    if (added.length > 0) {
+      const resUnplaced = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/unplaced`);
+      if (resUnplaced.ok) {
+        // data returned from /unplaced route:    res.json({ unplaced })
+        unplacedData = await resUnplaced.json();
+        unplacedGolfersCount = resUnplaced.unplacedData.length;
+      }
     }
+    const unplaced = unplacedData.unplaced || [];
+    console.log(`checkForPendingChangesOnLoad unplaced= ${unplaced}`);
 
-    // Auto-open modal if more than 5 changes
-    if (total > 5) {
-      window.latestChanges = data;
-      renderChangesModal(data);
-      updateStatus("Loaded pending changes.", "info");
-      return;
+    // 3. If added/removed changes exist, show info message
+    if (total > 0) {
+      showSystemMessage(
+        `${total} change${total !== 1 ? "s" : ""} pending in the tee sheet.`,
+        "info"
+      );
     }
-
-    // Otherwise show a friendly banner
-    showSystemMessage(
-      `${total} change${total !== 1 ? "s" : ""} pending. Click "Show Changes" to review.`,
-      "info"
-    );
 
   } catch (err) {
     console.error("Error checking pending changes:", err);
@@ -1208,45 +1334,224 @@ function markDirty(isDirty = true) {
   unsavedChanges = !!isDirty;
 
   const btnSave = document.getElementById("btn-save");
+  const btnRevert = document.getElementById("btn-revert");
   if (!btnSave) return;
 
   if (isDirty) {
     btnSave.disabled = false;
+    btnRevert.disabled = false;
     btnSave.classList.add("dirty");
+    btnRevert.classList.add("dirty");
     if (statusDirty) statusDirty.style.display = "inline";
   } else {
     btnSave.disabled = true;
+    btnRevert.disabled = true;
     btnSave.classList.remove("dirty");
+    btnRevert.classList.remove("dirty");
     if (statusDirty) statusDirty.style.display = "none";
   }
 }
 
 function updateStatus(message, type = "info") {
-  statusMessage.textContent = message;
-  statusMessage.className = "status-msg";
+  const banner = document.getElementById("status-banner");
 
-  if (type === "success") statusMessage.classList.add("status-success");
-  else if (type === "error") statusMessage.classList.add("status-error");
-  else statusMessage.classList.add("status-info");
+  banner.textContent = message;
+
+  // Reset classes
+  banner.className = "";
+  banner.classList.add(type);
+
+  banner.style.display = "block";
+
+  // Optional fade-out after 4 seconds
+  // setTimeout(() => {
+  //   banner.style.display = "none";
+  // }, 4000);
+}
+
+
+// ==========================================================================
+// ==========================================================================
+// new functions for autoPopulation of Changes Pane (left pane)
+// ==========================================================================
+// ==========================================================================
+
+// get pending tee sheet changes since last save of Tee Sheet (possibly 
+// after 8pm cron job to do the inital population of the tee_sheet table).
+async function loadPendingChanges() {
+  console.log("loadPendingChanges() - is starting");
+  const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/changes`);
+  // data returned by /changes route is  res.json({
+  //                                       added,
+  //                                       removed
+  data = res.json();
+  const added = data.added || [];
+  const removed = data.removed || [];
+  window.latestChanges = { added, removed };
+
+  const total = added.length + removed.length;
+  console.log(`loadPendingChanges added= ${added} 
+               removed= ${removed} total= ${total}`);
+}
+
+function renderChangesPane() {
+  console.log("renderChangesPane() - is starting");
+  const { added = [], removed = [] } = window.latestChanges || {};
+  const { placed = [], unplaced = [] } = window.latestApplyResult || {};
+
+  const droppedList = document.getElementById("changesDroppedList");
+  const placedList = document.getElementById("changesPlacedList");
+  const unplacedList = document.getElementById("changesUnplacedList");
+
+  droppedList.innerHTML = "";
+  placedList.innerHTML = "";
+  unplacedList.innerHTML = "";
+
+  // Update counts
+  document.getElementById("countDropped").textContent = `(${removed.length})`;
+  document.getElementById("countPlaced").textContent = `(${placed.length})`;
+  document.getElementById("countUnplaced").textContent = `(${unplaced.length})`;
+  const unplacedCount = unplaced.length;
+  updateUnplacedExplanation(unplacedCount);
+
+  // Dropped golfers
+  removed.forEach(r => {
+    droppedList.innerHTML += `
+      <div class="change-row dropped">
+        <span class="change-icon">✖</span>
+        <span class="change-name">${r.first_name} ${r.last_name}</span>
+        <span class="change-detail">${timeAgo(r.changed_at)}</span>
+      </div>`;
+  });
+
+  // Placed golfers
+  placed.forEach(r => {
+    placedList.innerHTML += `
+      <div class="change-row placed">
+        <span class="change-icon">✔</span>
+        <span class="change-name">${r.first_name} ${r.last_name}</span>
+        <span class="change-detail">${timeAgo(r.requested_at)}</span>
+      </div>`;
+  });
+
+  // Unplaced golfers
+  unplaced.forEach(r => {
+    unplacedList.innerHTML += `
+      <div class="change-row unplaced">
+        <span class="change-icon">⚠</span>
+        <span class="change-name">${r.first_name} ${r.last_name}</span>
+        <span class="change-detail">${timeAgo(r.requested_at)}</span>
+      </div>`;
+  });
+}
+
+function applyPlacedToGrid() {
+  const { added = [], removed = [] } = window.latestChanges || {};
+
+  for (const golfer of added) {
+    placeGolferById(golfer.user_id);   // your existing placement logic
+  }
+}
+
+function highlightPlacedInGrid() {
+  console.log("highlightPlacedInGrid() - started")
+ const { placed = [], unplaced = [] } = window.latestApplyResult || {};
+
+  for (const golfer of placed) {
+    const pill = document.querySelector(`[data-user-id="${golfer.user_id}"]`);
+    if (pill) {
+      const slotDiv = pill.parentElement;
+      slotDiv.classList.add("placed-highlight");
+    }
+  }
+}
+// -------------------------------------------------------
+// TEE SHEET LOADING & RENDERING
+// -------------------------------------------------------
+async function fetchTeeSheetInit() {
+  console.log("fetchTeeSheetInit() - is starting");
+  updateStatus("Loading tee sheet...", "info");
+
+  try {
+    const res1 = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/validate1`);
+    if (!res1.ok) throw new Error("/validate1 - Failed to load tee sheet");
+    // res.json back from /validate1 is:   res.json(fresh); ... array of tee_sheet_working
+    
+    // eliminate any duplicate names found on tee_sheet_working data
+    const res2 = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/validate2`);
+    if (!res2.ok) throw new Error("/validate2 - Failed to load tee sheet");
+    // good return from /validate2 is     res.json(workingRows);
+
+    const data = await res2.json();
+    teeRows = data;
+    originalRows = JSON.parse(JSON.stringify(data));
+
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error loading tee sheet.", "error");
+  }
 }
 
 // -------------------------------------------------------
 // TEE SHEET LOADING & RENDERING
 // -------------------------------------------------------
-async function fetchTeeSheet() {
+async function fetchTeeSheetAfterRebuildOrRevert(rebuild = false) {
+  console.log("fetchTeeSheetAfterRebuildOrRevert() - is starting");
   updateStatus("Loading tee sheet...", "info");
 
   try {
-    const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}`);
-    if (!res.ok) throw new Error("Failed to load tee sheet");
+    const res1 = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/validate1`);
+    if (!res1.ok) throw new Error("/validate1 - Failed to load tee sheet");
+    // res.json back from /validate1 is:   res.json(fresh); ... array of tee_sheet_working
+    
+    // eliminate any duplicate names found on tee_sheet_working data
+    const res2 = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/validate2`);
+    if (!res2.ok) throw new Error("/validate2 - Failed to load tee sheet");
+    // good return from /validate2 is     res.json(workingRows);
 
-    const data = await res.json();
+    const data = await res2.json();
     teeRows = data;
     originalRows = JSON.parse(JSON.stringify(data));
+    await checkForPendingChangesOnLoad();
+    console.log("window.latestChanges:", window.latestChanges);
+    if (window.latestChanges &&
+      (Array.isArray(window.latestChanges.added) ||
+        Array.isArray(window.latestChanges.removed))) {
 
+      const added = Array.isArray(window.latestChanges.added)
+        ? window.latestChanges.added
+        : [];
+
+      const removed = Array.isArray(window.latestChanges.removed)
+        ? window.latestChanges.removed
+        : [];
+
+      console.log(`Added count: ${added.length}, Removed count: ${removed.length}`);
+
+      if (added.length > 0 || removed.length > 0) {
+        console.log("Calling applyChangesToTeeSheet...");
+        await applyChangesToTeeSheet(removed, added, false);
+        console.log("applyChangesToTeeSheet completed.");
+      } else {
+        if (rebuild) {
+          updateStatus("Tee sheet rebuilt successfully.", "success");
+        } else {
+          updateStatus("Tee sheet reverted successfully.", "success");
+        }
+        markDirty(false);
+      }  
+    } else {
+      console.log("latestChanges arrays not available — skipping applyChangesToTeeSheet.");
+      if (rebuild) {
+        updateStatus("Tee sheet rebuilt successfully.", "success");
+      } else {
+        updateStatus("Tee sheet reverted successfully.", "success");
+      }
+      markDirty(false);
+    }
+    renderChangesPane();
     renderTeeSheetGrid();
-    markDirty(false);
-    updateStatus("Loaded tee sheet.", "info");
+    highlightPlacedInGrid();
 
   } catch (err) {
     console.error(err);
@@ -1255,6 +1560,7 @@ async function fetchTeeSheet() {
 }
 
 function renderTeeSheetGrid() {
+  console.log("renderTeeSheetGrid() - is starting");
   tbody.innerHTML = "";
 
   teeRows.forEach((row, rowIndex) => {
@@ -1346,6 +1652,7 @@ function handleDragLeave(e) {
 }
 
 function handleDrop(e) {
+  console.log("handleDrop function fired");
   e.preventDefault();
   e.currentTarget.classList.remove("drop-target");
   if (!dragSource) return;
@@ -1355,7 +1662,10 @@ function handleDrop(e) {
 
   swapGolferSlots(dragSource.rowIndex, dragSource.slot, targetRowIndex, targetSlot);
   renderTeeSheetGrid();
+  console.log("handleDrop function after renderTeeSheetGrid");
+  highlightPlacedInGrid();
   markDirty(true);
+  console.log("handleDrop function completed");
 }
 
 function swapGolferSlots(fromRow, fromSlot, toRow, toSlot) {
@@ -1366,24 +1676,51 @@ function swapGolferSlots(fromRow, fromSlot, toRow, toSlot) {
 
   const fromLnKey = "last_name" + fromSlot;
   const fromFnKey = "first_name" + fromSlot;
+  const fromIdKey = "user_id" + fromSlot;
+
   const toLnKey = "last_name" + toSlot;
   const toFnKey = "first_name" + toSlot;
+  const toIdKey = "user_id" + toSlot;
 
   const movingLast = fromRowObj[fromLnKey];
   const movingFirst = fromRowObj[fromFnKey];
+  const movingId = fromRowObj[fromIdKey];
 
   const targetLast = toRowObj[toLnKey];
   const targetFirst = toRowObj[toFnKey];
+  const targetId = toRowObj[toIdKey];
 
   fromRowObj[fromLnKey] = targetLast || "";
   fromRowObj[fromFnKey] = targetFirst || "";
+  fromRowObj[fromIdKey] = targetId || null;
+
   toRowObj[toLnKey] = movingLast || "";
   toRowObj[toFnKey] = movingFirst || "";
+  toRowObj[toIdKey] = movingId || null;
 }
 
 function setupDragAndDrop() {
   // Handlers are attached in renderTeeSheetGrid()
 }
+
+function interceptNavigation(e) {
+  if (!window.unsavedChanges) return;
+
+  e.preventDefault();
+
+  showLeaveWithoutSavingModal(() => {
+    resetWorkingCopy().then(() => {
+      window.location = e.currentTarget.href;
+    });
+  });
+}
+
+async function resetWorkingCopy() {
+  await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/reset-working`, {
+    method: "POST"
+  });
+}
+
 
 // -------------------------------------------------------
 // SAVE / REVERT / REBUILD
@@ -1422,6 +1759,7 @@ function computeTeeSheetDiff(oldRows, newRows) {
 }
 
 async function saveChanges() {
+  console.log("saveChanges() - is starting");
   updateStatus("Saving changes...", "info");
 
   try {
@@ -1436,7 +1774,6 @@ async function saveChanges() {
     originalRows = JSON.parse(JSON.stringify(teeRows));
     markDirty(false);
     updateStatus("Changes saved.", "success");
-    clearChangesBadge();
 
   } catch (err) {
     console.error(err);
@@ -1455,10 +1792,9 @@ async function revertTeeSheet() {
     if (!res.ok) throw new Error("Revert failed");
 
     const data = await res.json();
-    teeRows = data;
-    originalRows = JSON.parse(JSON.stringify(data));
 
-    renderTeeSheetGrid();
+    const rebuild = false;
+    await fetchTeeSheetAfterRebuildOrRevert(rebuild);
     markDirty(false);
     updateStatus("Reverted to live tee sheet.", "info");
 
@@ -1481,69 +1817,13 @@ async function rebuildTeeSheet() {
     const data = await res.json();
     if (data.status !== "SUCCESS") throw new Error(data.message || "Rebuild failed");
 
-    await fetchTeeSheet();
-    markDirty(false);
-    updateStatus("Rebuild complete and saved.", "success");
+    const rebuild = true;
+    await fetchTeeSheetAfterRebuildOrRevert(rebuild);
 
   } catch (err) {
     console.error(err);
     updateStatus("Error rebuilding tee sheet.", "error");
   }
-}
-
-// -------------------------------------------------------
-// SHOW CHANGES MODAL
-// -------------------------------------------------------
-function renderChangesModal(data) {
-  const modal = document.getElementById("changesModal");
-  const summary = document.getElementById("changesSummary");
-  const list = document.getElementById("changesList");
-
-  const added = data.added || [];
-  const removed = data.removed || [];
-
-  const total = added.length + removed.length;
-  summary.textContent = `${total} change${total !== 1 ? "s" : ""} pending`;
-
-  list.innerHTML = "";
-
-  if (removed.length > 0) {
-    const header = document.createElement("div");
-    header.className = "changes-section-header removed";
-    header.textContent = "No Longer Playing";
-    list.appendChild(header);
-
-    removed.forEach(r => {
-      const row = document.createElement("div");
-      row.className = "change-row removed-row";
-      row.innerHTML = `
-        <span class="change-icon removed">✕</span>
-        <span class="change-name">${r.first_name} ${r.last_name}</span>
-        <span class="change-detail">no longer playing</span>
-      `;
-      list.appendChild(row);
-    });
-  }
-
-  if (added.length > 0) {
-    const header = document.createElement("div");
-    header.className = "changes-section-header added";
-    header.textContent = "Wants to Play";
-    list.appendChild(header);
-
-    added.forEach(a => {
-      const row = document.createElement("div");
-      row.className = "change-row added-row";
-      row.innerHTML = `
-        <span class="change-icon added">✓</span>
-        <span class="change-name">${a.first_name} ${a.last_name}</span>
-        <span class="change-detail">requested at ${formatTimestamp(a.requested_at)}</span>
-      `;
-      list.appendChild(row);
-    });
-  }
-
-  modal.style.display = "flex";
 }
 
 function formatTimestamp(ts) {
@@ -1552,10 +1832,48 @@ function formatTimestamp(ts) {
   return d.toLocaleString();
 }
 
+function updateUnplacedExplanation(countUnplaced) {
+  const box = document.getElementById("unplaced-explanation");
+  console.log("updateUnplacedExplanation() - countUnplaced:", countUnplaced);
+
+  if (countUnplaced > 0) {
+    box.innerHTML = `
+      <div class="unplaced-explanation">
+        There are not enough allocated tee times for the number of league golfers on this date.
+        Either allocate another tee time(s) or send notification of unplaced golfers.
+      </div>
+    `;
+  } else {
+    box.innerHTML = "";
+  }
+}
+
+function setupUnplacedWarningHandlers() {
+  console.log("setupUnplacedWarningHandlers() running...");
+
+  const btnGoAllocate = document.getElementById("btnGoAllocate");
+  console.log("btnGoAllocate element:", btnGoAllocate);
+
+  // 1b. Allocate Tee Times (bottom button in left pane)
+  document.getElementById("btnGoAllocate").addEventListener("click", (e) => {
+
+    // If no unsaved changes → navigate immediately
+    if (!window.unsavedChanges) {
+      window.location.href = "/admin/allocated-tee-times";
+      return;
+    }
+
+    // If unsaved changes → show modal
+    e.preventDefault();
+    pendingNavigationHref = "/admin/allocated-tee-times";
+  });
+}
+
 // -------------------------------------------------------
 // APPLY CHANGES (frontend → backend)
 // -------------------------------------------------------
-async function applyChangesToTeeSheet(removed, added) {
+async function applyChangesToTeeSheet(removed, added, isUserInitiated = true) {
+  console.log("applyChangesToTeeSheet() is starting");
   if (!Array.isArray(removed) || !Array.isArray(added)) {
     console.error("applyChangesToTeeSheet called without valid arrays:", removed, added);
     alert("Internal error: missing added/removed arrays.");
@@ -1573,18 +1891,27 @@ async function applyChangesToTeeSheet(removed, added) {
 
     if (!res.ok) throw new Error("Apply changes failed");
 
+    //    /apply-changes route, upon success, returns:
+    //    res.json({
+    //    status: "SUCCESS",
+    //    placed,
+    //    unplaced,
+    //    rows
+
     const data = await res.json();
-
+   
+    // we save two copies of the tee_sheet_working table data.  Later originalRows can
+    // be compared against teeRows after the admin does any dragging and dropping 
+    // of golfers.
     teeRows = data.rows;
-    originalRows = JSON.parse(JSON.stringify(teeRows));
+    originalRows = JSON.parse(JSON.stringify(teeRows)); //a separate copy of teeRow
 
+    // Render once
     renderTeeSheetGrid();
-    markDirty(true);
-    clearChangesBadge();
-
     updateStatus("Changes applied.", "success");
     window.notificationsSent = false;
 
+    // Store placed/unplaced
     window.latestApplyResult = {
       placed: data.placed || [],
       unplaced: data.unplaced || []
@@ -1593,9 +1920,66 @@ async function applyChangesToTeeSheet(removed, added) {
     console.log("Placed:", data.placed);
     console.log("Unplaced:", data.unplaced);
 
+    if(data.unplaced.length > 0) {
+      const msg = `Changes applied. Warning: Unplaced golfer`;
+      updateStatus(msg, "warning");
+    }
+    // Highlight placed golfers
+    highlightPlacedInGrid();
+    
   } catch (err) {
     console.error(err);
     updateStatus("Error applying changes.", "error");
+  }
+}
+
+async function saveTeeSheet() {
+  try {
+    console.log("=== CLIENT SAVE START ===");
+
+    const payload = { rows: teeRows };
+    const url = `/admin/api/tee-sheet/${leagueId}/${teeDate}/save`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error("Save failed: " + response.statusText);
+    }
+
+    const result = await response.json();
+    console.log("Save result:", result);
+
+    if (result.status === "SUCCESS") {
+
+      // Reset dirty state
+      markDirty(false);
+      // updateSaveButtonState();
+
+      // Show banner or modal
+      updateStatus("Saved successfully.", "success");
+
+      // Refresh left pane
+      renderChangesPane();
+
+    } else {
+      updateStatus("Save failed.", "error");
+
+      // Save failed → sheet is still dirty
+      markDirty(true);
+      // updateSaveButtonState();
+    }
+
+  } catch (err) {
+    console.error("Error saving tee sheet:", err);
+    updateStatus("Save failed.", "error");
+
+    // Save failed → sheet is still dirty
+    markDirty(true);
+    // updateSaveButtonState();
   }
 }
 
@@ -1608,57 +1992,43 @@ function setupButtonHandlers() {
   const btnSave = document.getElementById("btn-save");
   const btnRevert = document.getElementById("btn-revert");
   const btnRebuild = document.getElementById("btn-rebuild");
-  const btnLateChanges = document.getElementById("btn-lateChanges");
-  const btnApplyChanges = document.getElementById("btn-applyChanges");
   const btnSendNotifications = document.getElementById("btn-sendNotifications");
 
-  const modalBackdrop = document.getElementById("modal-backdrop");
-  const modalDiff = document.getElementById("modal-diff");
-  const modalCancel = document.getElementById("modal-cancel");
-  const modalConfirm = document.getElementById("modal-confirm");
 
   console.log("btnSave:", btnSave);
   console.log("btnRevert:", btnRevert);
   console.log("btnRebuild:", btnRebuild);
-  console.log("btnLateChanges:", btnLateChanges);
-  console.log("btnApplyChanges:", btnApplyChanges);
   console.log("btnSendNotifications:", btnSendNotifications);
 
-  console.log("Attaching handler: btnSave");
-  btnSave.addEventListener("click", () => {
-    const diff = computeTeeSheetDiff(originalRows, teeRows);
-    modalDiff.textContent = diff || "No changes detected.";
+btnSave.addEventListener("click", () => {
+  console.log("SAVE CLICKED");
+
+  console.log("unsavedChanges =", window.unsavedChanges);
+  console.log("originalRows =", originalRows);
+  console.log("teeRows =", teeRows);
+
+  const diff = computeTeeSheetDiff(originalRows, teeRows);
+  console.log("DIFF RESULT =", diff);
+
+  if (!diff) {
+    console.log("NO DIFF — exiting save handler");
+    modalDiff.textContent = "No changes detected.";
     modalBackdrop.style.display = "flex";
-  });
+    return;
+  }
 
-  console.log("Attaching handler: modalCancel");
-  modalCancel.addEventListener("click", () => {
-    modalBackdrop.style.display = "none";
+  runWithBusy(async () => {
+    await saveChanges();
   });
+  
+});
 
-  console.log("Attaching handler: modalConfirm");
-  modalConfirm.addEventListener("click", () => {
-    modalBackdrop.style.display = "none";
-    runWithBusy(async () => {
-      await saveChanges();
-    });
-  });
-
-  console.log("Attaching handler: changesModal close");
-  document.getElementById("closeChangesModal").addEventListener("click", () => {
-    const modal = document.getElementById("changesModal");
-    modal.classList.add("hide");
-    setTimeout(() => {
-      modal.style.display = "none";
-      modal.classList.remove("hide");
-    }, 150);
-  });
 
   console.log("Attaching handler: btnRevert");
   btnRevert.addEventListener("click", () => {
     guardUnsavedChanges("revert", {
       onSave: async () => {
-        await saveChanges();
+        await await saveTeeSheet();
         runWithBusy(async () => {
           await revertTeeSheet();
         });
@@ -1676,85 +2046,14 @@ function setupButtonHandlers() {
   btnRebuild.addEventListener("click", () => {
     guardUnsavedChanges("rebuild", {
       onSave: async () => {
-        await saveChanges();
+        await saveTeeSheet();
         runWithBusy(async () => {
           await rebuildTeeSheet();
-          clearChangesBadge();
         });
       },
       onContinue: () => {
         runWithBusy(async () => {
           await rebuildTeeSheet();
-          clearChangesBadge();
-        });
-      },
-      onCancel: () => {}
-    });
-  });
-
-  console.log("Attaching handler: btnLateChanges");
-  btnLateChanges.addEventListener("click", async () => {
-    updateStatus("Checking for schedule changes...", "info");
-
-    try {
-      const res = await fetch(`/admin/api/tee-sheet/${leagueId}/${teeDate}/changes`);
-      if (!res.ok) throw new Error("Failed to fetch changes");
-
-      const data = await res.json();
-
-      window.latestChanges = data;
-      renderChangesModal(data);
-
-      updateStatus("Changes loaded.", "success");
-    } catch (err) {
-      console.error(err);
-      updateStatus("Error loading changes.", "error");
-    }
-  });
-
-  document.getElementById("applyChangesFromModal").addEventListener("click", () => {
-    document.getElementById("changesModal").style.display = "none";
-
-    guardUnsavedChanges("apply-changes", {
-      onSave: async () => {
-        await saveChanges();
-        runWithBusy(async () => {
-          await applyChangesToTeeSheet(
-            window.latestChanges.removed,
-            window.latestChanges.added
-          );
-        });
-      },
-      onContinue: () => {
-        runWithBusy(async () => {
-          await applyChangesToTeeSheet(
-            window.latestChanges.removed,
-            window.latestChanges.added
-          );
-        });
-      },
-      onCancel: () => {}
-    });
-  });
-
-  console.log("Attaching handler: btnApplyChanges");
-  btnApplyChanges.addEventListener("click", () => {
-    guardUnsavedChanges("apply-changes", {
-      onSave: async () => {
-        await saveChanges();
-        runWithBusy(async () => {
-          await applyChangesToTeeSheet(
-            window.latestChanges?.removed || [],
-            window.latestChanges?.added || []
-          );
-        });
-      },
-      onContinue: () => {
-        runWithBusy(async () => {
-          await applyChangesToTeeSheet(
-            window.latestChanges?.removed || [],
-            window.latestChanges?.added || []
-          );
         });
       },
       onCancel: () => {}
@@ -1886,6 +2185,14 @@ function setupButtonHandlers() {
   });
 }
 
+async function saveTeeSheetDiscardingUnplaced() {
+  console.warn("Force saving tee sheet — unplaced golfers will be discarded.");
+
+  await saveTeeSheet();  // your existing save function
+
+  updateStatus("Saved (unplaced golfers discarded).", "warning");
+}
+
 // -------------------------------------------------------
 // NAVIGATION GUARD
 // -------------------------------------------------------
@@ -1904,54 +2211,104 @@ function guardNavigation(e, url) {
     showLeaveWarning(url);
     return;
   }
-
-  openUnsavedChangesModal({
-    onSave: async () => {
-      await saveChanges();
-      window.location.href = url;
-    },
-    onContinue: () => {
-      window.location.href = url;
-    },
-    onCancel: () => {}
-  });
 }
 
 // -------------------------------------------------------
-// BEFOREUNLOAD GUARD
+// Load Admin Nav Bar
 // -------------------------------------------------------
-function attachBeforeUnloadGuard() {
-  window.addEventListener("beforeunload", (e) => {
-    const hasAppliedChanges = !!window.latestApplyResult;
-    const unsent = hasAppliedChanges && !window.notificationsSent;
+async function loadAdminNav() {
+    console.log("loadAdminNav starting");
+    const navContainer = document.getElementById("top-nav-container");
+    if (!navContainer) return;
 
-    if (!unsavedChanges && !(hasAppliedChanges && unsent)) return;
+    const res = await fetch("/partials/admin-nav.html", { credentials: "include" });
+    const html = await res.text();
+    navContainer.innerHTML = html;
 
-    e.preventDefault();
-    e.returnValue = "";
-  });
+    // Highlight current page
+    const path = window.location.pathname;
+
+    // Highlight active nav link
+    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href === path || (href !== "/" && path.startsWith(href))) {
+            link.classList.add("active");
+        }
+    });
+
+    // Intercept navigation if unsaved changes exist
+    document.querySelectorAll(".admin-nav .nav-links a").forEach(link => {
+        link.addEventListener("click", interceptNavigation);
+    });
+
+    return true;
 }
 
 // -------------------------------------------------------
 // PAGE INITIALIZATION
 // -------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
-  await initAdminNav();
   const session = await fetchSessionInfo();
+  loadAdminNav();
   await initAdminIdentity(session);
 
   attachNavGuard();
-  attachBeforeUnloadGuard();
   setupUnsavedModalHandlers();
   setupDragAndDrop();
   setupButtonHandlers();
+  setupUnplacedWarningHandlers();
 
-  await fetchTeeSheet();
+  await fetchTeeSheetInit();
   await checkForPendingChangesOnLoad();
+  console.log("DOMContentLoaded - Pending changes check complete.");
+  console.log("window.latestChanges:", window.latestChanges);
+  // Diagnostic: show added/removed counts
+  if (window.latestChanges) {
+    console.log("DOMContentLoaded - latestChanges.added:", window.latestChanges.added);
+    console.log("DOMContentLoaded - latestChanges.removed:", window.latestChanges.removed);
+  } else {
+    console.log("DOMContentLoaded - latestChanges is NOT set.");
+  }
 
+  console.log("DOMContentLoaded - Evaluating whether to apply changes...");
+  if (window.latestChanges &&
+     (Array.isArray(window.latestChanges.added) ||
+      Array.isArray(window.latestChanges.removed))) {
+
+    const added = Array.isArray(window.latestChanges.added)
+      ? window.latestChanges.added
+      : [];
+
+    const removed = Array.isArray(window.latestChanges.removed)
+      ? window.latestChanges.removed
+      : [];
+
+    console.log(`Added count: ${added.length}, Removed count: ${removed.length}`);
+
+    if (added.length > 0 || removed.length > 0) {
+      console.log("Calling applyChangesToTeeSheet...");
+      await applyChangesToTeeSheet(removed, added, false);
+      console.log("applyChangesToTeeSheet completed.");
+    } else {
+      console.log("No changes to apply.");
+      updateStatus("Current Tee Sheet.", "success");
+      markDirty(false);
+    }  
+  } else {
+    console.log("latestChanges arrays not available — skipping applyChangesToTeeSheet.");
+    updateStatus("Current Tee Sheet.", "success");
+    markDirty(false);
+  }
+  renderChangesPane();
+  renderTeeSheetGrid();
+  highlightPlacedInGrid();
+  console.log("=== DOMContentLoaded END ===");
   console.log("Tee Sheet Editor initialized.");
 });
 
 </script>
+<script src="/js/notify-modal.js"></script>
+<script src="/js/build-tee-sheet-HTML.js"></script>
+
 </body>
 </html>

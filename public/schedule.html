@@ -526,11 +526,9 @@ document.addEventListener("DOMContentLoaded", () => {
           onSave: async () => {
             console.log(">>> DEBUG: nav link clicked - onSave callback");
             await saveSchedule();
-            window.onbeforeunload = null;
             window.location = link.href;
           },
           onContinue: () => {
-            window.onbeforeunload = null;
             console.log(">>> DEBUG: nav link clicked - onContinue callback");
             window.location = link.href;
           },
@@ -697,11 +695,9 @@ function loadNavBar() {
           requireNoUnsavedChanges({
             onSave: async () => {
               await saveSchedule();
-              window.onbeforeunload = null;
               window.location = link.href;
             },
             onContinue: () => {
-              window.onbeforeunload = null;
               window.location = link.href;
             },
             onCancel: () => {}
@@ -932,8 +928,11 @@ async function saveSchedule() {
   if (isAdminMode) {
     // ⭐ ADMIN OVERRIDE SAVE ROUTE
     url = `/admin/schedule/save/${origInTownStatus}/${sessionStartTS}`;
-
+    // returned res.json({ is ...
+    // status: "saved",
+    // schedule: scheduleObj
     payload = {
+      status,
       target_user_id: targetUserId,
       year,
       month,
@@ -1170,13 +1169,11 @@ function wireUpEventListeners() {
   requireNoUnsavedChanges({
     onSave: async () => {
       await saveSchedule();
-      window.onbeforeunload = null;
       picker.value = newValue;
       console.log(">>> DEBUG: wireUpEventListeners - onSave calling loadScheduleForCurrentMonth");
       loadScheduleForCurrentMonth();
     },
     onContinue: () => {
-      window.onbeforeunload = null;
       picker.value = newValue;
       console.log(">>> DEBUG: wireUpEventListeners - onContinue calling loadScheduleForCurrentMonth");
       loadScheduleForCurrentMonth();
@@ -1200,12 +1197,10 @@ function wireUpEventListeners() {
 document.getElementById("defaultBtn").addEventListener("click", () => {
   defaultJustRan = true;   // ⭐ Prevent reload overwrite
   regenerateDefaultSchedule();
-  window.onbeforeunload = null;
 });
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   clearSchedule();
-  window.onbeforeunload = null;
 });
 
  wireUpJumpToday();
@@ -1505,13 +1500,6 @@ function wireUpJumpToday() {
     }
   });
 }
-
-window.onbeforeunload = (e) => {
-  if (!unsavedChanges) return;
-  e.preventDefault();
-  e.returnValue = "";
-};
-
 
 </script>
 

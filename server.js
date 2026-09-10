@@ -348,14 +348,14 @@ function parseLocalDate(dateStr) {
 // AUTO‑PLACE GOLFERS (Simplified Model)
 // Places golfers into the first available slot (chronological order)
 // -----------------------------------------------------------------------------
-async function autoPlaceGolfers(leagueId, teeDate, addedGolfers, changedBy) {
-  // 1. Load working tee sheet (later tee times first)
+async function autoPlaceGolfers(leagueId, teeDate, addedGolfers) {
+  // 1. Load working tee sheet into rows array by ascending tee times.
   const rows = await dbAll(
     `SELECT *
        FROM tee_sheet_working
       WHERE league_id = ?
         AND tee_date = ?
-      ORDER BY tee_time DESC, starting_nine`,
+      ORDER BY tee_time ASC, starting_nine`,
     [leagueId, teeDate]
   );
 
@@ -374,10 +374,10 @@ async function autoPlaceGolfers(leagueId, teeDate, addedGolfers, changedBy) {
         row.user_id4
       ];
 
-      const emptyIndex = slots.findIndex(s => !s);
+      const emptyIndex = slots.findIndex(s => !Number.isInteger(s));
 
-      if (emptyIndex !== -1) {
-        const slotNum = emptyIndex + 1;
+      if (emptyIndex !== -1) {           //an empty slot was found
+        const slotNum = emptyIndex + 1;  //emptyIndex starts w 0, so we add 1 for slotNum
         const colUser  = `user_id${slotNum}`;
         const colFirst = `first_name${slotNum}`;
         const colLast  = `last_name${slotNum}`;
@@ -420,6 +420,108 @@ async function autoPlaceGolfers(leagueId, teeDate, addedGolfers, changedBy) {
 
   return { placed, unplaced, rows: updatedRows };
 }
+// get the unplaced golfers and return it to the frontend
+// 1. Get the unplaced golfers for the upcoming play_date and for the league by
+// getting all players playing today based on schedule but do not exist
+// on the tee_sheet table for today.
+  
+app.get("/admin/api/tee-sheet/:leagueId/:teeDate/unplaced", requireTeeSheetEditor,
+  async (req, res) => {
+    const { leagueId, teeDate } = req.params;
+    console.log("=== /UNPLACED ROUTE START ===");
+    console.log("leagueId:", leagueId, "teeDate:", teeDate);
+
+    try {
+      // 1. Load all golfers scheduled for this date and current league
+      //    into a js array:  schedule[]
+      const scheduled = await dbAll(
+        `SELECT DISTINCT id, first_name, last_name
+           FROM schedule
+              , users
+          WHERE schedule.date = ?
+            AND is_playing = 1
+            AND users.id = schedule.user_id
+            AND users.league_id = ?`,
+        [teeDate, leagueId]
+      );
+      // 1. Log scheduled golfers
+      console.log("Scheduled golfers:");
+      console.log(JSON.stringify(scheduled, null, 2));
+
+      // 2. Load tee sheet working rows
+      const rows = await dbAll(
+        `SELECT *
+           FROM tee_sheet_working
+          WHERE league_id = ?
+            AND tee_date = ?`,
+        [leagueId, teeDate]
+      );
+
+      console.log("tee_sheet_working rows (full dump):");
+      console.log(JSON.stringify(rows, null, 2));
+
+      // 3. Build a set of placed user_ids
+      const placedIds = new Set();
+        for (const row of rows) {
+          [row.user_id1, row.user_id2, row.user_id3, row.user_id4]
+            .filter(s => Number.isInteger(s))
+            .forEach(id => placedIds.add(id));
+        }
+
+      rows.forEach((row, idx) => {
+        console.log(`Row ${idx} tee_time=${row.tee_time} starting_nine=${row.starting_nine}`);
+        console.log("  Slots:", {
+          user_id1: row.user_id1,
+          user_id2: row.user_id2,
+          user_id3: row.user_id3,
+          user_id4: row.user_id4
+        });
+      });
+
+      // 4. Find unplaced golfers
+      const unplaced = scheduled.filter(g => !placedIds.has(g.id));
+
+      console.log("Placed IDs (raw):", Array.from(placedIds));
+      console.log("Unplaced golfers (computed):");
+      console.log(JSON.stringify(unplaced, null, 2));
+
+      for (const unplacedRow of unplaced) {
+
+        await dbRun(
+          `UPDATE schedule_history
+              SET is_unplaced = 1
+            WHERE play_date = ?
+              AND league_id = ?
+              AND user_id = ?
+              AND changed_at = (
+                  SELECT MAX(changed_at)
+                    FROM schedule_history
+                  WHERE play_date = ?
+                    AND league_id = ?
+                    AND user_id = ?
+              )`,
+          [
+            teeDate,
+            leagueId,
+            unplacedRow.id,
+            teeDate,
+            leagueId,
+            unplacedRow.id
+          ]
+        );
+        console.log("in /unplaced route - set is_unplaced = 1  teeDate=", teeDate,
+            " leagueId=", leagueId, "unplacedRow.id=", unplacedRow.id);
+      }
+
+      console.log("=== UNPLACED ROUTE END ===");
+      res.json({ unplaced });
+
+    } catch (err) {
+      console.error("Error in GET of /unplaced route - loading unplaced golfers:", err);
+      res.status(500).json({ error: "Server error loading unplaced golfers." });
+    }
+  }
+);
 
 // ------------------------------
 // SUPER ADMIN LEAGUE SELECTION
@@ -518,183 +620,641 @@ app.get("/auth/me", (req, res) => {
     return res.json(req.session.user);
 });
 
-// -----------------------------------------------------------------------------
-// GET CHANGES SINCE LAST TEE SHEET UPDATE
-// -------------------------------------------------------------------------------------------------
-// SHOW CHANGES (simplified model: only schedule adds/drops)
-// -------------------------------------------------------------------------------------------------
-app.get(
-  "/admin/api/tee-sheet/:leagueId/:teeDate/changes",
+// -------------------------------------------------------------------------------------------
+// get golfers who have dropped out of golfing on the upcoming tee date and get golfers
+// who decided at the last minute (so to speak) to play on the upcoming tee date.
+// We return an 'removed' array and a 'added" array back to the frontend.
+// -------------------------------------------------------------------------------------------
+app.get("/admin/api/tee-sheet/:leagueId/:teeDate/changes",
   requireTeeSheetEditor,
   async (req, res) => {
     try {
       const { leagueId, teeDate } = req.params;
       console.log("GET /admin/api/tee-sheet/:leagueId/:teeDate/changes - route start -", 
       " leagueId=", leagueId, " teeDate=", teeDate);
+      
+      // -----------------------------------------------------------------------
+      // 1. Find users who are scheduled to play on the current play date but are
+      //    not found on tee_sheet_working (each such golfer needs to be added
+      //    to the current tee_sheet_working table)  
+      //    Any such players are to be put in the "added" array to be passed back
+      //     to the frontend.
+      // -----------------------------------------------------------------------
+      const missingRows = await dbAll(
+        `SELECT missing.userId
+              , missing.firstName
+              , missing.lastName
+              , missing.updatedAt
+           FROM (SELECT LFT.user_id as userId
+                      , LFT.first_name AS firstName
+                      , LFT.last_name as lastName
+                      , LFT.updated_at AS updatedAt
+                      , RGHT.user_id
+                      , RGHT.first_name
+                      , RGHT.last_name
+                   FROM (SELECT user_id
+                              , first_name
+                              , last_name
+                              , updated_at
+		                       FROM (SELECT users.id AS user_id
+                                      , first_name
+                                      , last_name
+                                      , updated_at
+                                   FROM schedule
+                                      , users
+                                  WHERE schedule.date = ?
+                                    AND is_playing = 1
+                                    AND users.id = schedule.user_id
+                                    AND users.league_id = ?
+                         UNION
+                        SELECT DISTINCT guests.id as user_id
+                             , guest_first_name as first_name
+                             , guest_last_name as last_name
+                             , updated_at
+                          FROM guests
+                             , users
+                         WHERE guests.sponsor_user_id = users.id
+                           AND users.league_id = ?
+                           AND ? in 
+                               (guests.date1, guests.date2, guests.date3,
+                                guests.date4, guests.date5))) AS LFT
+								 
+                LEFT JOIN
 
-      // -----------------------------------------------------------------------
-      // 1. Find last tee sheet update time (baseline)
-      // -----------------------------------------------------------------------
-      const lastUpdateRow = await dbGet(
-        `SELECT MAX(edited_at) AS last_update
-           FROM tee_sheet_working
-          WHERE league_id = ?
-            AND tee_date = ?`,
-        [leagueId, teeDate]
+                (SELECT user_id
+                      , first_name
+                      , last_name			
+                   FROM (SELECT user_id1 as user_id
+                              , first_name1 as first_name
+                              , last_name1 as last_name
+                           FROM tee_sheet_working
+                          WHERE league_id = ?
+                            AND tee_date = ?
+                            AND user_id1 <> ''
+                 UNION
+                SELECT user_id2 as user_id
+                     , first_name2 as first_name
+                     , last_name2 as last_name
+                  FROM tee_sheet_working
+                 WHERE league_id = ?
+                   AND tee_date = ?
+                   AND user_id2 <> ''
+                 UNION
+                SELECT user_id3 as user_id
+                     , first_name3 as first_name
+                     , last_name3 as last_name
+                  FROM tee_sheet_working
+                 WHERE league_id = ?
+                   AND tee_date = ?
+                   AND user_id3 <> ''
+                 UNION
+                SELECT user_id4 as user_id
+                     , first_name4 as first_name
+                     , last_name4 as last_name
+                  FROM tee_sheet_working
+                 WHERE league_id = ?
+                   AND tee_date = ?
+                   AND user_id4 <> '')) AS RGHT
+  
+  		              ON RGHT.user_id = LFT.user_id
+	               WHERE RGHT.user_id is NULL) AS missing 
+              ORDER BY updatedAT ASC`,
+        [teeDate, leagueId, leagueId, teeDate, leagueId, teeDate,
+         leagueId, teeDate, leagueId, teeDate, leagueId, teeDate]
       );
 
-      const lastUpdate = lastUpdateRow?.last_update || null;
-
-      console.log("=== SHOW CHANGES (SIMPLIFIED) ===");
-      console.log("leagueId:", leagueId, "teeDate:", teeDate);
-      console.log("baseline lastUpdate:", lastUpdate);
-
-      // -----------------------------------------------------------------------
-      // 2. Load schedule_history rows AFTER lastUpdate
-      // -----------------------------------------------------------------------
-      const historyRows = await dbAll(
-        `SELECT 
-            sh.user_id,
-            sh.old_is_playing,
-            sh.new_is_playing,
-            sh.changed_at,
-            u.first_name,
-            u.last_name,
-            u.email
-         FROM schedule_history sh
-         JOIN users u ON u.id = sh.user_id
-        WHERE sh.league_id = ?
-          AND sh.play_date = ?
-          AND sh.changed_at > ?
-        ORDER BY sh.changed_at ASC`,
-        [leagueId, teeDate, lastUpdate || "1970-01-01 00:00:00"]
-      );
-
-      console.log("historyRows:", historyRows.length);
-
-      // -----------------------------------------------------------------------
-      // 3. Classify adds and drops
-      // -----------------------------------------------------------------------
       const added = [];
       const removed = [];
-
-      for (const row of historyRows) {
-        // ADD: was not playing → now playing
-        if (row.old_is_playing === 0 && row.new_is_playing === 1) {
-          added.push({
-            user_id: row.user_id,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            email: row.email,
-            requested_at: row.changed_at
-          });
-        }
-
-        // DROP: was playing → now not playing
-        if (row.old_is_playing === 1 && row.new_is_playing === 0) {
-          removed.push({
-            user_id: row.user_id,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            email: row.email
-          });
+      if (missingRows.length > 0) {
+        for (const row of missingRows) {
+          // ADD: was not playing → now playing
+            added.push({
+              user_id: row.userId,
+              first_name: row.firstName,
+              last_name: row.lastName,
+              requested_at: row.updatedAt
+            });
         }
       }
 
-      // -----------------------------------------------------------------------
-      // 4. Return simplified diff
-      // -----------------------------------------------------------------------
+      console.log("/CHANGES route - added=", added);
+
+      // ---------------------------------------------------------------------------
+      // 2. Find users who are on tee_sheet_working table to golf on current play
+      //    date but are not scheduled to play on the current play date.  Any such
+      //    players are to be put in the "removed" array to be passed back to the
+      //    frontend.
+      // ----------------------------------------------------------------------------
+  const extraRows = await dbAll(
+  `SELECT extra.userId
+        , extra.firstName
+        , extra.lastName
+        , extra.editedAt
+     FROM (SELECT LFT.user_id AS userId
+                , LFT.first_name AS firstName
+                , LFT.last_name AS lastName
+                , LFT.edited_at AS editedAt
+                , RGHT.user_id
+                , RGHT.first_name
+                , RGHT.last_name
+             FROM (SELECT user_id
+                        , first_name
+                        , last_name
+                        , edited_at			
+                     FROM (SELECT user_id1 as user_id
+                                , first_name1 as first_name
+                                , last_name1 as last_name
+                                , edited_at
+                             FROM tee_sheet_working
+                            WHERE league_id = ?
+                              AND tee_date = ?
+                              AND user_id1 <> ''
+                          UNION
+                          SELECT user_id2 as user_id
+                              , first_name2 as first_name
+                              , last_name2 as last_name
+                              , edited_at
+                            FROM tee_sheet_working
+                          WHERE league_id = ?
+                            AND tee_date = ?
+                            AND user_id2 <> ''
+                          UNION
+                          SELECT user_id3 as user_id
+                              , first_name3 as first_name
+                              , last_name3 as last_name
+                              , edited_at
+                            FROM tee_sheet_working
+                          WHERE league_id = ?
+                            AND tee_date = ?
+                            AND user_id3 <> ''
+                          UNION
+                          SELECT user_id4 as user_id
+                              , first_name4 as first_name
+                              , last_name4 as last_name
+                              , edited_at
+                            FROM tee_sheet_working
+                          WHERE league_id = ?
+                            AND tee_date = ?
+                            AND user_id4 <> '')) AS LFT
+  
+                    LEFT JOIN
+  
+
+                   (SELECT user_id
+                         , first_name
+                         , last_name
+		                  FROM (SELECT users.id AS user_id
+                                 , first_name
+                                 , last_name
+                              FROM schedule
+                                 , users
+                             WHERE schedule.date = ?
+                               AND is_playing = 1
+                               AND users.id = schedule.user_id
+                               AND users.league_id = ?
+                            UNION
+                           SELECT DISTINCT guests.id as user_id
+                                , guest_first_name as first_name
+                                , guest_last_name as last_name
+                             FROM guests
+                                , users
+                            WHERE guests.sponsor_user_id = users.id
+                              AND users.league_id = ?
+                              AND ? in 
+                                  (guests.date1, guests.date2, guests.date3,
+                                   guests.date4, guests.date5))) AS RGHT
+  
+  		                 ON RGHT.user_id = LFT.user_id
+	                  WHERE RGHT.user_id is NULL) AS extra 
+            ORDER BY editedAt ASC`,
+        [leagueId, teeDate, leagueId, teeDate, leagueId, teeDate,
+         leagueId, teeDate, teeDate, leagueId, leagueId, teeDate]
+      );
+
+      if (extraRows.length > 0) {
+        for (const row of extraRows) {
+            removed.push({
+              user_id: row.userId,
+              first_name: row.firstName,
+              last_name: row.lastName,
+              requested_at: row.editedAt
+            });
+        }
+      }
+
+      console.log("/CHANGES route - removed=", removed);
+
       res.json({
-        lastUpdate,
         added,
         removed
       });
 
     } catch (err) {
-      console.error("Error in simplified tee-sheet changes route:", err);
+      console.error("Error in tee-sheet /changes route:", err);
       res.status(500).json({ error: "Server error" });
     }
   }
 );
 
-app.get("/admin/api/tee-sheet/:leagueId/:teeDate", requireTeeSheetEditor, async (req, res) => {
+function deleteFirstDupUserSlot(leagueId, teeDate, dupUserId) {
+  try {
+    const dupFoundRow = dbGet(
+      `SELECT tee_time
+            , user_id1
+            , last_name1
+            , first_name1
+            , user_id2
+            , last_name2
+            , first_name2
+            , user_id3
+            , last_name3
+            , first_name3
+            , user_id4
+            , last_name4
+            , first_name4
+        FROM tee_sheet_working
+        WHERE league_id = ?
+          AND tee_date = ?
+          AND ? in (user_id1, user_id2, user_id3, user_id4)
+        LIMIT 1`,
+      [leagueId, teeDate, dupUserId]
+    );
+    const teeTime = dupFoundRow.tee_time;
+    let userId1 = dupFoundRow.user_id1;
+    let lastName1 = dupFoundRow.last_name1;
+    let firstName1 = dupFoundRow.first_name1;
+    let userId2 = dupFoundRow.user_id2;
+    let lastName2 = dupFoundRow.last_name2;
+    let firstName2 = dupFoundRow.first_name2;
+    let userId3 = dupFoundRow.user_id3;
+    let lastName3 = dupFoundRow.last_name3;
+    let firstName3 = dupFoundRow.first_name3;
+    let userId4 = dupFoundRow.user_id4;
+    let lastName4 = dupFoundRow.last_name4;
+    let firstName4 = dupFoundRow.first_name4;
+    let slotNum;
+    if (userId1 = dupUserId) {
+      userId1 = '';lastName1 = ''; firstName1 = ''; slotNum = 1}
+    else if (userId2 = dupUserId) {
+      userId2 = '';lastName2 = ''; firstName2 = ''; slotNum = 2}
+    else if (userId3 = dupUserId) {
+      userId3 = '';lastName3 = ''; firstName3 = ''; slotNum = 3}
+    else if (userId4 = dupUserId) {
+      userId4 = '';lastName4 = ''; firstName4 = ''; slotNum = 41}
+    
+    const dupGone = dbGet(
+      `UPDATE tee_sheet_working
+          SET user_id1 = ?
+            , last_name1 = ?
+            , first_name1 = ?
+            , user_id2 = ?
+            , last_name2 = ?
+            , first_name2 = ?
+            , user_id3 = ?
+            , last_name3 = ?
+            , first_name3 = ?
+            , user_id4 = ?
+            , last_name4 = ?
+            , first_name4 = ?
+        WHERE league_id = ?
+          AND tee_date = ?
+          AND tee_time = ?`,
+      [userId1, lastName1, firstName1,
+        userId2, lastName2, firstName2,
+        userId3, lastName3, firstName3,
+        userId4, lastName4, firstName4,
+        leagueId, teeDate, teeTime]
+    );
+
+    if (dupGone.length === 0) {
+      console.log("failed to remove user with id: ", dupUserId,
+                  " from tee_sheet_working with tee Date=", teeDate, " tee time=",
+                  teeTime, "and slot=", slotNum, ". Rows updated =", dupGone.length); 
+
+    } else {
+      console.log("removed user with id: ", dupUserId, " from tee_sheet_working",
+                  " tee Date=", teeDate, " tee time=", teeTime,
+                  "and slot=", slotNum);
+    }
+    return
+  } catch (err) {
+    console.error("deleteFirstDupUserSlot() function error:", err);
+    res.status(500).send("Server error");
+    return
+  }
+}
+
+function getNextTeeTime(teeTime, teeTimeInterval) {
+  // Split "hh:mm"
+  const [hh, mm] = teeTime.split(":").map(Number);
+
+  // Create a Date object for today with that time
+  const d = new Date();
+  d.setHours(hh);
+  d.setMinutes(mm);
+  d.setSeconds(0);
+  d.setMilliseconds(0);
+
+  // Add interval
+  d.setMinutes(d.getMinutes() + teeTimeInterval);
+
+  // Format back to hh:mm (12‑hour)
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+
+  // Convert 24‑hour → 12‑hour
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours -= 12;
+
+  return `${hours}:${minutes}`;
+}
+//--------------------------------------------------------------------------------
+// The validate2 route elimnates duplicate users from tee_sheet_working.
+//--------------------------------------------------------------------------------
+app.get("/admin/api/tee-sheet/:leagueId/:teeDate/validate2", requireTeeSheetEditor,
+         async (req, res) => {
   const { leagueId, teeDate } = req.params;
 
+  console.log("get /admin/api/tee-sheet/:leagueid/:teeDate/validate2 - ",
+              "TEE SHEET ROUTE SESSION:", req.session);
+  try {
+    // 1. first we find any user id on tee_sheet_working that occurs in more than
+    //    one slot. If any such user_id is found, remove from the first slot in which
+    //    it is found.   
+    const duplicateRows = await dbAll(
+      `SELECT A.user_id
+            , count(*) as slots_count
+         FROM (SELECT user_id1 AS user_id
+                 FROM tee_sheet_working 
+                WHERE league_id = ?
+                  AND tee_date = ?
+                  AND user_id1 <> ''
+                UNION ALL
+                SELECT user_id2 AS user_id
+                  FROM tee_sheet_working
+                  WHERE league_id = ?
+                  AND tee_date = ?
+                  AND user_id2 <> '' 
+                UNION ALL
+                SELECT user_id3 AS user_id
+                  FROM tee_sheet_working
+                 WHERE league_id = ?
+                   AND tee_date = ?
+                   AND user_id3 <> ''
+                 UNION ALL
+                SELECT user_id4 AS user_id
+                  FROM tee_sheet_working
+                 WHERE league_id = ?
+                   AND tee_date = ?
+                   AND user_id4 <> '') AS A
+        GROUP BY user_id
+       HAVING count(*) > 1`,
+       [leagueId, teeDate, leagueId, teeDate,
+        leagueId, teeDate, leagueId, teeDate]
+    );
+    console.log("/Validate2 route - duplicate user(s) found on tee_sheet_working is ",
+                duplicateRows.length, "for date:", teeDate, " and league:", leagueId);
+
+    if (duplicateRows.length > 0) {
+       console.log("/Validate2 route - duplicate user(s) found on tee_sheet_working: ",
+                duplicateRows.length);
+       // For each duplicate user found on tee_sheet_working table, we delete the
+       // first slot found containing the user_id.
+       let dupUserId;    
+       let dupCount;
+       duplicateRows.forEach(d => {
+          dupUserId = d.user_id;
+          dupCount = slots_count - 1;
+          for (var i=1; i <= dupCount; i++) {
+            deleteFirstDupUserSlot(leagueId, teeDate, dupUserId);
+          }
+       });
+    }
+
+    const workingRows = await dbAll(
+      `SELECT *
+         FROM tee_sheet_working
+        WHERE league_id = ?
+          AND tee_date = ?
+        ORDER BY tee_time ASC`,
+      [leagueId, teeDate]
+    );
+
+    if (workingRows.length === 0) {
+        return res.status(404).send("No rows found", 
+               " on tee_sheet_working table for current league and date: ", teeDate,
+               ".  Click back button.  Contact League Coordinator."
+        );
+    }
+
+    res.json(workingRows);
+
+  } catch (err) {
+    console.error("Load tee sheet error:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+// --------------------------------------------------------------------------------
+// make sure tee_sheet_working table is populated.  
+// Throw error if there are no rows on tee_sheet_working nor on tee_sheet for the
+// tee date.  If rows exist, check to see if the same number of rows exist on the
+// allocated_tee_times table.
+// If no rows exist on allocated_tee_times table, throw an error.
+// If there are more rows on allocated_tee_times than on tee_sheet_working, add
+// row(s) to tee_sheet_working.
+// If there are fewer rows on allocated_tee_times than on tee_sheet_working, remove
+// row(s) from tee_sheet_working.
+// if there are no rows on tee_sheet_working and there are rows on tee_sheet table
+// for the tee date, copy tee_sheet rows to tee_sheet_working table.
+// Finally, after all changes to working_tee_sheet are done, select all rows from
+// the tee_sheet_working table into an array and return the array to the frontend.
+//---------------------------------------------------------------------------------
+app.get("/admin/api/tee-sheet/:leagueId/:teeDate/validate1", requireTeeSheetEditor,
+        async (req, res) => {
+  const { leagueId, teeDate } = req.params;
   const userEmail =  req.session.user.email;
 
-  console.log("get /admin/api/tee-sheet/:leagueid/:teeDate - req.session.user.email=", req.session.user.email);
-  console.log("get /admin/api/tee-sheet/:leagueid/:teeDate - TEE SHEET ROUTE SESSION:", req.session);
+  console.log("get /admin/api/tee-sheet/:leagueid/:teeDate - req.session.user.email=",
+              req.session.user.email);
+  console.log("get /admin/api/tee-sheet/:leagueid/:teeDate - TEE SHEET ROUTE SESSION:",
+              req.session);
 
   try {
     // 1. Check if working copy exists
     const workingRows = await dbAll(
       `SELECT *
-            FROM tee_sheet_working
+         FROM tee_sheet_working
         WHERE league_id = ?
-               AND tee_date = ?
-         ORDER BY tee_time ASC`,
+          AND tee_date = ?
+        ORDER BY tee_time ASC`,
       [leagueId, teeDate]
     );
 
-    if (workingRows.length > 0) {
-      return res.json(workingRows);
-    }
+    console.log("tee_sheet_working row count = ", workingRows.length);
 
-    // 2. If not, copy from tee_sheet
-    const liveRows = await dbAll(
-      `SELECT *
-            FROM tee_sheet
-         WHERE league_id = ?
-                AND tee_date = ?
+    if (workingRows.length > 0)
+    {
+      const allocatedRows = await dbAll(
+        `SELECT tee_time_number, tee_time, tee_interval_minutes, league_name
+            FROM allocated_tee_times
+              , leagues
+          WHERE play_date = ?
+            AND league_id = ?
+            AND leagues.id = ?
+          ORDER BY tee_time_number ASC`,
+        [teeDate, leagueId, leagueId]
+        ); 
+
+        // b. no allocated_tee_times rows exist, send error.
+        if (allocatedRows.length === 0) {
+          return res.status(404).send("No allocated tee times for league on: ", teeDate,
+                  ".  Click back button.  Then click on 'Allocate Tee Times' link (or",
+                  " button, if available) and enter tee times for", teeDate, "."
+          );
+        }
+        
+        // c. if there are more rows allocated then there are rows in tee_sheet_working,
+        //    then add a row to tee_sheet_working with all empty slots for each added row
+        if (allocatedRows.length > workingRows.length) {
+          const allocatedRowCount = allocatedRows.length;
+          const workingRowCount = workingRows.length;
+          const missingRows = allocatedRowCount - workingRowCount;
+
+          const teeIntervalMinutes = allocatedRows[0].tee_interval_minutes;
+
+          const lastTeeTime = workingRows[workingRowCount - 1].tee_time;
+          let newTeeTime = getNextTeeTime(lastTeeTime, teeIntervalMinutes);
+
+          const startingNine = workingRows[0].starting_nine;
+          const leagueName = workingRows[0].league_name;
+
+          console.log("More allocated tee times:", allocatedRows.length,
+                      " than rows on the tee_sheet_working table ", workingRows.length,
+                      " Adding ", missingRows, " to tee_sheet_working.")
+            
+          const insertTSWorking = `
+            INSERT INTO tee_sheet_working (
+              tee_date, tee_time, starting_nine, league_id, league_name,
+              user_id1, last_name1, first_name1,
+              user_id2, last_name2, first_name2,
+              user_id3, last_name3, first_name3,
+              user_id4, last_name4, first_name4,
+              edited_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          for (var i=workingRowCount; i < allocatedRowCount; i++) {
+            // Insert row into tee_sheet_working table
+            await dbRun(insertTSWorking, [
+              teeDate,
+              newTeeTime,
+              startingNine,
+              leagueId,
+              leagueName,
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              userEmail
+            ]);
+            newTeeTime = getNextTeeTime(newTeeTime, teeIntervalMinutes);
+          }
+        } else 
+          if (allocatedRows.length < workingRows.length) {
+          // d. there are fewer allocated tee times than there are rows of the 
+          //    tee_sheet_working table, so we must delete extra rows from
+          //    tee_sheet_working.
+          let extraRows = workingRows.length - allocatedRows.length; 
+          while (extraRows > 0) {
+            await dbRun(
+              `DELETE FROM tee_sheet_working
+                WHERE league_id = ?
+                  AND tee_date = ?
+                  AND tee_time = 
+                      (SELECT max(tee_time)
+                        FROM tee_sheet_working
+                        WHERE league_id = ?
+                        AND tee_date = ?)`,
+              [leagueId, teeDate, leagueId, teeDate]
+            );
+            extraRows = extraRows - 1;        
+          }
+        } else if (allocatedRows.length === workingRows.length) {
+            // e. number of allocated_tee_time rows = number of tee_sheet_working rows
+            //    so we can return the results of the workingRows select at the
+            //    top of route.
+            return res.json(workingRows);
+        }
+    } else {
+      // 2. No rows found on tee_sheet_working.  
+      //    So we copy data from tee_sheet table to the tee_sheet_working table.
+      const liveRows = await dbAll(
+        `SELECT *
+          FROM tee_sheet
+          WHERE league_id = ?
+            AND tee_date = ?
           ORDER BY tee_time ASC`,
-      [leagueId, teeDate]
-    );
+        [leagueId, teeDate]
+      );
 
-    if (liveRows.length === 0) {
-      return res.status(404).send("No tee sheet exists for this league/date");
+      if (liveRows.length === 0) {
+        return res.status(404).send("No tee sheet exists for league on: ", teeDate,
+        ".  Click back button.  Wait for the tee date's deadline ",
+        " (typically 8pm two days prior to actual tee date).  Check with League ",
+        " Coordinator for actual date and time that the tee sheet will be available.");
+      }
+      
+      // Insert into working table
+      const insertStmt = `
+        INSERT INTO tee_sheet_working (
+          tee_date, tee_time, starting_nine, league_id, league_name,
+          user_id1, last_name1, first_name1,
+          user_id2, last_name2, first_name2,
+          user_id3, last_name3, first_name3,
+          user_id4, last_name4, first_name4,
+          edited_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      for (const row of liveRows) {
+        await dbRun(insertStmt, [
+          row.tee_date,
+          row.tee_time,
+          row.starting_nine,
+          leagueId,
+          row.league_name,
+          row.user_id1,
+          row.last_name1,
+          row.first_name1,
+          row.user_id2,
+          row.last_name2,
+          row.first_name2,
+          row.user_id3,
+          row.last_name3,
+          row.first_name3,
+          row.user_id4,
+          row.last_name4,
+          row.first_name4,
+          userEmail
+        ]);
+      }
     }
-
-    // 3. Insert into working table
-    const insertStmt = `
-      INSERT INTO tee_sheet_working (
-        tee_date, tee_time, starting_nine, league_id, league_name,
-        user_id1, last_name1, first_name1,
-        user_id2, last_name2, first_name2,
-        user_id3, last_name3, first_name3,
-        user_id4, last_name4, first_name4,
-        edited_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    for (const row of liveRows) {
-      await dbRun(insertStmt, [
-        row.tee_date,
-        row.tee_time,
-        row.starting_nine,
-        leagueId,
-        row.league_name,
-        row.user_id1,
-        row.last_name1,
-        row.first_name1,
-        row.user_id2,
-        row.last_name2,
-        row.first_name2,
-        row.user_id3,
-        row.last_name3,
-        row.first_name3,
-        row.user_id4,
-        row.last_name4,
-        row.first_name4,
-        userEmail
-      ]);
-    }
-
+    
     const fresh = await dbAll(
       `SELECT *
-            FROM tee_sheet_working
-         WHERE league_id = ?
-                AND tee_date = ?
-          ORDER BY tee_time ASC`,
+        FROM tee_sheet_working
+        WHERE league_id = ?
+          AND tee_date = ?
+        ORDER BY tee_time ASC`,
       [leagueId, teeDate]
     );
 
@@ -1245,7 +1805,7 @@ app.post(
 // INTERNAL: APPLY DROPS (Simplified Model)
 // removedUserIds = array of objects: { user_id, first_name, last_name, email }
 // -----------------------------------------------------------------------------
-async function applyDropsInternal(leagueId, teeDate, removedUserIds, changedBy) {
+async function applyDropsInternal(leagueId, teeDate, removedUserIds) {
   if (!Array.isArray(removedUserIds) || removedUserIds.length === 0) return;
 
   console.log("applyDropsInternal: removing", removedUserIds);
@@ -1259,17 +1819,17 @@ async function applyDropsInternal(leagueId, teeDate, removedUserIds, changedBy) 
          FROM tee_sheet_working
         WHERE league_id = ?
           AND tee_date = ?
-          AND (
-                CAST(user_id1 AS INTEGER) = CAST(? AS INTEGER)
-             OR CAST(user_id2 AS INTEGER) = CAST(? AS INTEGER)
-             OR CAST(user_id3 AS INTEGER) = CAST(? AS INTEGER)
-             OR CAST(user_id4 AS INTEGER) = CAST(? AS INTEGER)
-          )`,
+          AND (  CAST(user_id1 AS INTEGER) = CAST(? AS INTEGER)
+              OR CAST(user_id2 AS INTEGER) = CAST(? AS INTEGER)
+              OR CAST(user_id3 AS INTEGER) = CAST(? AS INTEGER)
+              OR CAST(user_id4 AS INTEGER) = CAST(? AS INTEGER)
+          )
+        ORDER BY TEE_TIME ASC`,
       [leagueId, teeDate, uid, uid, uid, uid]
     );
 
     if (!row) {
-      console.log(`applyDropsInternal: user ${uid} not found on tee sheet`);
+      console.log(`🔥applyDropsInternal: user ${uid} not found on tee sheet`);
       continue;
     }
 
@@ -1281,7 +1841,7 @@ async function applyDropsInternal(leagueId, teeDate, removedUserIds, changedBy) 
     else if (Number(row.user_id4) === uid) slot = 4;
 
     if (!slot) {
-      console.log(`applyDropsInternal: user ${uid} found but slot unknown`);
+      console.log(`🔥applyDropsInternal: user ${uid} found but slot unknown`);
       continue;
     }
 
@@ -1299,7 +1859,8 @@ async function applyDropsInternal(leagueId, teeDate, removedUserIds, changedBy) 
       [row.id]
     );
 
-    console.log(`applyDropsInternal: cleared slot ${slot} for user ${uid}`);
+    console.log(`applyDropsInternal: cleared slot ${slot} for user ${uid} and 
+                tee time ${row.tee_time}`);
   }
 }
 
@@ -1313,24 +1874,21 @@ async function applyDropsInternal(leagueId, teeDate, removedUserIds, changedBy) 
 // ------------------------------------------------------------------------------------------- 
 // APPLY CHANGES (Simplified Model: Drops → Adds Chronologically)
 // -----------------------------------------------------------------------------
-app.post(
-  "/admin/api/tee-sheet/:leagueId/:teeDate/apply-changes",
-  requireTeeSheetEditor,
+app.post("/admin/api/tee-sheet/:leagueId/:teeDate/apply-changes",requireTeeSheetEditor,
   async (req, res) => {
     const { leagueId, teeDate } = req.params;
     const { removed, added } = req.body;
     const adminEmail = req.session.user.email;
     const ts = easternNow();
 
-    console.log("=== APPLY CHANGES (SIMPLIFIED) ===");
-    console.log("removed:", removed);
-    console.log("added:", added);
-
     if (!Array.isArray(removed) || !Array.isArray(added)) {
       return res.status(400).json({
-        error: "Apply Changes error: request body missing valid 'added' and 'removed' arrays."
+        error: "/Apply-Changes error: request body missing valid added and removed arrays."
       });
     }
+
+    // the 4 variables in both removed and added are:
+    // user_id  first_name  last_name  reqeusted_at
 
     try {
       // ---------------------------------------------------------
@@ -1343,7 +1901,7 @@ app.post(
       // ---------------------------------------------------------
       if (removed.length > 0) {
         console.log("Applying DROPS...");
-        await applyDropsInternal(leagueId, teeDate, removed, adminEmail);
+        await applyDropsInternal(leagueId, teeDate, removed);
       }
 
       // ---------------------------------------------------------
@@ -1353,18 +1911,17 @@ app.post(
       let unplaced = [];
 
       if (added.length > 0) {
-        console.log("Applying ADDS chronologically...");
 
+        //console.log("Applying ADDS chronologically...");
         // Sort by requested_at ascending
-        const sortedAdds = [...added].sort(
-          (a, b) => new Date(a.requested_at) - new Date(b.requested_at)
-        );
+        // const sortedAdds = [...added].sort(
+        //   (a, b) => new Date(a.requested_at) - new Date(b.requested_at)
+        // );
 
         const placementResult = await autoPlaceGolfers(
           leagueId,
           teeDate,
-          sortedAdds,
-          adminEmail
+          added
         );
 
         placed = placementResult.placed;
@@ -1376,8 +1933,10 @@ app.post(
       // ---------------------------------------------------------
       await dbRun(
         `UPDATE tee_sheet_working
-           SET edited_at = ?, edited_by = ?
-         WHERE league_id = ? AND tee_date = ?`,
+            SET edited_at = ?
+              , edited_by = ?
+          WHERE league_id = ? 
+            AND tee_date = ?`,
         [ts, adminEmail, leagueId, teeDate]
       );
 
@@ -1599,6 +2158,72 @@ app.post(
   }
 );
 
+// ------------------------------------------------------------------------------------
+// Copy data from tee_sheet table to tee_sheet_working for current league and play date
+// ------------------------------------------------------------------------------------
+app.post("/admin/api/tee-sheet/:leagueId/:teeDate/reset-working",
+  requireTeeSheetEditor,
+  async (req, res) => {
+    const { leagueId, teeDate } = req.params;
+    const userEmail = req.session.user.email;
+    const easternTimestamp = easternNow();
+
+    try {
+      // 1. Delete working rows
+      await dbRun(
+        `DELETE FROM tee_sheet_working
+          WHERE league_id = ?
+            AND tee_date = ?`,
+        [leagueId, teeDate]
+      );
+
+      // 2. Load saved tee_sheet rows
+      const savedRows = await dbAll(
+        `SELECT *
+           FROM tee_sheet
+          WHERE league_id = ?
+            AND tee_date = ?
+       ORDER BY tee_time ASC`,
+        [leagueId, teeDate]
+      );
+
+      // 3. Insert into working copy
+      const insertWorking = `
+        INSERT INTO tee_sheet_working (
+          tee_date, tee_time, starting_nine, league_id, league_name,
+          user_id1, last_name1, first_name1,
+          user_id2, last_name2, first_name2,
+          user_id3, last_name3, first_name3,
+          user_id4, last_name4, first_name4,
+          edited_by, edited_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      for (const row of savedRows) {
+        await dbRun(insertWorking, [
+          row.tee_date,
+          row.tee_time,
+          row.starting_nine,
+          row.league_id,
+          row.league_name,
+          row.user_id1, row.last_name1, row.first_name1,
+          row.user_id2, row.last_name2, row.first_name2,
+          row.user_id3, row.last_name3, row.first_name3,
+          row.user_id4, row.last_name4, row.first_name4,
+          userEmail,
+          easternTimestamp
+        ]);
+      }
+
+      res.json({ status: "RESET" });
+
+    } catch (err) {
+      console.error("RESET WORKING ERROR:", err);
+      res.status(500).send("Server error");
+    }
+  }
+);
+
 // ------------------------------
 // START AT index.html
 // -----------------------------
@@ -1623,7 +2248,7 @@ app.get("/admin-dashboard", requireAdmin, (req, res) => {
     });
 
     console.log("session.user.league_id =", req.session.user?.league_id);
-    console.log("session.user.league_name =", req.session.user?.league_name);
+    console.log("session.user.id =", req.session.user?.id);
 
     res.sendFile(path.join(__dirname, "public", "admin-dashboard.html"));
 });
@@ -1900,6 +2525,9 @@ app.put("/admin/schedule/save/:origInTownStatus/:sessionStartTS", async (req, re
 
     // -------------------------------------------------------------------------
     // WRITE CHANGES TO schedule_history (UPSERT)
+    // AND
+    // WRITE CHANGED TO schedule (UPSERT) as we want to keep the updated_at
+    // timestamp.
     // -------------------------------------------------------------------------
     const historyStmt = db.prepare(`
       INSERT INTO schedule_history (
@@ -1923,6 +2551,15 @@ app.put("/admin/schedule/save/:origInTownStatus/:sessionStartTS", async (req, re
           after_state    = excluded.after_state
     `);
 
+    const scheduleStmt = db.prepare(`
+      INSERT INTO schedule (user_id, date, is_playing, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, date)
+      DO UPDATE SET
+          is_playing = excluded.is_playing,
+          updated_at = excluded.updated_at
+    `);
+
     for (const [date, newVal] of Object.entries(schedule)) {
       const oldVal = existingMap[date] ?? 0;
       const newInt = newVal ? 1 : 0;
@@ -1940,11 +2577,19 @@ app.put("/admin/schedule/save/:origInTownStatus/:sessionStartTS", async (req, re
           JSON.stringify({ is_playing: oldVal }),
           JSON.stringify({ is_playing: newInt })
         );
+
+        scheduleStmt.run(
+          target_user_id,
+          date,
+          newInt,
+          sessionStartTS
+        );
       }
-    }
+    }    
+    
     // -------------------------------------------------------------------------
     // DELETE schedule rows where after prior UPSERT caused new_is_playing to be
-    // equal to old_is_playing as that would indicate no change ... and we onlye
+    // equal to old_is_playing as that would indicate no change ... and we only
     // want to keep the history rows where there is a change.
     // -------------------------------------------------------------------------
     db.prepare(
@@ -1953,33 +2598,11 @@ app.put("/admin/schedule/save/:origInTownStatus/:sessionStartTS", async (req, re
           AND play_date LIKE ?
           AND new_is_playing = old_is_playing`
     ).run(target_user_id, `${prefix}%`);
-    // -------------------------------------------------------------------------
-    // DELETE EXISTING SCHEDULE FOR THIS MONTH
-    // -------------------------------------------------------------------------
-    db.prepare(
-      `DELETE FROM schedule
-        WHERE user_id = ?
-          AND date LIKE ?`
-    ).run(target_user_id, `${prefix}%`);
-
-    // -------------------------------------------------------------------------
-    // INSERT NEW SCHEDULE ROWS
-    // -------------------------------------------------------------------------
-    const insertStmt = db.prepare(
-      `INSERT INTO schedule (user_id, date, is_playing)
-       VALUES (?, ?, ?)`
-    );
 
     console.log("admin save route ... schedule=", schedule)
 
-    for (const [dateStr, isPlaying] of Object.entries(schedule)) {
-      console.log(`admin save route ... INSERT INTO schedule (${target_user_id}
-                   ${dateStr}, ${isPlaying})`);
-      insertStmt.run(target_user_id, dateStr, isPlaying ? 1 : 0);
-    }
-
     // -------------------------------------------------------------------------
-    // RETURN UPDATED SCHEDULE + DETERMINE IN-TOWN STATUS
+    // RETURN UPDATED SCHEDULE 
     // -------------------------------------------------------------------------
     const rows = db.prepare(
       `SELECT date, is_playing
@@ -2628,17 +3251,18 @@ cron.schedule("0 20 * * *", async () => {
 // the editor places in the second argument of 
 // generateTeeSheet(leagueId, teeDate, emailid)
 // COMMENT below code OUT AFTER RUNNING!!!
-//    cron.schedule("22 22 * * *", async () => {
+//
+//    cron.schedule("59 15 * * *", async () => {
 //    console.log("⏰ tee sheet rebuild cron job to run based on editing");
 //    const uid = 1;  // leagueId
-//    const teeDate = "2026-07-10";  // date to rebuild
+//    const teeDate = "2026-09-11";  // date to rebuild
 //    const emailId = "rlhayner@verizon.net"; 
 //    await generateTeeSheet({
 //          leagueId: Number(uid),
 //          playDate: teeDate,
 //          generatedBy: emailId}); 
 //    }, {
-//      timezone: "America/New_York"
+//    timezone: "America/New_York"
 //    });
 
 // -----------------------------------------------------------------

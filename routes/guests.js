@@ -146,6 +146,7 @@ router.post("/", async (req, res) => {
 
     const sponsorId = req.session.user.id;
     const leagueId = req.session.user.league_id;
+    const ts = easternNow();
 
     // Collect + clean + sort dates
     const dates = [date1, date2, date3, date4, date5]
@@ -162,7 +163,7 @@ router.post("/", async (req, res) => {
     const result = await db.runAsync(
       `INSERT INTO guests (
         sponsor_user_id, guest_last_name, guest_first_name, guest_email,
-        date1, date2, date3, date4, date5
+        date1, date2, date3, date4, date5, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sponsorId,
@@ -173,7 +174,8 @@ router.post("/", async (req, res) => {
         dates[1] || null,
         dates[2] || null,
         dates[3] || null,
-        dates[4] || null
+        dates[4] || null,
+        ts
       ]
     );
 
@@ -211,6 +213,7 @@ router.put("/:id", async (req, res) => {
     const id = req.params.id;
     const sponsorId = req.session.user.id;
     const leagueId = req.session.user.league_id;
+    const ts = easternNow();
 
     const {
       guest_first_name,
@@ -248,7 +251,7 @@ router.put("/:id", async (req, res) => {
     await db.runAsync(
       `UPDATE guests
        SET guest_last_name = ?, guest_first_name = ?, guest_email = ?,
-           date1 = ?, date2 = ?, date3 = ?, date4 = ?, date5 = ?
+           date1 = ?, date2 = ?, date3 = ?, date4 = ?, date5 = ?, updated_at = ?
        WHERE id = ? AND sponsor_user_id = ?`,
       [
         guest_last_name.trim(),
@@ -259,6 +262,7 @@ router.put("/:id", async (req, res) => {
         newDates[2] || null,
         newDates[3] || null,
         newDates[4] || null,
+        ts,
         id,
         sponsorId
       ]
