@@ -164,7 +164,7 @@ router.post("/", async (req, res) => {
       `INSERT INTO guests (
         sponsor_user_id, guest_last_name, guest_first_name, guest_email,
         date1, date2, date3, date4, date5, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sponsorId,
         guest_last_name.trim(),
