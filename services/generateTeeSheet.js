@@ -12,21 +12,6 @@ const app = express();
 const { easternNow } = require("../utils/easternTime");
 const { sendEmail } = require("../services/mailer");
 
-// ------------------------------
-// SQLite Promise Helpers
-// ------------------------------
-function dbGet(sql, params = []) {
-    return db.getAsync(sql, params);
-}
-
-function dbAll(sql, params = []) {
-    return db.allAsync(sql, params);
-}
-
-function dbRun(sql, params = []) {
-    return db.runAsync(sql, params);
-}
-
 // -------------------------------------------------------------------------------------------------
 // HELPER FUNCTIONS
 // -------------------------------------------------------------------------------------------------
@@ -211,7 +196,7 @@ async function A0500generateTeeSheetForLeagueAndDate(leagueId, playDate, generat
       golfersCount
     );
 
-  const ctx = D4500createContext(teeSlots);
+  const ctx = await D4500createContext(teeSlots);
 
   const rcE = await E5000LoadTeeSheetWithGuests(leagueId, playDate, ctx);
   if (rcE === "ERROR") return "ERROR";
@@ -250,10 +235,9 @@ async function A0500generateTeeSheetForLeagueAndDate(leagueId, playDate, generat
 //  validate the passed leagueId and the passed playDate
 // ------------------------------------------------------------------------------------------------------------------------------------------
 async function A0550validateLeagueAndDate(leagueId, playDate) {
-  const league = await dbAll(
-    `SELECT * FROM leagues WHERE id = ?`,
-    [leagueId]
-  );
+  const league = db.prepare(
+    `SELECT * FROM leagues WHERE id = ?`
+    ).all(leagueId);
   if (!league || league.length === 0) {
     throw new Error(`League ${leagueId} not found`);
   }
@@ -282,10 +266,9 @@ async function A1000get2DaysHence() {
   try {
     const ts = easternNow();   // already Eastern, already SQLite format
 
-    const row = await dbGet(
-      `SELECT date(datetime(?, '+2 days')) AS two_days_hence`,
-      [ts]
-    );
+    const row = db.prepare(
+      `SELECT date(datetime(?, '+2 days')) AS two_days_hence`
+    ).get(ts);
     console.log("A1000 - row.two_days_hence = ", row.two_days_hence);
     return row?.two_days_hence || "ERROR";
 
@@ -308,16 +291,15 @@ async function A1000get2DaysHence() {
   // 1) delete all data in the work_tee_sheet table for the passedPlayDate
 
   try {
-     const delResult = await dbRun(
+     const delResult = db.prepare(
           `DELETE FROM WORK_TEE_SHEET
-           WHERE play_date = ?`,
-           [ passedPlayDate ]
-     );
+           WHERE play_date = ?`
+     ).run(passedPlayDate);
      console.log("B2000 ", delResult.changes, "rows deleted from table work_tee_sheet ", 
                             "for play_date = ", passedPlayDate );
 
     // 2. Insert new rows into table, work_tee_sheet, for the selected play_date
-     insertResult = await dbRun(
+     const insertResult = db.prepare(
       `WITH 
           member_players AS (
               SELECT 
@@ -398,10 +380,9 @@ async function A1000get2DaysHence() {
                 , first_name
                 , asterisk_suffix
                 , sponsor_id
-      FROM guest_players`,
-      [ passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate, 
-        passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate ]
-    );
+      FROM guest_players`
+     ).run(passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate, 
+        passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate);
 
     if (insertResult.changes === 0) {
         console.log("⏰ Service, generateTeeSheet did not find any golfers playing twoDaysFromNow=",
@@ -432,17 +413,16 @@ async function A1000get2DaysHence() {
   // 1) delete all data in the work_tee_sheet table for the passedPlayDate
 
   try {
-     const delResult = await dbRun(
+     const delResult = db.prepare(
           `DELETE FROM WORK_TEE_SHEET
            WHERE play_date = ?
-                  AND league_id = ?`,
-           [ passedPlayDate, passedLeague  ]
-     );
+                  AND league_id = ?`
+     ).run(passedPlayDate, passedLeague);
      console.log("B2500 ", delResult.changes, "rows deleted from table work_tee_sheet ", 
                             "for league = ", passedLeague, " and play_date = ", passedPlayDate );
 
     // 2. Insert new rows into table, work_tee_sheet, for the selected play_date
-     const insertPlayers = await dbRun(
+     const insertPlayers = db.prepare(
       `WITH 
           member_players AS (
               SELECT 
@@ -525,10 +505,9 @@ async function A1000get2DaysHence() {
                 , first_name
                 , asterisk_suffix
                 , sponsor_id
-      FROM guest_players`,
-      [ passedPlayDate, passedPlayDate, passedLeague, passedPlayDate,  passedLeague,
-        passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate ]
-    );
+      FROM guest_players`
+     ).run(passedPlayDate, passedPlayDate, passedLeague, passedPlayDate,  passedLeague,
+        passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate, passedPlayDate);
 
     if (insertPlayers.changes === 0) {
         console.log("⏰ Service, generateTeeSheet did not find any golfers playing in league=",
@@ -557,14 +536,13 @@ async function A1000get2DaysHence() {
 async function C3000getLeaguesPlayingTwoDaysHence(twoDaysHence) {
 
 try {
-  const rows = await dbAll(
+  const rows = db.prepare(
     `SELECT league_id
           , count(*) as golfer_count
        FROM work_tee_sheet
       WHERE play_date = ?
-      GROUP BY league_id`,
-    [twoDaysHence]
-  );
+      GROUP BY league_id`
+  ).all(twoDaysHence);
 
   if (rows.length === 0) {
     console.log("⏰ Service, generateTeeSheet did not return any leagues golfing twoDaysFromNow=", twoDaysHence);
@@ -675,7 +653,7 @@ async function E5000LoadTeeSheetWithGuests(leagueId, playDate, ctx) {
     // -------------------------------------------------------------
     // 1. Query guest/sponsor pairs
     // -------------------------------------------------------------
-    const guestResults = await dbAll(
+    const guestResults = db.prepare(
       `SELECT 
           W2.last_name       AS sponsor_last_name,
           W2.first_name      AS sponsor_first_name,
@@ -697,9 +675,8 @@ async function E5000LoadTeeSheetWithGuests(leagueId, playDate, ctx) {
          AND W1.play_date = ?
          AND W1.league_id = ?
          AND (W1.first_name || W1.last_name) <> (W2.first_name || W2.last_name)
-       ORDER BY sponsor_last_name, sponsor_first_name`,
-      [playDate, leagueId]
-    );
+       ORDER BY sponsor_last_name, sponsor_first_name`
+    ).all(playDate, leagueId);
 
     // -------------------------------------------------------------
     // 2. No guests? That's fine — mark ctx and return success
@@ -836,7 +813,7 @@ async function E5000LoadTeeSheetWithGuests(leagueId, playDate, ctx) {
 // -----------------------------------------------------------------------------
 async function F6000DeleteGuestsFromWorkTeeSheetTable(leagueId, playDate) {
   try {
-       const delResultSponsor = await dbRun(
+       const delResultSponsor = db.prepare(
        `DELETE FROM work_tee_sheet
          WHERE play_date = ?
            AND league_id = ?
@@ -846,21 +823,19 @@ async function F6000DeleteGuestsFromWorkTeeSheetTable(leagueId, playDate) {
                         WHERE E.play_date = ?
                           AND E.league_id = ?
                           AND E.asterisk_suffix LIKE '%**%'
-                          AND work_tee_sheet.sponsor_id = E.sponsor_id)`,
-       [playDate, leagueId, playDate, leagueId]
-       );
+                          AND work_tee_sheet.sponsor_id = E.sponsor_id)`
+       ).run(playDate, leagueId, playDate, leagueId);
       console.log(
       `F6000 - ${delResultSponsor.changes} sponsor rows deleted from work_tee_sheet for
        league_id=${leagueId}, play_date=${playDate}`
       );
 
-       const delResult = await dbRun(
+       const delResult = db.prepare(
        `DELETE FROM work_tee_sheet
          WHERE play_date = ?
            AND league_id = ?
-           AND asterisk_suffix LIKE '%**%'`,
-        [playDate, leagueId]
-      );
+           AND asterisk_suffix LIKE '%**%'`
+       ).run(playDate, leagueId);
 
       console.log(
         `F6000 - ${delResult.changes} guest rows deleted from work_tee_sheet for league_id=${leagueId},
@@ -907,16 +882,15 @@ async function G7000LoadAnySubgroupGolfers(leagueId, playDate, ctx) {
     // -------------------------------------------------------------
     for (const subgroup of subgroups) {
 
-      const subgroupResults = await dbAll(
+      const subgroupResults = db.prepare(
         `SELECT user_id, last_name, first_name, subgroup,
                 subgroup_number, asterisk_suffix
            FROM work_tee_sheet
           WHERE play_date = ?
             AND league_id = ?
             AND subgroup = ?
-          ORDER BY subgroup_number ASC`,
-        [playDate, leagueId, subgroup]
-      );
+          ORDER BY subgroup_number ASC`
+      ).all(playDate, leagueId, subgroup);
 
       if (subgroupResults.length === 0) {
         console.log(`G7000 - No subgroup golfers found for subgroup ${subgroup}`);
@@ -1000,7 +974,7 @@ async function G7100DeleteGolferFromWorkTable(
   subgroupNumber
 ) {
   try {
-    const delResult = await dbRun(
+    const delResult = db.prepare(
       `DELETE FROM work_tee_sheet
          WHERE play_date = ?
            AND league_id = ?
@@ -1008,8 +982,8 @@ async function G7100DeleteGolferFromWorkTable(
            AND first_name = ?
            AND asterisk_suffix = ?
            AND subgroup = ?
-           AND subgroup_number = ?`,
-      [
+           AND subgroup_number = ?`
+    ).run(
         playDate,
         leagueId,
         lastName,
@@ -1017,7 +991,6 @@ async function G7100DeleteGolferFromWorkTable(
         asteriskSuffix,
         subgroup,
         subgroupNumber
-      ]
     );
 
     console.log(
@@ -1045,7 +1018,7 @@ async function H8000UpdateSubgroupValues(leagueId, playDate) {
     // -------------------------------------------------------------------------
     // STEP 1 — Convert orphaned subgroups (count = 1) to independent
     // -------------------------------------------------------------------------
-    const upd1 = await dbRun(
+    const upd1 = db.prepare(
       `UPDATE work_tee_sheet
           SET subgroup = ''
         WHERE league_id = ?
@@ -1058,9 +1031,8 @@ async function H8000UpdateSubgroupValues(leagueId, playDate) {
                    AND subgroup <> ''
               GROUP BY subgroup
                 HAVING COUNT(*) = 1
-          )`,
-      [leagueId, playDate, leagueId, playDate]
-    );
+          )`
+    ).run(leagueId, playDate, leagueId, playDate);
 
     console.log(
       `H8000: Updated ${upd1.changes} orphaned subgroup golfers to independent (league ${leagueId},
@@ -1077,7 +1049,7 @@ async function H8000UpdateSubgroupValues(leagueId, playDate) {
     //
     // This ensures no subgroup exceeds 4 golfers.
     // -------------------------------------------------------------------------
-    const upd2 = await dbRun(
+    const upd2 = db.prepare(
       `UPDATE work_tee_sheet
                 SET subgroup = ''
         WHERE league_id = ?
@@ -1097,9 +1069,8 @@ async function H8000UpdateSubgroupValues(leagueId, playDate) {
                                               HAVING COUNT(*) > 4
                    )
               GROUP BY subgroup
-          )`,
-      [leagueId, playDate, leagueId, playDate, leagueId, playDate]
-    );
+          )`
+    ).run(leagueId, playDate, leagueId, playDate, leagueId, playDate);
 
     console.log(
       `H8000: Updated ${upd2.changes} overflow subgroup golfers to independent (league ${leagueId}, date ${playDate})`
@@ -1128,7 +1099,7 @@ async function I9000getSubgroupGolfers(leagueId, playDate, ctx) {
     // -------------------------------------------------------------------------
     // STEP 1 — Get subgroup counts
     // -------------------------------------------------------------------------
-    const subgroupCounts = await dbAll(
+    const subgroupCounts = db.prepare(
       `SELECT subgroup
             , COUNT(*) AS subgroup_count
          FROM work_tee_sheet
@@ -1136,9 +1107,8 @@ async function I9000getSubgroupGolfers(leagueId, playDate, ctx) {
           AND league_id = ?
           AND subgroup <> ''
         GROUP BY subgroup
-        ORDER BY subgroup_count DESC`,
-      [playDate, leagueId]
-    );
+        ORDER BY subgroup_count DESC`
+    ).all(playDate, leagueId);
 
     if (subgroupCounts.length === 0) {
       console.log(
@@ -1162,7 +1132,7 @@ async function I9000getSubgroupGolfers(leagueId, playDate, ctx) {
       // -----------------------------------------------------
       // Get golfers in this subgroup
       // -----------------------------------------------------
-      const subgroupGolfers = await dbAll(
+      const subgroupGolfers = db.prepare(
         `SELECT subgroup_number
               , user_id
               , last_name
@@ -1172,9 +1142,8 @@ async function I9000getSubgroupGolfers(leagueId, playDate, ctx) {
           WHERE play_date = ?
             AND league_id = ?
             AND subgroup = ?
-       ORDER BY subgroup_number ASC`,
-        [playDate, leagueId, subgroup]
-      );
+       ORDER BY subgroup_number ASC`
+      ).all(playDate, leagueId, subgroup);
 
       if (subgroupGolfers.length === 0) continue;
 
@@ -1271,7 +1240,7 @@ async function J10000populateIndependentGolfers(leagueId, playDate, ctx) {
     // -------------------------------------------------------------------------
     // STEP 1 — Get independent golfers
     // -------------------------------------------------------------------------
-    const independents = await dbAll(
+    const independents = db.prepare(
       `SELECT user_id 
             , last_name
             , first_name
@@ -1280,9 +1249,8 @@ async function J10000populateIndependentGolfers(leagueId, playDate, ctx) {
         WHERE play_date = ?
           AND league_id = ?
           AND subgroup = ''
-        ORDER BY random()`,
-      [playDate, leagueId]
-    );
+        ORDER BY random()`
+    ).all(playDate, leagueId);
 
     if (independents.length === 0) {
       console.log(
@@ -1373,15 +1341,14 @@ async function J10000populateIndependentGolfers(leagueId, playDate, ctx) {
 // -----------------------------------------------------------------------------
 async function K10500DeleteLeagueDataFromTeeSheetTable(leagueId, playDate) {
   try {
-       const delTeeSheetData = await dbRun(
+       const delTeeSheetData = db.prepare(
        `DELETE FROM tee_sheet
          WHERE tee_date = ?
            AND league_name in 
                (SELECT league_name
                   FROM leagues
-                 WHERE leagues.id = ?)`,
-       [playDate, leagueId]
-       );
+                 WHERE leagues.id = ?)`
+       ).run(playDate, leagueId);
       console.log(
       `K10500 - ${delTeeSheetData.changes} tee_sheet rows deleted for
        league_id=${leagueId}, tee_date=${playDate}`
@@ -1419,7 +1386,7 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
       generated_by_value = "CRON-8pm";
     }
 
-    const allocatedTeeTimes = await dbAll(
+    const allocatedTeeTimes = db.prepare(
       `SELECT att.tee_time_number,
               att.tee_time,
               att.first_nine,
@@ -1429,9 +1396,8 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
          JOIN leagues l ON l.id = att.league_id
         WHERE att.league_id = ?
           AND att.play_date = ?
-        ORDER BY att.tee_time_number ASC`,
-      [leagueId, playDate]
-    );
+        ORDER BY att.tee_time_number ASC`
+    ).all(leagueId, playDate);
 
     if (allocatedTeeTimes.length === 0) {
       console.error(`L11000: No allocated tee times for league ${leagueId} on ${playDate}`);
@@ -1441,7 +1407,7 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
     for (const row of allocatedTeeTimes) {
       const n = row.tee_time_number;
 
-      await dbRun(
+      const instStmt = db.prepare(
         `INSERT INTO tee_sheet (
             tee_date,
             tee_time,
@@ -1455,8 +1421,8 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
             is_locked,
             generated_at,
             generated_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
           playDate,
           row.tee_time,
           row.first_nine,
@@ -1477,7 +1443,6 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
           1,
           ts,                   // generated_at
           generated_by_value    // generated_by
-        ]
       );
     }
 
@@ -1499,12 +1464,11 @@ async function L11000populateTeeSheetTable(leagueId, playDate, ctx, generatedBy)
 async function M12000DeleteLeagueDataFromTeeSheetWorking(leagueId, playDate) {
   try {
        // --- Sync tee_sheet_working with the newly rebuilt tee_sheet ---
-       const delTeeSheetWorking = await dbRun(
+       const delTeeSheetWorking = db.prepare(
          `DELETE FROM tee_sheet_working
            WHERE league_id = ?
-                  AND tee_date = ?`,
-          [ leagueId, playDate ]
-       );
+                  AND tee_date = ?`
+       ).run(leagueId, playDate);
       console.log(
       `M12000 - ${delTeeSheetWorking.changes} tee_sheet_working rows deleted for
        league_id=${leagueId}, tee_date=${playDate}`
@@ -1529,7 +1493,7 @@ async function N13000LoadTeeSheetWorking(leagueId, playDate, generatedBy) {
   try {
     const ts = easternNow();   // ⭐ unified timestamp
 
-    const copyToWorkingTable = await dbRun(
+    const copyToWorkingTable = db.prepare(
       `INSERT INTO tee_sheet_working (
          tee_date, tee_time, starting_nine, league_id, league_name,
          user_id1, last_name1, first_name1,
@@ -1551,9 +1515,8 @@ async function N13000LoadTeeSheetWorking(leagueId, playDate, generatedBy) {
          ?                  -- ⭐ edited_by
        FROM tee_sheet
        WHERE league_id = ?
-         AND tee_date = ?`,
-      [ts, generatedBy, leagueId, playDate]
-    );
+         AND tee_date = ?`
+    ).run(ts, generatedBy, leagueId, playDate);
 
     return "SUCCESS";
 
@@ -1577,7 +1540,7 @@ async function O14000SendTeeSheetEmail(leagueId, playDate) {
     // 1. Build list of email recipients
     // ------------------------------------------------------------
     const currMonth = parseInt(playDate.substring(5, 7), 10);
-    const emailIds = await dbAll(
+    const emailIds = db.prepare(
 
        `SELECT DISTINCT email
 	     FROM (
@@ -1615,9 +1578,8 @@ async function O14000SendTeeSheetEmail(leagueId, playDate) {
 			   , tee_sheet.user_id3
 			   , tee_sheet.user_id4
 			   )
-		      )`,
-               [ leagueId, playDate, currMonth, leagueId, playDate ]
-          );
+		      )`
+    ).all(leagueId, playDate, currMonth, leagueId, playDate);
 
       if (emailIds.length === 0) {
       console.warn(`O14000: No recipients found for league ${leagueId} on ${playDate}`);
@@ -1644,14 +1606,13 @@ async function O14000SendTeeSheetEmail(leagueId, playDate) {
    // ------------------------------------------------------------
     // 2. Load tee sheet rows into an array 
     // ------------------------------------------------------------
-    const teeRows = await dbAll(
+    const teeRows = db.prepare(
       `SELECT *
          FROM tee_sheet
         WHERE league_id = ?
           AND tee_date = ?
-        ORDER BY tee_time ASC`,
-      [leagueId, playDate]
-    );
+        ORDER BY tee_time ASC`
+    ).all(leagueId, playDate);
 
     if (teeRows.length === 0) {
       console.warn(`O14000: No tee sheet rows found for league ${leagueId} on ${playDate}`);

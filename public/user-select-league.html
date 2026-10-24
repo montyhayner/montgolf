@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select League</title>
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        .select-container {
+            max-width: 500px;
+            margin: 80px auto;
+            padding: 30px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.15);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 25px;
+            font-size: 16px;
+        }
+        .btn {
+            width: 100%;
+            padding: 10px 18px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+        }
+        #toast {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: #333;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 6px;
+            opacity: 0;
+            transition: opacity .3s;
+        }
+        #toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="select-container">
+        <h1>Select League</h1>
+
+        <label for="leagueSelect">Choose a league:</label>
+        <select id="leagueSelect">
+            <option value="">Loading...</option>
+        </select>
+
+        <button class="btn" onclick="selectLeague()">Continue</button>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        function showToast(msg) {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.classList.add("show");
+            setTimeout(() => t.classList.remove("show"), 2500);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadUserLeagues();
+        });
+
+        // Load leagues from session.user.leagues
+        async function loadUserLeagues() {
+            try {
+                const res = await fetch("/auth/me");
+                const user = await res.json();
+
+                const leagues = user.leagues || [];
+                const sel = document.getElementById("leagueSelect");
+                sel.innerHTML = "";
+
+                if (leagues.length === 0) {
+                    sel.innerHTML = `<option value="">No leagues found</option>`;
+                    return;
+                }
+
+                leagues.forEach(l => {
+                    const opt = document.createElement("option");
+                    opt.value = l.league_id;
+                    opt.textContent = l.league_name || ("League " + l.league_id);
+                    sel.appendChild(opt);
+                });
+
+            } catch (err) {
+                console.error(err);
+                showToast("Error loading leagues");
+            }
+        }
+
+        async function selectLeague() {
+            try {
+                const leagueId = document.getElementById("leagueSelect").value;
+
+                if (!leagueId) {
+                    showToast("Please select a league");
+                    return;
+                }
+
+                await fetch("/auth/user-select-league", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ league_id: leagueId }),
+                    credentials: "include"
+                });
+
+                window.location.href = "/schedule";
+
+            } catch (err) {
+                console.error(err);
+                showToast("Error selecting league");
+            }
+        }
+    </script>
+
+</body>
+</html>

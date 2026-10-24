@@ -9,25 +9,6 @@ const path = require("path");
 
 const router = express.Router();
 
-// DB helpers
-function dbGet(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-  });
-}
-function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-  });
-}
-function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      err ? reject(err) : resolve(this);
-    });
-  });
-}
-
 // -----------------------------------------------------------------------------
 // ADMIN GOLFERS PAGE
 // -----------------------------------------------------------------------------
@@ -41,11 +22,15 @@ router.get("/", requireAdmin, (req, res) => {
 router.get("/list", requireAdmin, async (req, res) => {
   logger.route("GET", "/admin/golfers/list");
   try {
-    const rows = await dbAll(`
-      SELECT id, first_name, last_name, email
-      FROM users
-      ORDER BY last_name, first_name
-    `);
+    const rows = db.prepare(`
+      SELECT id
+           , first_name
+           , last_name
+           , email
+        FROM users
+       ORDER BY last_name
+              , first_name
+    `).all();
     res.json({ golfers: rows });
   } catch (err) {
     logger.error(err, "Admin GET /golfers/list");
@@ -59,13 +44,21 @@ router.get("/list", requireAdmin, async (req, res) => {
 router.get("/api", requireAdmin, async (req, res) => {
   logger.route("GET", "/admin/golfers/api");
   try {
-    const rows = await dbAll(`
-      SELECT id, first_name, last_name, email,
-             password_hash, is_admin, league_id,
-             subgroup, subgroup_number, is_member
-      FROM users
-      ORDER BY last_name, first_name
-    `);
+    const rows = db.prepare(`
+      SELECT id
+           , first_name
+           , last_name
+           , email
+           , password_hash
+           , is_admin
+           , league_id
+           , subgroup
+           , subgroup_number
+           , is_member
+        FROM users
+       ORDER BY last_name
+              , first_name
+    `).all();
     res.json({ golfers: rows });
   } catch (err) {
     logger.error(err, "Admin GET /golfers/api");
@@ -79,24 +72,47 @@ router.get("/api", requireAdmin, async (req, res) => {
 router.post("/api", requireAdmin, async (req, res) => {
   logger.route("POST", "/admin/golfers/api");
   const {
-    last_name, first_name, email,
-    password_hash, is_admin, league_id,
-    subgroup, subgroup_number, is_member
+      last_name
+    , first_name
+    , email
+    , password_hash
+    , is_admin
+    , league_id
+    , subgroup
+    , subgroup_number
+    , is_member
   } = req.body;
 
   try {
-    const result = await dbRun(`
-      INSERT INTO users (
-        last_name, first_name, email,
-        password_hash, is_admin, league_id,
-        subgroup, subgroup_number, is_member
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      last_name, first_name, email,
-      password_hash, is_admin, league_id,
-      subgroup, subgroup_number, is_member
-    ]);
+    const result = db.prepare(`
+      INSERT INTO logins (
+             last_name
+           , first_name
+           , email
+           , password_hash
+       )
+       VALUES (?, ?, ?, ?)
+    `).run(  last_name
+           , first_name
+           , email
+           , password_hash
+     );
+
+     const result2 = db.prepare(`
+       INSERT INTO league_users (
+                is_admin
+              , league_id
+              , subgroup
+              , subgroup_number
+              , is_member
+       )
+        VALUES (?, ?, ?, ?, ?)
+        `).run(  is_admin
+               , league_id
+               , subgroup
+               , subgroup_number
+               , is_member
+         );
 
     logger.db("INSERT golfer", { id: result.lastID });
     res.json({ success: true, id: result.lastID });
@@ -119,18 +135,18 @@ router.put("/api/:id", requireAdmin, async (req, res) => {
   } = req.body;
 
   try {
-    const result = await dbRun(`
+    const result = db.prepare(`
       UPDATE users
       SET last_name = ?, first_name = ?, email = ?,
           password_hash = ?, is_admin = ?, league_id = ?,
           subgroup = ?, subgroup_number = ?, is_member = ?
       WHERE id = ?
-    `, [
+    `).run(
       last_name, first_name, email,
       password_hash, is_admin, league_id,
       subgroup, subgroup_number, is_member,
       id
-    ]);
+    );
 
     logger.db("UPDATE golfer", { id, changes: result.changes });
     res.json({ success: true });
@@ -148,7 +164,7 @@ router.delete("/api/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await dbRun(`DELETE FROM users WHERE id = ?`, [id]);
+    const result = db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
     logger.db("DELETE golfer", { id, changes: result.changes });
     res.json({ success: true });
   } catch (err) {
@@ -165,10 +181,9 @@ router.get("/api/:id/playdays", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const row = await dbGet(
-      "SELECT play_days FROM user_play_days WHERE user_id = ?",
-      [id]
-    );
+    const row = db.prepare(
+      `SELECT play_days FROM user_play_days WHERE user_id = ?`
+    ).get(id);
     res.json({ play_days: row ? row.play_days : "" });
   } catch (err) {
     logger.error(err, "Admin GET /golfers/api/:id/playdays");
@@ -182,11 +197,13 @@ router.put("/api/:id/playdays", requireAdmin, async (req, res) => {
   const { play_days } = req.body;
 
   try {
-    await dbRun(`
-      INSERT INTO user_play_days (user_id, play_days)
-      VALUES (?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET play_days = excluded.play_days
-    `, [id, play_days]);
+    insertStmt = db.prepare(`
+      INSERT INTO user_play_days (user_id, league_id, day_of_week, is_play_day)
+      VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, league_id, day_of_week) 
+          DO UPDATE 
+                SET is_play_day = excluded.is_play_day
+    `).run(id, req.body.league_id, req.body.day_of_week, req.body.is_play_day);
 
     logger.db("UPSERT user_play_days", { user_id: id });
     res.json({ success: true });

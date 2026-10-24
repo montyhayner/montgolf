@@ -1,0 +1,52 @@
+Production Upgrade
+=================
+Local - C:/users/monty/Golf/montgolf - NO TAGS
+-------------------------------------------------------------------------
+	git status
+	git add *
+	git commit -m "description of changes"
+	git push origin main
+
+Local - C:/users/monty/Golf/montgolf - TAGS
+--------------------------------------------------------------------
+	git fetch --tags
+	git tag -a v1.1.0 -m "description of release"
+	git push origin v1.1.0
+
+Production - NO TAGS
+----------------------------------
+	cd  - /var/www/montgolf/
+	git pull origin main
+	npm install
+	pm2 restart montgolf   (or systemctl restart montgolf)
+
+Production - TAGS
+-----------------------------
+	git fetch --tags
+	git checkout v1.0.0
+	pm2 restart montgolf
+
+Production Support
+=================
+View last 100 lines of logs
+---------------------------------------
+	pm2 logs montgolf --lines 100
+	tail -n 100 production.log  (<== file name)
+
+Production Database
+--------------------------------
+	cd /var/www/montgolf/
+	sqlite3 ./golf.db
+	SQLite>  <sql ending with ; >
+	SQLite> .schema schedule_history (will give CREATE TABLE ddl)
+	sqlites> .quit
+
+Copy production file to localhost
+============================
+scp root@107.170.38.79:/var/www/montgolf/golf.db /users/monty/golf.db
+scp root@107.170.38.79:/var/www/montgolf/public/admin-edit-tee-sheet.html /users/monty/dmin-edit-tee-sheet.html
+
+
+
+
+     

@@ -1,0 +1,4 @@
+UPDATE league_users
+SET subgroup_number =
+       CAST(CAST(subgroup_number AS INTEGER) AS TEXT)
+WHERE subgroup_number LIKE '%.%';

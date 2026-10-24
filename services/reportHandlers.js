@@ -71,7 +71,7 @@ function buildTwoWeekUserReportData(db, leagueId) {
 // ------------------------------------------------------------
 // TWO‑WEEK REPORT HELPERS (your code)
 // ------------------------------------------------------------
-async function buildTwoWeekReportData(db, leagueId) {
+function buildTwoWeekReportData(db, leagueId) {
   const dateRows = db.prepare(`
     SELECT DISTINCT schedule.date AS play_date
     FROM schedule
@@ -388,7 +388,7 @@ async function sendTwoWeekReportEmail(req, res) {
     }
 
     await sendEmail({
-      from: "rlhayner@verizon.net",
+      from: "notifications@mg.montgolf.net",
       to: recipients.join(", "),
       subject: `Two-Week Golfers Report - ${leagueName}`,
       text: textReport,
@@ -458,7 +458,7 @@ async function sendLatestTeeSheetEmail(req, res) {
 
     if (!row || !row.latest_date) {
       await sendEmail({
-        from: "rlhayner@verizon.net",
+        from: "notifications@mg.montgolf.net",
         to: user.email,
         subject: `Latest Tee Sheet Report - ${leagueName}`,
         text: "No tee sheet found.",
@@ -492,7 +492,7 @@ async function sendLatestTeeSheetEmail(req, res) {
     }
 
     await sendEmail({
-      from: "rlhayner@verizon.net",
+      from: "notifications@mg.montgolf.net",
       to: recipients.join(", "),
       subject: `Latest Tee Sheet Report - ${leagueName}`,
       text: textReport,

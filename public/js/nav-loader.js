@@ -16,7 +16,10 @@ async function loadNav() {
     const user = await who.json();
     console.log("NAV LOADER: user:", user, " user_mode:", user.user_mode);
 
-    const isAdmin = user && user.user_mode === "admin";
+    const isAdmin = user &&
+                    (user.user_mode === "admin" ||
+                    user.is_admin === 1 ||
+                    user.is_super_admin === 1);
 
     const navFile = isAdmin
       ? "/partials/admin-nav.html"

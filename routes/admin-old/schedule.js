@@ -6,20 +6,6 @@ const { requireAdmin } = require("../../middleware/auth");
 
 const router = express.Router();
 
-// DB helpers
-function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-  });
-}
-function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      err ? reject(err) : resolve(this);
-    });
-  });
-}
-
 // -----------------------------------------------------------------------------
 // GET A USER'S SCHEDULE FOR A MONTH
 // -----------------------------------------------------------------------------
@@ -34,11 +20,11 @@ router.get("/api/:userId/:year/:month", requireAdmin, async (req, res) => {
   const end = `${year}-${String(month).padStart(2, "0")}-31`;
 
   try {
-    const rows = await dbAll(`
+    const rows = db.prepare(`
       SELECT date, is_playing
       FROM schedule
       WHERE user_id = ? AND date BETWEEN ? AND ?
-    `, [userId, start, end]);
+    `).all(userId, start, end);
 
     const schedule = {};
     rows.forEach(r => schedule[r.date] = r.is_playing);

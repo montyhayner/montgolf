@@ -7,6 +7,8 @@ const db = require("../db");
 const logger = require("../utils/logger");
 const { requireLogin } = require("../middleware/auth");
 const { easternNow } = require("../utils/easternTime");
+
+// Services
 const {
   getTwoWeekReport,
   sendTwoWeekReportEmail,
@@ -14,197 +16,168 @@ const {
   sendLatestTeeSheetEmail
 } = require("../services/reportHandlers");
 
-// --- DB helpers (async/await wrappers) ---
-function dbGet(sql, params = []) {
-  return db.getAsync(sql, params);
-}
-
-function dbAll(sql, params = []) {
-  return db.allAsync(sql, params);
-}
-
-function dbRun(sql, params = []) {
-  return db.runAsync(sql, params);
-}
-
+// ============================================================================
+// INIT ROUTE
+// ============================================================================
 router.get("/schedule/init", (req, res) => {
-  console.log("🔥 USER INIT ROUTE HIT");
-
   try {
     const easternTS = easternNow();
-    console.log("🔥 easternTS = ", easternTS);
-
-    return res.json({
-      status: "ok",
-      easternTS: easternTS
-    });
-
+    return res.json({ status: "ok", easternTS });
   } catch (err) {
-    console.error("🔥 GET /user/schedule/init", err);
     return res.status(500).json({ error: "Server error getting eastern timezone timestamp" });
   }
 });
 
-
 // ============================================================================
 // SAVE USER SCHEDULE (with schedule_history logging)
 // ============================================================================
-
 async function saveScheduleHandler(req, res) {
   logger.route("PUT", "/user/schedule/:year/:month");
+  console.log(">>> BACKEND SAVE incoming schedule:", req.body.schedule);
+  console.log(">>> BACKEND SAVE incoming status:", req.body.status);
 
   try {
-    // ⭐ User can ONLY edit their own schedule
+
     const targetUserId = req.session.user.id;
     const targetUserEmail = req.session.user.email;
     const leagueId = req.session.user.league_id;
 
-    // ⭐ Extract params + body
     const { year, month } = req.params;
     const { schedule, sessionStartTS } = req.body;
 
     const source = "user";
+    const transactn = db.transaction(() => {
+      // Validate allowed league play days
+      const leagueDaysRows = db.prepare(`
+        SELECT day_of_week
+          FROM league_play_days
+          WHERE league_id = ?
+            AND is_play_day = 1
+      `).all(leagueId);
 
-    // -------------------------------------------------------------------------
-    // VALIDATION: Ensure user is only selecting days allowed by the league
-    // -------------------------------------------------------------------------
-    const leagueDaysRows = await dbAll(
-      `SELECT day_of_week
-         FROM league_play_days
-        WHERE league_id = ?
-          AND is_play_day = 1`,
-      [leagueId]
-    );
+      const allowedDays = leagueDaysRows.map(r => r.day_of_week);
+      const invalidSelections = [];
 
-    const allowedDays = leagueDaysRows.map(r => r.day_of_week);
-    const invalidSelections = [];
-
-    for (const [date, isPlaying] of Object.entries(schedule)) {
-      if (!isPlaying) continue;
-
-      const [y, m, d] = date.split("-");
-      const dow = new Date(y, m - 1, d).getDay();
-
-      if (!allowedDays.includes(dow)) {
-        invalidSelections.push(date);
+      for (const [date, isPlaying] of Object.entries(schedule)) {
+        if (!isPlaying) continue;
+        const [y, m, d] = date.split("-");
+        const dow = new Date(y, m - 1, d).getDay();
+        if (!allowedDays.includes(dow)) invalidSelections.push(date);
       }
-    }
 
-    if (invalidSelections.length > 0) {
-      return res.status(400).json({
-        error: "Invalid days selected",
-        invalidDates: invalidSelections
-      });
-    }
-
-    // -------------------------------------------------------------------------
-    // LOAD EXISTING SCHEDULE FOR THIS USER + MONTH
-    // -------------------------------------------------------------------------
-    const pad = n => String(n).padStart(2, "0");
-    const prefix = `${year}-${pad(month)}-`;
-
-    const existingRows = await dbAll(
-      `SELECT date, is_playing
-         FROM schedule
-        WHERE user_id = ?
-          AND date LIKE ?`,
-      [targetUserId, `${prefix}%`]
-    );
-
-    const existingMap = {};
-    for (const row of existingRows) {
-      existingMap[row.date] = row.is_playing;
-    }
-
-    // -------------------------------------------------------------------------
-    // DETECT CHANGES AND WRITE TO schedule_history and TO schedule
-    // -------------------------------------------------------------------------
-    const historyStmt = db.prepare(`
-      INSERT INTO schedule_history (
-          user_id,
-          league_id,
-          play_date,
-          old_is_playing,
-          new_is_playing,
-          changed_by,
-          changed_at,
-          source,
-          before_state,
-          after_state
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id, league_id, play_date, changed_at)
-      DO UPDATE SET
-          new_is_playing = excluded.new_is_playing,
-          changed_by     = excluded.changed_by,
-          source         = excluded.source,
-          after_state    = excluded.after_state
-    `);
-
-    const scheduleStmt = db.prepare(`
-      INSERT INTO schedule (user_id, date, is_playing, updated_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(user_id, date)
-      DO UPDATE SET
-          is_playing = excluded.is_playing,
-          updated_at = excluded.updated_at
-    `);
-
-    for (const [date, newVal] of Object.entries(schedule)) {
-      const oldVal = existingMap[date] ?? 0;
-      const newInt = newVal ? 1 : 0;
-
-      if (oldVal !== newInt) {
-        historyStmt.run(
-          targetUserId,
-          leagueId,
-          date,
-          oldVal,
-          newInt,
-          targetUserEmail,     // ⭐ user email, not admin email
-          sessionStartTS,      // ⭐ from body
-          source,
-          JSON.stringify({ is_playing: oldVal }),
-          JSON.stringify({ is_playing: newInt })
-        );
-        
-        scheduleStmt.run(
-          targetUserId,
-          date,
-          newInt,
-          sessionStartTS
-        );
+      if (invalidSelections.length > 0) {
+        return res.status(400).json({
+          error: "Invalid days selected",
+          invalidDates: invalidSelections
+        });
       }
-    }
 
-    // -------------------------------------------------------------------------
-    // CLEAN UP HISTORY ROWS WITH NO CHANGE
-    // -------------------------------------------------------------------------
-    db.prepare(
-      `DELETE FROM schedule_history
+      // Load existing schedule
+      const pad = n => String(n).padStart(2, "0");
+      const prefix = `${year}-${pad(month)}-`;
+
+      const existingRows = db.prepare(`
+        SELECT date, is_playing
+          FROM schedule
         WHERE user_id = ?
-          AND play_date LIKE ?
-          AND new_is_playing = old_is_playing`
-    ).run(targetUserId, `${prefix}%`);
+          AND league_id = ?
+          AND date LIKE ?
+      `).all(targetUserId, leagueId, `${prefix}%`);
 
-    // -------------------------------------------------------------------------
-    // UPDATE user_play_months.in_town
-    // -------------------------------------------------------------------------
-    const numOne = 1;
-    await db.runAsync(
-      `INSERT INTO user_play_months (user_id, month, in_town, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(user_id, month)
-       DO UPDATE SET in_town = 1, updated_at = excluded.updated_at`,
-      [targetUserId, month, numOne, sessionStartTS]
-    );
+      const existingMap = {};
+      for (const row of existingRows) {
+        existingMap[row.date] = row.is_playing;
+      }
 
-    return res.json({
+      // Prepare statements
+      // Prepare UPSERT statement for schedule_history
+      const historyUpsertStmt = db.prepare(`
+        INSERT INTO schedule_history (
+            user_id,
+            league_id,
+            play_date,
+            old_is_playing,
+            new_is_playing,
+            changed_by,
+            changed_at,
+            source,
+            before_state,
+            after_state
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, league_id, play_date, changed_at)
+        DO UPDATE SET
+            old_is_playing = excluded.old_is_playing,
+            new_is_playing = excluded.new_is_playing,
+            before_state = excluded.before_state,
+            after_state = excluded.after_state,
+            changed_by = excluded.changed_by,
+            source = excluded.source
+      `);
+
+      // Prepare UPSERT statement for schedule table
+      const scheduleStmt = db.prepare(`
+        INSERT INTO schedule (user_id, league_id, date, is_playing, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, league_id, date)
+        DO UPDATE SET
+            is_playing = excluded.is_playing,
+            updated_at = excluded.updated_at
+      `);
+
+      // Apply changes — ONLY during Save
+      for (const [date, newVal] of Object.entries(schedule)) {
+        const oldVal = existingMap[date] ?? 0;
+        const newInt = newVal ? 1 : 0;
+
+        if (oldVal !== newInt) {
+          historyUpsertStmt.run(
+            targetUserId,
+            leagueId,
+            date,
+            oldVal,
+            newInt,
+            targetUserEmail,
+            sessionStartTS,   // SAME timestamp for entire session
+            source,
+            JSON.stringify({ is_playing: oldVal }),
+            JSON.stringify({ is_playing: newInt })
+          );
+
+          scheduleStmt.run(
+            targetUserId,
+            leagueId,
+            date,
+            newInt,
+            sessionStartTS
+          );
+        }
+      }
+
+      // Update user_play_months
+      const insertStmt = db.prepare(`
+        INSERT INTO user_play_months (user_id, league_id, month, in_town, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, league_id, month)
+        DO UPDATE 
+              SET in_town = 1
+                , updated_at = excluded.updated_at
+        `).run(targetUserId, leagueId, month, 1, sessionStartTS);
+    })
+
+    // Commit transaction    
+    transactn();    
+
+    const responseObj = {
       status: "saved",
       schedule,
       edited_by: targetUserEmail,
       edited_user: targetUserEmail
-    });
+    };
+
+    console.log(">>> BACKEND SAVE returning:", responseObj);
+
+    return res.json(responseObj);
 
   } catch (err) {
     logger.error(err, "PUT /user/schedule/:year/:month");
@@ -212,22 +185,18 @@ async function saveScheduleHandler(req, res) {
   }
 }
 
-// Attach to /user route
 router.put("/schedule/:year/:month", requireLogin, saveScheduleHandler);
 
-
-//---------------------------------------------------------
-//  CLEAR SCHEDULE (Supports ADMIN OVERRIDE)
-//---------------------------------------------------------
-
+// ============================================================================
+// CLEAR SCHEDULE (Supports ADMIN OVERRIDE)
+// ============================================================================
 async function clearScheduleHandler(req, res) {
   logger.route("POST", "/user/schedule/clear/:year/:month");
 
   const isAdmin = req.session.user.is_admin === 1;
-
   let targetUserId = req.session.user.id;
 
-  if (isAdmin && req.body && req.body.target_user_id) {
+  if (isAdmin && req.body?.target_user_id) {
     targetUserId = parseInt(req.body.target_user_id);
   }
 
@@ -239,47 +208,23 @@ async function clearScheduleHandler(req, res) {
   const prefix = `${year}-${pad(month)}-`;
 
   try {
-    const existingRows = await dbAll(
-      `SELECT date, is_playing
-       FROM schedule
-       WHERE user_id = ?
-         AND date LIKE ?`,
-      [targetUserId, `${prefix}%`]
-    );
+    const existingRows = db.prepare(`
+      SELECT date
+            , is_playing
+         FROM schedule
+        WHERE user_id = ?
+          AND league_id = ?
+          AND date LIKE ?
+    `).all(targetUserId, leagueId, `${prefix}%`);
 
     const ts = easternNow();
 
-    const historyStmt = db.prepare(`
-      INSERT INTO schedule_history (
-        user_id, league_id, play_date,
-        old_is_playing, new_is_playing,
-        changed_by, changed_at, source,
-        before_state, after_state
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    for (const row of existingRows) {
-      historyStmt.run(
-        targetUserId,
-        leagueId,
-        row.date,
-        row.is_playing,
-        0,
-        adminEmail,
-        ts,
-        isAdmin ? "admin" : "user",
-        JSON.stringify({ is_playing: row.is_playing }),
-        JSON.stringify({ is_playing: 0 })
-      );
-    }
-
-    await db.runAsync(
-      `DELETE FROM schedule
+    const deleteStmt = db.prepare(`
+       DELETE FROM schedule
        WHERE user_id = ?
-         AND date LIKE ?`,
-      [targetUserId, `${prefix}%`]
-    );
+         AND league_id = ?
+         AND date LIKE ?
+       `).run(targetUserId, leagueId, `${prefix}%`);
 
     return res.json({
       status: "cleared",
@@ -288,38 +233,36 @@ async function clearScheduleHandler(req, res) {
     });
 
   } catch (err) {
-    console.error(err);
+    logger.error(err, "POST /user/schedule/clear/:year/:month");
     res.status(500).json({ error: err.message });
   }
 }
 
-// Attach to /user route
 router.post("/schedule/clear/:year/:month", requireLogin, clearScheduleHandler);
 
-//---------------------------------------------------------
-//  DEFAULT SCHEDULE (Supports ADMIN OVERRIDE)
-//---------------------------------------------------------
-
+// ============================================================================
+// DEFAULT SCHEDULE (Supports ADMIN OVERRIDE)
+// ============================================================================
 async function defaultScheduleHandler(req, res) {
   logger.route("POST", "/user/schedule/default/:year/:month");
 
   const isAdmin = req.session.user.is_admin === 1;
-
   let targetUserId = req.session.user.id;
 
-  if (isAdmin && req.body && req.body.target_user_id) {
+  if (isAdmin && req.body?.target_user_id) {
     targetUserId = parseInt(req.body.target_user_id);
   }
-
+  const leagueId = req.session.user.league_id;
   const { year, month } = req.params;
 
   try {
-    const monthRow = await dbGet(
-      `SELECT in_town
-       FROM user_play_months
-       WHERE user_id = ? AND month = ?`,
-      [targetUserId, month]
-    );
+    const monthRow = db.prepare(`
+       SELECT in_town
+         FROM user_play_months
+        WHERE user_id = ? 
+          AND league_id = ?
+          AND month = ?
+    `).get(targetUserId, leagueId, month);
 
     let isInTown = monthRow?.in_town === 1;
 
@@ -327,24 +270,13 @@ async function defaultScheduleHandler(req, res) {
       return res.json({ status: "out_of_town" });
     }
 
-    if (!isInTown) {
-      await dbRun(
-        `UPDATE user_play_months
-            SET in_town = 1
-          WHERE user_id = ? 
-            AND month = ?`,
-        [targetUserId, month]
-      );
-      isInTown = true;
-    }
-
-    const dayRows = await dbAll(
-      `SELECT day_of_week
+    const dayRows = db.prepare(`
+       SELECT day_of_week
          FROM user_play_days
-        WHERE user_id = ? 
-          AND is_play_day = 1`,
-      [targetUserId]
-    );
+        WHERE user_id = ?
+          AND league_id = ?
+          AND is_play_day = 1
+    `).all([targetUserId, leagueId]);
 
     const allowedDays = dayRows.map(r => r.day_of_week);
 
@@ -369,70 +301,50 @@ async function defaultScheduleHandler(req, res) {
   }
 }
 
-// Attach to /user route
 router.post("/schedule/default/:year/:month", requireLogin, defaultScheduleHandler);
 
-
-// -----------------------------------------------------------------------------
-// USER INFO - get first_name, last_name  of logged-in user and pass back to frontend
-// -----------------------------------------------------------------------------
-
-router.get("/info", requireLogin, async (req, res) => {
-  logger.route("GET", "/user/info");
-
-  try {
-    const userId = req.session.user.id;
-
-    const row = await dbGet(
-      `SELECT first_name, last_name FROM users WHERE id = ?`,
-      [userId]
-    );
-
-    res.json({ user: row });
-  } catch (err) {
-    logger.error(err, "GET /user/info");
-    res.status(500).json({ error: err.message });
-  }
+// ============================================================================
+// USER INFO
+// ============================================================================
+router.get("/info", requireLogin, (req, res) => {
+  const user = req.session.user;
+  res.json({
+    user: {
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email
+    }
+  });
 });
 
-// ------------------------------------------------------------
+// ============================================================================
 // USER REPORTS
-// ------------------------------------------------------------
-
-// Two‑Week Golfers Report (JSON for the page)
+// ============================================================================
 router.get("/reports/two-week", requireLogin, getTwoWeekReport);
+router.post("/reports/two-week/email", requireLogin, sendTwoWeekReportEmail);
 
-// Two‑Week Golfers Report (send email)
-router.post("two-week/email", requireLogin, sendTwoWeekReportEmail);
-
-// Latest Tee Sheet Report (JSON for the page)
 router.get("/reports/latest-tee-sheet", requireLogin, getLatestTeeSheet);
-
-// Latest Tee Sheet Report (send email)
 router.post("/reports/latest-tee-sheet/email", requireLogin, sendLatestTeeSheetEmail);
 
-// -----------------------------------------------------------------------------
-// SELECTED LEAGUE - get the league_name of the logged-in user's selected league
-// -----------------------------------------------------------------------------
+// ============================================================================
+// SELECTED LEAGUE
+// ============================================================================
+router.get("/selected-league", requireLogin, (req, res) => {
+  const leagueId = req.session.user.league_id;
 
-router.get("/selected-league", requireLogin, async (req, res) => {
-  logger.route("GET", "/user/selected-league");
+  const row = db.prepare(`
+    SELECT id
+         , league_name 
+      FROM leagues 
+     WHERE id = ?
+  `).get([leagueId]);
 
-  try {
-    const leagueId = req.session.user.league_id;
-
-    const row = await dbGet(
-      `SELECT id, league_name FROM leagues WHERE id = ?`,
-      [leagueId]
-    );
-
-    res.json({ league: row });
-  } catch (err) {
-    logger.error(err, "GET /user/selected-league");
-    res.status(500).json({ error: err.message });
-  }
+  res.json({ league: row });
 });
 
+// ============================================================================
+// PROFILE PAGES
+// ============================================================================
 const path = require("path");
 
 router.get("/edit-profile", requireLogin, (req, res) => {
@@ -443,12 +355,10 @@ router.get("/change-password", requireLogin, (req, res) => {
   res.sendFile(path.resolve("public/user-change-password.html"));
 });
 
-// -----------------------------------------------------------------------------
-// USER LAST-VIEWED SCHEDULE MONTH
-// -----------------------------------------------------------------------------
+// ============================================================================
+// LAST VIEWED SCHEDULE MONTH
+// ============================================================================
 router.get("/schedule", requireLogin, (req, res) => {
-  logger.route("GET", "/user/schedule");
-
   let { lastScheduleYear, lastScheduleMonth } = req.session;
 
   if (!lastScheduleYear || !lastScheduleMonth) {
@@ -467,48 +377,41 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
   logger.route("GET", "/user/schedule/:year/:month");
 
   const userId = req.session.user.id;
+  const leagueId = req.session.user.league_id;
   const { year, month } = req.params;
 
   const pad = n => String(n).padStart(2, "0");
   const prefix = `${year}-${pad(month)}-`;
 
-  const endDate = new Date(year, month, 0).getDate();
-
   try {
-    // 1. Load in-town status
-    const monthRow = await dbGet(
-      `SELECT in_town
+    const monthRow = db.prepare(`
+       SELECT in_town
          FROM user_play_months
         WHERE user_id = ? 
-          AND month = ?`,
-      [userId, month]
-    );
+          AND league_id = ?
+          AND month = ?
+    `).get([userId, leagueId, month]);
 
     const inTown = monthRow?.in_town === 1;
 
-    // 2. Load league play days
-    const leagueRows = await dbAll(
-      `SELECT day_of_week
+    const leagueRows = db.prepare(`
+       SELECT day_of_week
          FROM league_play_days
         WHERE league_id = ? 
-          AND is_play_day = 1`,
-      [req.session.user.league_id]
-    );
+          AND is_play_day = 1
+       `).all(leagueId);
 
     const leaguePlayDays = leagueRows.map(r => r.day_of_week);
 
-    // 3. Load saved schedule rows
-    const rows = await dbAll(
-      `SELECT date, is_playing
+    const rows = db.prepare(
+      `SELECT date
+            , is_playing
          FROM schedule
         WHERE user_id = ?
-          AND date LIKE ?`,
-      [userId, `${prefix}%`]
-    );
+          AND league_id = ?
+          AND date LIKE ?
+      `).all(userId, leagueId, `${prefix}%`);
 
-    // ---------------------------------------------------------------------
-    // CASE A: Out of town → always return empty schedule
-    // ---------------------------------------------------------------------
     if (!inTown) {
       return res.json({
         schedule: {},
@@ -518,9 +421,6 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
       });
     }
 
-    // ---------------------------------------------------------------------
-    // CASE B: No saved rows → new month (blank)
-    // ---------------------------------------------------------------------
     if (rows.length === 0) {
       return res.json({
         schedule: {},
@@ -530,9 +430,6 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
       });
     }
 
-    // ---------------------------------------------------------------------
-    // CASE C: Saved rows exist → determine cleared vs saved
-    // ---------------------------------------------------------------------
     const allZero = rows.every(r => r.is_playing === 0);
 
     if (allZero) {
@@ -544,9 +441,6 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
       });
     }
 
-    // ---------------------------------------------------------------------
-    // CASE D: Saved schedule
-    // ---------------------------------------------------------------------
     const schedule = {};
     rows.forEach(r => {
       schedule[r.date] = r.is_playing === 1;
@@ -565,9 +459,11 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
   }
 });
 
-router.get("/session-info", requireLogin, async (req, res) => {
+// ============================================================================
+// SESSION INFO
+// ============================================================================
+router.get("/session-info", requireLogin, (req, res) => {
   const user = req.session.user;
-
   res.json({
     first_name: user.first_name,
     last_name: user.last_name,
@@ -575,6 +471,9 @@ router.get("/session-info", requireLogin, async (req, res) => {
   });
 });
 
+// ============================================================================
+// AVAILABILITY — GET
+// ============================================================================
 router.get("/availability", requireLogin, async (req, res) => {
   logger.route("GET", "/user/availability");
 
@@ -582,81 +481,79 @@ router.get("/availability", requireLogin, async (req, res) => {
   const leagueId = req.session.user.league_id;
 
   try {
-    // 1. Load league play days
-    const leagueDaysRows = await dbAll(
-      `SELECT day_of_week
-         FROM league_play_days
+    const leagueDaysRows = db.prepare(`
+      SELECT day_of_week
+        FROM league_play_days
         WHERE league_id = ? 
-          AND is_play_day = 1`,
-      [leagueId]
-    );
+          AND is_play_day = 1
+    `).all(leagueId);
 
     const leaguePlayDays = leagueDaysRows.map(r => r.day_of_week);
+    const leaguePlayMonths = Array.from({ length: 12 }, (_, i) => i + 1); 
 
-    // League plays all 12 months
-    const leaguePlayMonths = Array.from({ length: 12 }, (_, i) => i + 1);
-
-    // 2. Load user rows
-    let playDaysRows = await dbAll(
-      `SELECT day_of_week
+    let playDaysRows = db.prepare(`
+      SELECT day_of_week
             , is_play_day
-         FROM user_play_days
-        WHERE user_id = ?`,
-      [userId]
-    );
+        FROM user_play_days
+        WHERE user_id = ?
+          AND league_id = ?
+      `).all(userId, leagueId);
 
-    let playMonthsRows = await dbAll(
-      `SELECT month
-            , in_town
-         FROM user_play_months
-        WHERE user_id = ?`,
-      [userId]
-    );
+    let playMonthsRows = db.prepare(`
+      SELECT month, in_town
+        FROM user_play_months
+      WHERE user_id = ?
+        AND league_id = ?
+    `).all(userId, leagueId);
 
-    // 3. Auto-create missing user rows
     if (playDaysRows.length === 0) {
       for (let dow = 0; dow < 7; dow++) {
         const isPlay = leaguePlayDays.includes(dow) ? 1 : 0;
-        await dbRun(
-          `INSERT INTO user_play_days (user_id, day_of_week, is_play_day)
-           VALUES (?, ?, ?)`,
-          [userId, dow, isPlay]
-        );
+        const insertStmt = db.prepare(
+          `INSERT INTO user_play_days (
+                      user_id
+                    , league_id
+                    , day_of_week
+                    , is_play_day)
+                VALUES (?, ?, ?, ?)
+          `).run(userId, leagueId, dow, isPlay);
       }
-      playDaysRows = await dbAll(
-        `SELECT day_of_week
+
+      const playDaysRows = db.prepare(`
+        SELECT day_of_week
               , is_play_day
-           FROM user_play_days
-          WHERE user_id = ?`,
-        [userId]
-      );
+          FROM user_play_days
+          WHERE user_id = ?
+            AND league_id = ?
+      `).all(userId, leagueId);
     }
 
-    isInTown = 1;
+    let isInTown = 1;
 
     if (playMonthsRows.length < 12) {
-        const existingMonths = new Set(playMonthsRows.map(r => r.month));
+      const existingMonths = new Set(playMonthsRows.map(r => r.month));
 
-        for (let m = 1; m <= 12; m++) {
-          if (!existingMonths.has(m)) {
-            await dbRun(
-              `INSERT INTO user_play_months (user_id, month, in_town)
-               VALUES (?, ?, ?)`,
-              [userId, m, isInTown]
-            );
-          }
+      for (let m = 1; m <= 12; m++) {
+        if (!existingMonths.has(m)) {
+          const insertStatement = db.prepare(`
+            INSERT INTO user_play_months 
+                        (user_id
+                      , league_id
+                      , month
+                      , in_town)
+            VALUES (?, ?, ?, ?)
+            `).run(userId, leagueId, m, isInTown);
         }
+      }
 
-      playMonthsRows = await dbAll(
-        `SELECT month
-              , in_town
-           FROM user_play_months
-          WHERE user_id = ?`,
-        [userId]
-      );
-    }
+      const playMonthsRows = db.prepare(`
+        SELECT month, in_town
+          FROM user_play_months
+        WHERE user_id = ?
+          AND league_id = ?
+      `).all(userId, leagueId);
+    }  
 
-    // 4. Convert to objects for frontend
     const playDays = Object.fromEntries(
       playDaysRows.map(r => [r.day_of_week, r.is_play_day === 1])
     );
@@ -665,7 +562,6 @@ router.get("/availability", requireLogin, async (req, res) => {
       playMonthsRows.map(r => [r.month, r.in_town === 1])
     );
 
-    // 5. Return everything
     res.json({
       playDays,
       playMonths,
@@ -679,64 +575,70 @@ router.get("/availability", requireLogin, async (req, res) => {
   }
 });
 
+// ============================================================================
+// AVAILABILITY — PUT
+// ============================================================================
 router.put("/availability", requireLogin, async (req, res) => {
   logger.route("PUT", "/user/availability");
 
   const userId = req.session.user.id;
   const leagueId = req.session.user.league_id;
-  console.log("put /availability - req.body = ", req.body);
   const { playDays, playMonths } = req.body;
 
   try {
-    // 1. Load allowed league play days
-    const rows = await dbAll(
-      `SELECT day_of_week
-       FROM league_play_days
-       WHERE league_id = ? AND is_play_day = 1`,
-      [leagueId]
-    );
+    const updateTransaction = db.transaction(() => {
 
-    const allowedDays = rows.map(r => r.day_of_week);
+      const rows = db.prepare(`
+         SELECT day_of_week
+           FROM league_play_days
+          WHERE league_id = ? 
+            AND is_play_day = 1
+      `).all(leagueId);
 
-    // 2. Validate user selections
-    const invalid = [];
-    for (const [dow, val] of Object.entries(playDays)) {
-      if (val && !allowedDays.includes(Number(dow))) {
-        invalid.push(Number(dow));
+      const allowedDays = rows.map(r => r.day_of_week);
+
+      const invalid = [];
+      for (const [dow, val] of Object.entries(playDays)) {
+        if (val && !allowedDays.includes(Number(dow))) {
+          invalid.push(Number(dow));
+        }
       }
-    }
 
-    if (invalid.length > 0) {
-      return res.status(400).json({
-        error: "Invalid play days selected",
-        invalidDays: invalid
-      });
-    }
+      if (invalid.length > 0) {
+        return res.status(400).json({
+          error: "Invalid play days selected",
+          invalidDays: invalid
+        });
+      }
 
-    // 3. Update weekly play days
-    const stmtDays = db.prepare(`
-      UPDATE user_play_days
-      SET is_play_day = ?
-      WHERE user_id = ? AND day_of_week = ?
-    `);
+      const stmtDays = db.prepare(`
+        UPDATE user_play_days
+          SET is_play_day = ?
+        WHERE user_id = ? 
+          AND league_id = ? 
+          AND day_of_week = ?
+      `);
 
-    for (const [dow, val] of Object.entries(playDays)) {
-      stmtDays.run(val ? 1 : 0, userId, dow);
-    }
+      for (const [dow, val] of Object.entries(playDays)) {
+        stmtDays.run(val ? 1 : 0, userId, leagueId, dow);
+      }
+          // 4. Update monthly in-town
+      const stmtMonths = db.prepare(`
+        UPDATE user_play_months
+          SET in_town = ?
+        WHERE user_id = ? 
+          AND league_id = ? 
+          AND month = ?
+      `);
 
-    // 4. Update monthly in-town
-    const stmtMonths = db.prepare(`
-      UPDATE user_play_months
-      SET in_town = ?
-      WHERE user_id = ? AND month = ?
-    `);
+      for (const [month, val] of Object.entries(playMonths)) {
+        stmtMonths.run(val ? 1 : 0, userId, leagueId, Number(month));
+      }
+    }); 
 
-    console.log("playMonths received:", playMonths);
+    // Commit transaction
+    updateTransaction();
 
-    for (const [month, val] of Object.entries(playMonths)) {
-     stmtMonths.run(val ? 1 : 0, userId, Number(month));
-    }
-    
     // 5. Success
     res.json({ success: true });
 
@@ -747,44 +649,65 @@ router.put("/availability", requireLogin, async (req, res) => {
 });
 
 // ============================================================================
-// POST /auth/admin-login  (ADMIN LOGIN)
+// AVAILABILITY DEFAULT (reset to league defaults)
 // ============================================================================
-router.post("/admin-login", async (req, res) => {
-  const { email, password } = req.body;
+router.post("/availability/default", requireLogin, async (req, res) => {
+  logger.route("POST", "/user/availability/default");
+
+  const userId = req.session.user.id;
+  const leagueId = req.session.user.league_id;
 
   try {
-    // Look up admin user
-    const user = await db.getAsync(
-      "SELECT * FROM users WHERE email = ? AND is_admin = 1",
-      [email]
-    );
+    // Reset weekly play days to league defaults
 
-    if (!user) {
-      return res.redirect("/admin-login?error=1");
+    db.prepare(`
+      UPDATE user_play_days
+        SET is_play_day = COALESCE((
+                          SELECT is_play_day
+                            FROM league_play_days
+                            WHERE league_play_days.league_id = ?
+                              AND league_play_days.day_of_week = user_play_days.day_of_week
+                          ), 0)
+      WHERE user_id = ?
+        AND league_id = ?
+    `).run(leagueId, userId, leagueId);
+
+    // Reset all months to in-town
+    db.prepare(`
+      UPDATE user_play_months
+        SET in_town = 1
+      WHERE user_id = ?
+        AND league_id = ?
+    `).run(userId, leagueId);
+
+    // Reload updated weekly play days
+    const dayRows = db.prepare(
+      `SELECT day_of_week, is_play_day
+        FROM user_play_days
+        WHERE user_id = ?
+          AND league_id = ?`
+    ).all(userId, leagueId);
+
+    const playDays = {};
+    dayRows.forEach(r => {
+      playDays[r.day_of_week] = r.is_play_day === 1;
+    });
+
+    // Build updated monthly values
+    const playMonths = {};
+    for (let m = 1; m <= 12; m++) {
+      playMonths[m] = true;
     }
 
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) {
-      return res.redirect("/admin-login?error=1");
-    }
-
-    // Save session
-    req.session.user = {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      league_id: user.league_id,
-      is_admin: true,
-      is_super_admin: user.is_super_admin === 1,
-      user_mode: "admin"   // ⭐ REQUIRED
-    };
-
-    return res.redirect("/admin-dashboard");
+    res.json({
+      playDays,
+      playMonths,
+      status: "default"
+    });
 
   } catch (err) {
-    console.error("🔥 ADMIN LOGIN ERROR:", err);
-    return res.redirect("/admin-login?error=1");
+    logger.error(err, "POST /user/availability/default");
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -795,10 +718,13 @@ router.put("/edit-profile", requireLogin, async (req, res) => {
 
   try {
     // Check if email already exists for another user in the same league
-    const existing = await db.getAsync(
-      `SELECT id FROM users WHERE email = ? AND league_id = ? AND id != ?`,
-      [email, leagueId, userId]
-    );
+    const existing = await db.prepare(`
+       SELECT id 
+         FROM users 
+        WHERE email = ? 
+          AND league_id = ? 
+          AND id != ?
+       `).get(email, leagueId, userId);
 
     if (existing) {
       return res.status(400).json({
@@ -807,10 +733,13 @@ router.put("/edit-profile", requireLogin, async (req, res) => {
     }
 
     // Update profile
-    await db.runAsync(
-      `UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?`,
-      [first_name, last_name, email, userId]
-    );
+    const updateStmt = db.prepare(`
+       UPDATE logins 
+          SET first_name = ?
+            , last_name = ?
+            , email = ? 
+        WHERE id = ?
+    `).run(first_name, last_name, email, userId);
 
     // Update session
     req.session.user.first_name = first_name;
@@ -825,74 +754,9 @@ router.put("/edit-profile", requireLogin, async (req, res) => {
   }
 });
 
-
-router.post("/availability/default", requireLogin, async (req, res) => {
-  logger.route("POST", "/user/availability/default");
-
-  const userId = req.session.user.id;
-  const leagueId = req.session.user.league_id;
-
-  try {
-    // 1. Reset weekly play days to league defaults (SQLite-safe)
-    await new Promise((resolve, reject) => {
-      db.run(
-        `
-        UPDATE user_play_days
-        SET is_play_day = COALESCE((
-          SELECT is_play_day
-          FROM league_play_days
-          WHERE league_play_days.league_id = ?
-            AND league_play_days.day_of_week = user_play_days.day_of_week
-        ), 0)
-        WHERE user_id = ?
-        `,
-        [leagueId, userId],
-        err => err ? reject(err) : resolve()
-      );
-    });
-
-    // 2. Reset all months to in-town
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE user_play_months SET in_town = 1 WHERE user_id = ?`,
-        [userId],
-        err => err ? reject(err) : resolve()
-      );
-    });
-
-    // 3. Read updated weekly play days back from DB
-    const dayRows = await dbAll(
-      `SELECT day_of_week, is_play_day
-       FROM user_play_days
-       WHERE user_id = ?`,
-      [userId]
-    );
-
-    const playDays = {};
-    dayRows.forEach(r => {
-      playDays[r.day_of_week] = r.is_play_day === 1;
-    });
-
-    // 4. Build updated monthly values
-    const playMonths = {};
-    for (let m = 1; m <= 12; m++) {
-      playMonths[m] = true;
-    }
-
-    // 5. Return correct values to frontend
-    res.json({
-      playDays,
-      playMonths,
-      status: "default"
-    });
-
-  } catch (err) {
-    logger.error(err, "POST /user/availability/default");
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Save last viewed month
+// ============================================================================
+// SAVE LAST VIEWED MONTH
+// ============================================================================
 router.post("/set-last-month", requireLogin, (req, res) => {
   logger.route("POST", "/user/set-last-month");
 
@@ -904,10 +768,9 @@ router.post("/set-last-month", requireLogin, (req, res) => {
   res.json({ success: true });
 });
 
-// -----------------------------------------------------------------------------
-// LEAGUE SELECTION (for multi-league users)
-// -----------------------------------------------------------------------------
-
+// ============================================================================
+// MULTI-LEAGUE USER — SELECT LEAGUE
+// ============================================================================
 router.post("/select-league", requireLogin, async (req, res) => {
   logger.route("POST", "/user/select-league");
 
@@ -930,26 +793,25 @@ router.post("/select-league", requireLogin, async (req, res) => {
       id: row.id,
       email: row.email,
       league_id: row.league_id,
-
-      // ⭐ Preserve admin flags
       is_admin: req.session.user.is_admin,
       is_super_admin: req.session.user.is_super_admin,
-
-      // ⭐ Preserve user/admin mode
       user_mode: req.session.user.user_mode
     };
 
     delete req.session.pendingUser;
 
     res.json({ success: true });
+
   } catch (err) {
     logger.error(err, "POST /user/select-league");
     res.status(500).json({ error: err.message });
   }
 });
 
+// ============================================================================
+// EXPORT HANDLERS
+// ============================================================================
 module.exports = router;
-
 module.exports.saveScheduleHandler = saveScheduleHandler;
 module.exports.clearScheduleHandler = clearScheduleHandler;
 module.exports.defaultScheduleHandler = defaultScheduleHandler;

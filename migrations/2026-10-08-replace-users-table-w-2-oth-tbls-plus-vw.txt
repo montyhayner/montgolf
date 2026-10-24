@@ -1,0 +1,70 @@
+CREATE TABLE "logins" (
+	"id"	INTEGER,
+	"email"	TEXT NOT NULL UNIQUE,
+	"password_hash"	TEXT NOT NULL,
+	"last_name"	TEXT NOT NULL,
+	"first_name"	TEXT NOT NULL,
+	PRIMARY KEY("id" AUTOINCREMENT)
+);
+
+delete from users where id = 29;
+
+insert into logins (id, email, password_hash, last_name, first_name)
+             select id, email, password_hash, last_name, first_name 
+			   FROM users;
+			   
+CREATE TABLE league_users (			   
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    league_id INTEGER NOT NULL,
+    is_admin INTEGER NOT NULL CHECK(is_admin IN (0, 1)),
+    subgroup TEXT NOT NULL DEFAULT '' CHECK (
+        subgroup = '' OR (subgroup >= 'A' AND subgroup <= 'Z')
+    ),
+    subgroup_number TEXT NOT NULL DEFAULT '' CHECK (
+        subgroup_number = '' OR (subgroup_number >= '1' AND subgroup_number <= '9')
+    ),
+    is_member INTEGER NOT NULL CHECK(is_member IN (0, 1)),
+    UNIQUE(user_id, league_id),
+    FOREIGN KEY (user_id)
+        REFERENCES logins(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    FOREIGN KEY (league_id)
+        REFERENCES leagues(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+insert into league_users (
+	   user_id,
+	   league_id,
+	   is_admin,
+	   subgroup,
+	   subgroup_number,
+	   is_member)
+select id,
+       league_id,
+       is_admin,
+       subgroup,
+       subgroup_number,
+       is_member
+  FROM users;
+
+ALTER TABLE users RENAME TO users_old;  
+
+CREATE VIEW "users" AS
+     SELECT l.id AS "id"
+		  , l.last_name AS "last_name"
+		  , l.first_name AS "first_name"
+	  	  , l.email AS "email"
+		  , l.password_hash AS "password_hash"	
+		  , lu.is_admin AS "is_admin"
+		  , lu.league_id AS "league_id"
+		  , lu.subgroup AS "subgroup" 
+		  , lu.subgroup_number AS "subgroup_number"
+		  , lu.is_member AS "is_member"
+       FROM logins AS l
+	   JOIN league_users AS lu
+	     ON lu.user_id = l.id
+;

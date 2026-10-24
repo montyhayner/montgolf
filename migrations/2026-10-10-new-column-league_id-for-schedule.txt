@@ -1,0 +1,39 @@
+
+ALTER TABLE schedule RENAME TO schedule_old;
+
+CREATE TABLE schedule (
+    sched_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    league_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    is_playing INTEGER NOT NULL CHECK(is_playing IN (0,1)),
+    updated_at TEXT,
+    UNIQUE(user_id, league_id, date),
+    FOREIGN KEY (user_id)
+        REFERENCES logins(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    FOREIGN KEY (league_id)
+        REFERENCES leagues(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+INSERT INTO schedule (
+    user_id,
+    league_id,
+    date,
+    is_playing,
+    updated_at
+)
+SELECT
+    s.user_id,
+    lu.league_id,
+    s.date,
+    s.is_playing,
+    s.updated_at
+FROM schedule_old AS s
+JOIN league_users AS lu
+  ON lu.user_id = s.user_id;
+
+DROP TABLE schedule_old;

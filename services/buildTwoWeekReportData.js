@@ -1,6 +1,6 @@
 // services/buildTwoWeekReportData.js
 
-async function buildTwoWeekReportData(db, leagueId) {
+function buildTwoWeekReportData(db, leagueId) {
 
   // ------------------------------------------------------------
   // 1. Dates in next 14 days

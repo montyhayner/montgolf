@@ -3,20 +3,6 @@ const router = express.Router();
 const db = require("../db");
 const { easternNow } = require("../utils/easternTime");
 
-// --- DB helpers (async/await wrappers) ---
-function dbGet(sql, params = []) {
-  return db.getAsync(sql, params);
-}
-
-function dbAll(sql, params = []) {
-  return db.allAsync(sql, params);
-}
-
-function dbRun(sql, params = []) {
-  return db.runAsync(sql, params);
-}
-
-
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
@@ -34,7 +20,10 @@ function isValidRange(dt) {
   return d >= today && d <= oneYear;
 }
 
-async function insertHistory({
+// ------------------------------------------------------------
+// Synchronous schedule_history writer
+// ------------------------------------------------------------
+function insertHistory({
   user_id,
   league_id,
   play_date,
@@ -49,55 +38,50 @@ async function insertHistory({
 }) {
   const ts = easternNow();
 
-  console.log("WRITE schedule_history in guests.js:",
-    "user:", user_id,
-    "old:", old_is_playing,
-    "new:", new_is_playing,
-    "changed_at:", ts
-  );
-
   try {
-    await db.runAsync(
-      `INSERT INTO schedule_history (
+    db.prepare(`
+      INSERT INTO schedule_history (
         user_id, league_id, play_date,
         old_is_playing, new_is_playing,
         old_guest_email, new_guest_email,
         changed_by, changed_at, source,
         before_state, after_state
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        user_id,
-        league_id,
-        play_date,
-        old_is_playing,
-        new_is_playing,
-        old_email,
-        new_email,
-        changed_by,
-        ts,              // ⭐ correct placement
-        source,
-        JSON.stringify(before_state),
-        JSON.stringify(after_state)
-      ]
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user_id,
+      league_id,
+      play_date,
+      old_is_playing,
+      new_is_playing,
+      old_email,
+      new_email,
+      changed_by,
+      ts,
+      source,
+      JSON.stringify(before_state),
+      JSON.stringify(after_state)
     );
+
   } catch (err) {
-    console.error("insertHistory() function error:", err);
-    // ❌ removed res.status(...) — res is not in scope here
+    console.error("insertHistory() error:", err);
   }
 }
 
 // ------------------------------------------------------------
 // GET guest for logged-in user
 // ------------------------------------------------------------
-router.get("/:id", async (req, res) => {
+router.get("/:id", (req, res) => {
   try {
     const id = req.params.id;
 
-    const row = await db.getAsync(
-      "SELECT * FROM guests WHERE id = ? AND sponsor_user_id = ?",
-      [id, req.session.user.id]
-    );
+    const row = db.prepare(`
+      SELECT *
+      FROM guests
+      WHERE id = ? 
+        AND sponsor_user_id = ?
+        AND league_id = ?
+    `).get(id, req.session.user.id, req.session.user.league_id);
 
     if (!row) {
       return res.status(404).json({ error: "Guest not found" });
@@ -114,15 +98,15 @@ router.get("/:id", async (req, res) => {
 // ------------------------------------------------------------
 // GET all guests for logged-in user
 // ------------------------------------------------------------
-router.get("/", async (req, res) => {
+router.get("/", (req, res) => {
   try {
-    const rows = await db.allAsync(
-      `SELECT *
-       FROM guests
-       WHERE sponsor_user_id = ?
-       ORDER BY guest_last_name, guest_first_name`,
-      [req.session.user.id]
-    );
+    const rows = db.prepare(`
+      SELECT *
+      FROM guests
+      WHERE sponsor_user_id = ? 
+        AND league_id = ?
+      ORDER BY guest_last_name, guest_first_name
+    `).all(req.session.user.id, req.session.user.league_id);
 
     res.json(rows);
 
@@ -135,7 +119,7 @@ router.get("/", async (req, res) => {
 // ------------------------------------------------------------
 // POST create guest
 // ------------------------------------------------------------
-router.post("/", async (req, res) => {
+router.post("/", (req, res) => {
   try {
     const {
       guest_first_name,
@@ -148,25 +132,28 @@ router.post("/", async (req, res) => {
     const leagueId = req.session.user.league_id;
     const ts = easternNow();
 
-    // Collect + clean + sort dates
     const dates = [date1, date2, date3, date4, date5]
-      .filter(d => d)
+      .filter(Boolean)
       .sort();
 
     for (const dt of dates) {
       if (!isValidRange(dt)) {
-        return res.status(400).json({ error: `Invalid date range.` });
+        return res.status(400).json({ error: "Invalid date range." });
       }
     }
 
-    // Insert guest
-    const result = await db.runAsync(
-      `INSERT INTO guests (
-        sponsor_user_id, guest_last_name, guest_first_name, guest_email,
-        date1, date2, date3, date4, date5, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    const insertTransaction = db.transaction(() => {
+
+      const stmt = db.prepare(`
+        INSERT INTO guests (
+          sponsor_user_id, league_id, guest_last_name, guest_first_name, guest_email,
+          date1, date2, date3, date4, date5, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const info = stmt.run(
         sponsorId,
+        leagueId,
         guest_last_name.trim(),
         guest_first_name.trim(),
         guest_email?.trim() || null,
@@ -176,26 +163,34 @@ router.post("/", async (req, res) => {
         dates[3] || null,
         dates[4] || null,
         ts
-      ]
-    );
+      );
 
-    const guestId = result.lastID;
+      const guestId = info.lastInsertRowid;
 
-    // Write schedule_history rows for each date
-    for (const dt of dates) {
-      await insertHistory({
-        user_id: guestId,
-        league_id: leagueId,
-        play_date: dt,
-        old_is_playing: 0,
-        new_is_playing: 1,
-        old_email: null,
-        new_email: guest_email,
-        before_state: {},
-        after_state: { guest_first_name, guest_last_name, guest_email, play_date: dt },
-        changed_by: sponsorId
-      });
-    }
+      // Write schedule_history rows
+      for (const dt of dates) {
+        insertHistory({
+          user_id: guestId,
+          league_id: leagueId,
+          play_date: dt,
+          old_is_playing: 0,
+          new_is_playing: 1,
+          old_email: null,
+          new_email: guest_email,
+          before_state: {},
+          after_state: {
+            guest_first_name,
+            guest_last_name,
+            guest_email,
+            play_date: dt
+          },
+          changed_by: sponsorId
+        });
+      }
+    });
+
+    // Execute the transaction
+    insertTransaction();
 
     res.json({ success: true });
 
@@ -208,7 +203,7 @@ router.post("/", async (req, res) => {
 // ------------------------------------------------------------
 // PUT update guest (with left-shift logic + schedule_history)
 // ------------------------------------------------------------
-router.put("/:id", async (req, res) => {
+router.put("/:id", (req, res) => {
   try {
     const id = req.params.id;
     const sponsorId = req.session.user.id;
@@ -222,38 +217,49 @@ router.put("/:id", async (req, res) => {
       date1, date2, date3, date4, date5
     } = req.body;
 
-    // Load old guest
-    const old = await db.getAsync(
-      `SELECT * FROM guests WHERE id = ? AND sponsor_user_id = ?`,
-      [id, sponsorId]
-    );
+    const updateTransaction = db.transaction(() => {
 
-    if (!old) {
-      return res.status(404).json({ error: "Guest not found" });
-    }
+      const old = db.prepare(`
+        SELECT *
+          FROM guests
+        WHERE id = ? 
+          AND sponsor_user_id = ? 
+          AND league_id = ?
+      `).get(id, sponsorId, leagueId);
 
-    const oldDates = [old.date1, old.date2, old.date3, old.date4, old.date5]
-      .filter(d => d)
-      .sort();
-
-    // Left-shift new dates
-    const newDates = [date1, date2, date3, date4, date5]
-      .filter(d => d)
-      .sort();
-
-    for (const dt of newDates) {
-      if (!isValidRange(dt)) {
-        return res.status(400).json({ error: `Invalid date range.` });
+      if (!old) {
+        return res.status(404).json({ error: "Guest not found" });
       }
-    }
 
-    // Update guest
-    await db.runAsync(
-      `UPDATE guests
-       SET guest_last_name = ?, guest_first_name = ?, guest_email = ?,
-           date1 = ?, date2 = ?, date3 = ?, date4 = ?, date5 = ?, updated_at = ?
-       WHERE id = ? AND sponsor_user_id = ?`,
-      [
+      const oldDates = [old.date1, old.date2, old.date3, old.date4, old.date5]
+        .filter(Boolean)
+        .sort();
+
+      const newDates = [date1, date2, date3, date4, date5]
+        .filter(Boolean)
+        .sort();
+
+      for (const dt of newDates) {
+        if (!isValidRange(dt)) {
+          return res.status(400).json({ error: "Invalid date range." });
+        }
+      }
+
+      db.prepare(`
+        UPDATE guests
+          SET guest_last_name = ?
+            , guest_first_name = ?
+            , guest_email = ?
+            , date1 = ?
+            , date2 = ?
+            , date3 = ?
+            , date4 = ?
+            , date5 = ?
+            , updated_at = ?
+        WHERE id = ? 
+          AND sponsor_user_id = ?
+          AND league_id = ?
+      `).run(
         guest_last_name.trim(),
         guest_first_name.trim(),
         guest_email?.trim() || null,
@@ -264,45 +270,59 @@ router.put("/:id", async (req, res) => {
         newDates[4] || null,
         ts,
         id,
-        sponsorId
-      ]
-    );
+        sponsorId,
+        leagueId
+      );
 
-    // Detect adds
-    for (const dt of newDates) {
-      if (!oldDates.includes(dt)) {
-        await insertHistory({
-          user_id: id,
-          league_id: leagueId,
-          play_date: dt,
-          old_is_playing: 0,
-          new_is_playing: 1,
-          old_email: old.guest_email,
-          new_email: guest_email,
-          before_state: old,
-          after_state: { guest_first_name, guest_last_name, guest_email, play_date: dt },
-          changed_by: sponsorId
-        });
+      // Detect adds
+      for (const dt of newDates) {
+        if (!oldDates.includes(dt)) {
+          insertHistory({
+            user_id: id,
+            league_id: leagueId,
+            play_date: dt,
+            old_is_playing: 0,
+            new_is_playing: 1,
+            old_email: old.guest_email,
+            new_email: guest_email,
+            before_state: old,
+            after_state: {
+              guest_first_name,
+              guest_last_name,
+              guest_email,
+              play_date: dt
+            },
+            changed_by: sponsorId
+          });
+        }
       }
-    }
 
-    // Detect drops
-    for (const dt of oldDates) {
-      if (!newDates.includes(dt)) {
-        await insertHistory({
-          user_id: id,
-          league_id: leagueId,
-          play_date: dt,
-          old_is_playing: 1,
-          new_is_playing: 0,
-          old_email: old.guest_email,
-          new_email: guest_email,
-          before_state: old,
-          after_state: { guest_first_name, guest_last_name, guest_email, play_date: dt },
-          changed_by: sponsorId
-        });
+      // Detect drops
+      for (const dt of oldDates) {
+        if (!newDates.includes(dt)) {
+          insertHistory({
+            user_id: id,
+            league_id: leagueId,
+            play_date: dt,
+            old_is_playing: 1,
+            new_is_playing: 0,
+            old_email: old.guest_email,
+            new_email: guest_email,
+            before_state: old,
+            after_state: {
+              guest_first_name,
+              guest_last_name,
+              guest_email,
+              play_date: dt
+            },
+            changed_by: sponsorId
+          });
+        }
       }
-    }
+    });
+
+    // Execute the transaction
+    updateTransaction();
 
     res.json({ success: true });
 
@@ -315,45 +335,56 @@ router.put("/:id", async (req, res) => {
 // ------------------------------------------------------------
 // DELETE guest (write drops to schedule_history)
 // ------------------------------------------------------------
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", (req, res) => {
   try {
     const id = req.params.id;
     const sponsorId = req.session.user.id;
     const leagueId = req.session.user.league_id;
 
-    const old = await db.getAsync(
-      `SELECT * FROM guests WHERE id = ? AND sponsor_user_id = ?`,
-      [id, sponsorId]
-    );
+    const deleteTransaction = db.transaction(() => {
 
-    if (!old) {
-      return res.status(404).json({ error: "Guest not found" });
-    }
+      const old = db.prepare(`
+        SELECT *
+          FROM guests
+        WHERE id = ? 
+          AND sponsor_user_id = ? 
+          AND league_id = ?
+      `).get(id, sponsorId, leagueId);
 
-    const oldDates = [old.date1, old.date2, old.date3, old.date4, old.date5]
-      .filter(d => d);
+      if (!old) {
+        return res.status(404).json({ error: "Guest not found" });
+      }
 
-    // Write drops to schedule_history
-    for (const dt of oldDates) {
-      await insertHistory({
-        user_id: id,
-        league_id: leagueId,
-        play_date: dt,
-        old_is_playing: 1,
-        new_is_playing: 0,
-        old_email: old.guest_email,
-        new_email: null,
-        before_state: old,
-        after_state: {},
-        changed_by: sponsorId
-      });
-    }
+      const oldDates = [old.date1, old.date2, old.date3, old.date4, old.date5]
+        .filter(Boolean);
 
-    // Delete guest
-    await db.runAsync(
-      `DELETE FROM guests WHERE id = ? AND sponsor_user_id = ?`,
-      [id, sponsorId]
-    );
+      for (const dt of oldDates) {
+        insertHistory({
+          user_id: id,
+          league_id: leagueId,
+          play_date: dt,
+          old_is_playing: 1,
+          new_is_playing: 0,
+          old_email: old.guest_email,
+          new_email: null,
+          before_state: old,
+          after_state: {},
+          changed_by: sponsorId
+        });
+      }
+
+      db.prepare(`
+        DELETE 
+          FROM guests
+        WHERE id = ? 
+          AND sponsor_user_id = ?
+          AND league_id = ?
+      `).run(id, sponsorId, leagueId);
+
+    });
+
+    // Execute the transaction
+    deleteTransaction();
 
     res.json({ success: true });
 

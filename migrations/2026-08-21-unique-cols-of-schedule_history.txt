@@ -1,0 +1,23 @@
+CREATE TABLE schedule_history_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    league_id INTEGER NOT NULL,
+    play_date TEXT NOT NULL,
+    old_is_playing INTEGER,
+    new_is_playing INTEGER,
+    old_guest_email TEXT,
+    new_guest_email TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    before_state TEXT,
+    after_state TEXT,
+    UNIQUE(user_id, league_id, play_date, changed_at)
+);
+
+INSERT INTO schedule_history_new
+SELECT * FROM schedule_history;
+
+DROP TABLE schedule_history;
+
+ALTER TABLE schedule_history_new RENAME TO schedule_history;

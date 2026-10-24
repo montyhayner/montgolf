@@ -1,0 +1,53 @@
+v1.0.0 — Initial Stable Release
+=========================
+The Golf Scheduler System reaches its first full, stable release. This version delivers    complete end‑to‑end functionality for league golfers, league administrators, and super administrators, including scheduling, tee‑sheet management, reporting, availability tracking, guest management, and automated cron‑based operations.
+
+User Features
+============
+   - Schedule Page — Monthly calendar with toggleable play dates and month navigation.
+
+   - My Availability — Mark months as in‑town/out‑of‑town and select preferred play days.
+
+   - Reports — Two‑Week Golfers Report and Latest Tee Sheet Report, printable or emailable.
+
+   - Guests — Add guests and assign them to specific play dates.
+
+   - Edit Profile — Update name, email, and password.
+
+Admin Features
+=============
+   - Dashboard — League overview and access to all admin tools.
+
+   - Allocate Tee Times — Enter tee times allocated for each play date.
+
+   - Edit Tee Sheet
+       . View and manage golfer placement within allocated tee times
+       . Move golfers between tee times
+       . View latest adds, drops, and unplaced golfers
+       . Email tee sheet reports to golfers and club staff
+
+   - Reports — Same reports as users, with expanded email distribution options.
+
+   - Golfers Management — Add, edit, delete golfers; modify individual schedules.
+
+   - Leagues Management — Super Admin‑only league configuration.
+
+Automated Cron Jobs
+===================
+   - Database optimization (ANALYZE, PRAGMA optimize) at startup
+
+   - Monthly VACUUM
+
+   - Daily tee‑sheet generation (8 PM)
+
+   - Monthly calendar extension (4:25 AM)
+
+   - Default next‑month play dates (1st, 14th, last day at 5:30 AM)
+
+Database Schema
+===============
+Initial schema includes 20 tables, covering scheduling, tee sheets, league configuration, availability, guests, staff, audit logs, and user management.
+
+Status
+======
+This marks the first fully stable, production‑ready release of the Golf Scheduler System. All core workflows — user scheduling, admin tee‑sheet management, reporting, and automated operations — are complete and functioning reliably.

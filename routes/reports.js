@@ -17,14 +17,11 @@ const { requireLogin, requireAdmin } = require("../middleware/auth");
 const buildTwoWeekReportData = require("../services/buildTwoWeekReportData");
 const { sendEmail } = require("../services/mailer");
 const { buildUserTwoWeekEmailHTML } = require("../services/twoWeekEmailBuilders");
-
-// DB async helpers
-function dbGet(sql, params = []) { return db.getAsync(sql, params); }
-function dbAll(sql, params = []) { return db.allAsync(sql, params); }
-function dbRun(sql, params = []) { return db.runAsync(sql, params); }
+const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
+const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
 
 // ============================================================================
-// TWO-WEEK GOLFERS REPORT + ALLOCATED TEE TIMES (combined)
+// TWO-WEEK GOLFERS REPORT + ALLOCATED TEE TIMES (combined).
 // GET /api/reports/two-week/full
 // ============================================================================
 router.get("/two-week/full", requireLogin, async (req, res) => {
@@ -46,6 +43,7 @@ router.get("/two-week/full", requireLogin, async (req, res) => {
         allocatedTeeTimes: {}
       });
     }
+
     console.log("=== TWO-WEEK REPORT DEBUG ===");
     console.log("dates:", dates);
     console.log("players:", players);
@@ -85,15 +83,17 @@ router.get("/available-next-two-weeks/:leagueId", requireAdmin, async (req, res)
 
     const sql = `
       SELECT u.id, u.first_name, u.last_name, s.date
-      FROM schedule s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.league_id = ?
-        AND s.is_playing = 1
-        AND s.date BETWEEN ? AND ?
-      ORDER BY s.date, u.last_name, u.first_name
+        FROM schedule s
+        JOIN users u 
+          ON u.id = s.user_id
+         AND u.league_id = s.league_id
+       WHERE u.league_id = ?
+         AND s.is_playing = 1
+         AND s.date BETWEEN ? AND ?
+       ORDER BY s.date, u.last_name, u.first_name
     `;
 
-    const rows = await dbAll(sql, [leagueId, start, end]);
+    const rows = db.prepare(sql).all(leagueId, start, end);
 
     const grouped = {};
     rows.forEach(r => {
@@ -121,12 +121,11 @@ router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
   try {
     const leagueId = req.session.user.league_id;
 
-    // Get latest tee date
-    const row = await dbGet(`
+    const row = db.prepare(`
       SELECT MAX(tee_date) AS latest_date
-      FROM tee_sheet
-      WHERE league_id = ?
-    `, [leagueId]);
+        FROM tee_sheet
+       WHERE league_id = ?
+    `).get(leagueId);
 
     if (!row || !row.latest_date) {
       return res.json({
@@ -139,17 +138,14 @@ router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
 
     const teeDate = row.latest_date;
 
-    // Fetch tee sheet rows
-    const teeSheet = await dbAll(`
+    const teeSheet = db.prepare(`
       SELECT *
-      FROM tee_sheet
-      WHERE league_id = ?
-        AND tee_date = ?
-      ORDER BY tee_time, starting_nine
-    `, [leagueId, teeDate]);
+        FROM tee_sheet
+       WHERE league_id = ?
+         AND tee_date = ?
+       ORDER BY tee_time, starting_nine
+    `).all(leagueId, teeDate);
 
-    // Format long date
-    // Format long date (avoid UTC shift)
     const [year, month, day] = teeDate.split("-");
     const localDate = new Date(year, month - 1, day);
 
@@ -169,8 +165,8 @@ router.get("/latest-tee-sheet", requireLogin, async (req, res) => {
       teeDate,
       longDate,
       teeSheet,
-      teeRows: teeSheet,   // <-- ADD THIS
-      league_id: leagueId, // <-- ADD THIS (your frontend expects it)
+      teeRows: teeSheet,
+      league_id: leagueId,
       isAdmin
     });
 
@@ -192,15 +188,17 @@ router.get("/available-date/:leagueId/:date", requireAdmin, async (req, res) => 
 
     const sql = `
       SELECT u.id, u.first_name, u.last_name
-      FROM schedule s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.league_id = ?
-        AND s.date = ?
-        AND s.is_playing = 1
-      ORDER BY u.last_name, u.first_name
+        FROM schedule s
+        JOIN users u 
+          ON u.id = s.user_id
+         AND u.league_id = s.league_id
+       WHERE u.league_id = ?
+         AND s.date = ?
+         AND s.is_playing = 1
+       ORDER BY u.last_name, u.first_name
     `;
 
-    const rows = await dbAll(sql, [leagueId, date]);
+    const rows = db.prepare(sql).all(leagueId, date);
 
     res.json({ date, available: rows });
 
@@ -216,13 +214,12 @@ router.get("/available-date/:leagueId/:date", requireAdmin, async (req, res) => 
 // ============================================================================
 router.get("/usrs/list", requireAdmin, async (req, res) => {
   try {
-    const rows = await dbAll(
+    const rows = db.prepare(
       `SELECT id, first_name, last_name, email
-       FROM users
-       WHERE league_id = ?
-       ORDER BY last_name, first_name`,
-      [req.user.league_id]
-    );
+         FROM users
+        WHERE league_id = ?
+        ORDER BY last_name, first_name`
+    ).all(req.user.league_id);
 
     res.json(rows);
 
@@ -246,7 +243,9 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
       WITH next_play_date AS (
         SELECT MIN(schedule.date) AS play_date
         FROM schedule
-        JOIN users ON users.id = schedule.user_id
+        JOIN users 
+          ON users.id = schedule.user_id
+         AND users.league_id = schedule.league_id
         WHERE users.league_id = ?
           AND schedule.is_playing = 1
           AND schedule.date BETWEEN date(datetime('now', '+8 hours'))
@@ -259,11 +258,13 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
           CASE WHEN users.is_member = 0 THEN ' *' ELSE '' END AS player,
           (users.last_name || ' ' || users.first_name) AS last_name_first,
           np.play_date
-        FROM schedule
-        JOIN users ON users.id = schedule.user_id
-        JOIN next_play_date np ON schedule.date = np.play_date
-        WHERE users.league_id = ?
-          AND schedule.is_playing = 1
+          FROM schedule
+          JOIN users 
+            ON users.id = schedule.user_id
+           AND users.league_id = schedule.league_id
+          JOIN next_play_date np ON schedule.date = np.play_date
+         WHERE users.league_id = ?
+           AND schedule.is_playing = 1
       ),
 
       guest_players AS (
@@ -272,7 +273,9 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
           (guest_last_name || ' ' || guest_first_name) AS last_name_first,
           np.play_date
         FROM guests
-        JOIN users ON users.id = guests.sponsor_user_id
+        JOIN users 
+          ON users.id = guests.sponsor_user_id
+         AND users.league_id = guests.league_id
         JOIN next_play_date np
         WHERE users.league_id = ?
           AND (
@@ -285,14 +288,14 @@ router.get("/next-play-day/:leagueId", async (req, res) => {
       )
 
       SELECT player, last_name_first, play_date
-      FROM member_players
+        FROM member_players
       UNION ALL
       SELECT player, last_name_first, play_date
-      FROM guest_players
-      ORDER BY last_name_first
+        FROM guest_players
+       ORDER BY last_name_first
     `;
 
-    const rows = await dbAll(sql, [leagueId, leagueId, leagueId]);
+    const rows = db.prepare(sql).all(leagueId, leagueId, leagueId);
 
     const nextPlayDate = rows.length > 0 ? rows[0].play_date : null;
     const text = rows.map(r => r.player).join("\n");
@@ -326,7 +329,6 @@ router.post("/email", requireLogin, async (req, res) => {
 
   let recipients = [req.user.email];
 
-  // Email validation helpers
   function backendValidateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (email.includes("..")) return false;
@@ -344,7 +346,6 @@ router.post("/email", requireLogin, async (req, res) => {
     return { ok: true };
   }
 
-  // Admins may add extra recipients
   if (req.user.is_admin === 1) {
     const validation = validateRecipientList(extraRecipients);
     if (!validation.ok) {
@@ -393,7 +394,6 @@ router.post("/send-email", async (req, res) => {
   }
 });
 
-
 // ============================================================================
 // TEST EMAIL
 // GET /api/reports/test-email
@@ -424,7 +424,6 @@ router.post("/user-two-week/email", requireLogin, async (req, res) => {
       return res.status(400).json({ error: "User email not available." });
     }
 
-    // Build the report data
     const {
       dates,
       players,
@@ -432,11 +431,6 @@ router.post("/user-two-week/email", requireLogin, async (req, res) => {
       allocatedTeeTimes
     } = await buildTwoWeekReportData(db, user.league_id);
 
-    // ❌ REMOVE THESE — they call browser-only functions
-    // const golfersTableHTML = buildTwoWeekTableHTML({ dates, players, totals });
-    // const allocatedHTML = buildAllocatedTeeTimesHTML(allocatedTeeTimes);
-
-    // ✔ USE ONLY THIS — the Node-side email builder
     const html = buildUserTwoWeekEmailHTML(
       { dates, players, totals },
       allocatedTeeTimes
@@ -457,33 +451,24 @@ router.post("/user-two-week/email", requireLogin, async (req, res) => {
 });
 
 // ============================================================================
-// SEND TWO-WEEK GOLFERS REPORT (email)
-// POST /api/reports/two-week/email
-// ============================================================================
-const generateTwoWeekReportText = require("../services/generateTwoWeekReportText");
-const generateTwoWeekReportHTML = require("../services/generateTwoWeekReportHTML");
-
-// ============================================================================
 // POST /api/reports/admin-two-week/email
 // ============================================================================
 router.post("/admin-two-week/email", requireLogin, async (req, res) => {
-
   try {
     const user = req.session.user;
     const leagueId = user.league_id;
+
     console.log("HIT ADMIN-TWO-WEEK/EMAIL POST ROUTE");
     console.log("USER SESSION:", req.session.user);
-    
-    // Get league name
+
     const league = db.prepare(`
       SELECT league_name
-      FROM leagues
-      WHERE id = ?
+        FROM leagues
+       WHERE id = ?
     `).get(leagueId);
 
     const leagueName = league?.league_name || "";
 
-    // Build report data
     const {
       dates,
       players,
@@ -491,7 +476,6 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       allocatedTeeTimes
     } = await buildTwoWeekReportData(db, leagueId);
 
-    // Handle empty report
     if (!dates || dates.length === 0) {
       const emptyText = `Two-Week Golfers Report - ${leagueName}\n\nNo scheduled play in the next 14 days.\n`;
 
@@ -505,7 +489,6 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       return res.json({ ok: true });
     }
 
-    // Generate email content
     const reportText = generateTwoWeekReportText(
       dates,
       players,
@@ -522,7 +505,6 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       leagueName
     );
 
-    // Recipient logic
     const {
       includePlayers,
       includeAdmins,
@@ -534,33 +516,32 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
 
     const recipients = new Set();
 
-    // Always include logged-in user if requested
     if (includeSelf && user.email) {
       recipients.add(user.email);
     }
 
-    // Players in report
     if (includePlayers && playersInReport.length > 0) {
       const placeholders = playersInReport.map(() => "?").join(",");
       const rows = db.prepare(`
         SELECT email
-        FROM users
-        WHERE id IN (${placeholders})
-          AND league_id = ?
+          FROM users
+         WHERE id IN (${placeholders})
+           AND league_id = ?
       `).all(...playersInReport, leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Guests in report
     if (includePlayers && guestsInReport.length > 0) {
       const placeholders = guestsInReport.map(() => "?").join(",");
       const rows = db.prepare(`
         SELECT g.guest_email, u.email AS sponsor_email
-        FROM guests g
-        JOIN users u ON u.id = g.sponsor_user_id
-        WHERE g.id IN (${placeholders})
-          AND u.league_id = ?
+          FROM guests g
+          JOIN users u 
+            ON u.id = g.sponsor_user_id
+           AND u.league_id = g.league_id
+         WHERE g.id IN (${placeholders})
+           AND u.league_id = ?
       `).all(...guestsInReport, leagueId);
 
       rows.forEach(g => {
@@ -570,11 +551,10 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       });
     }
 
-    // Admins
     if (includeAdmins) {
       const rows = db.prepare(`
         SELECT email
-        FROM users
+         FROM users
         WHERE league_id = ?
           AND is_admin = 1
       `).all(leagueId);
@@ -582,12 +562,11 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Staff
     if (includeStaff) {
       const rows = db.prepare(`
         SELECT email
-        FROM club_staff
-        WHERE league_id = ?
+          FROM club_staff
+         WHERE league_id = ?
       `).all(leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
@@ -599,16 +578,13 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
-    // ✔ USE ONLY THIS — the Node-side email builder
     const html = buildUserTwoWeekEmailHTML(
       { dates, players, totals },
       allocatedTeeTimes
     );
 
-    // Send email to each recipient individually to avoid exposing emails
-
     for (const recipient of finalRecipients) {
-      await sendEmail({  
+      await sendEmail({
         to: recipient,
         subject: `Two-Week Golfers Report - ${leagueName}`,
         html
@@ -616,12 +592,12 @@ router.post("/admin-two-week/email", requireLogin, async (req, res) => {
     }
 
     console.log("post - /admin-two-week/email route");
-    console.log("Two-week report email sent to:", finalRecipients); 
+    console.log("Two-week report email sent to:", finalRecipients);
 
-    res.json({ 
+    res.json({
       success: true,
       recipients: finalRecipients
-     });
+    });
 
   } catch (err) {
     console.error("Error sending user two-week report:", err);
@@ -638,21 +614,19 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
     const user = req.session.user;
     const leagueId = user.league_id;
 
-    // Get league name
     const league = db.prepare(`
       SELECT league_name
-      FROM leagues
-      WHERE id = ?
+        FROM leagues
+       WHERE id = ?
     `).get(leagueId);
 
     const leagueName = league?.league_name || "";
 
-    // Get latest tee date
-    const row = await dbGet(`
+    const row = db.prepare(`
       SELECT MAX(tee_date) AS latest_date
-      FROM tee_sheet
-      WHERE league_id = ?
-    `, [leagueId]);
+        FROM tee_sheet
+       WHERE league_id = ?
+    `).get(leagueId);
 
     if (!row || !row.latest_date) {
       return res.status(400).json({ error: "No tee sheet available" });
@@ -660,15 +634,14 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
 
     const teeDate = row.latest_date;
 
-    // Fetch tee sheet rows
-    const teeSheet = await dbAll(`
+    const teeSheet = db.prepare(`
       SELECT *
-      FROM tee_sheet
-      WHERE league_id = ?
-        AND tee_date = ?
-      ORDER BY tee_time, starting_nine
-    `, [leagueId, teeDate]);
-    
+        FROM tee_sheet
+       WHERE league_id = ?
+         AND tee_date = ?
+       ORDER BY tee_time, starting_nine
+    `).all(leagueId, teeDate);
+
     const buildHTML = rows => {
       const [year, month, day] = teeDate.split("-");
       const localDate = new Date(year, month - 1, day);
@@ -679,6 +652,7 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
         month: "long",
         day: "numeric"
       });
+
       let html = `
         <div style="text-align:center; margin-bottom:10px;">
           <div style="font-size:24px; font-weight:bold; color:#333;">
@@ -696,7 +670,7 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
               <th style="padding:6px; border:1px solid #000;">Starting Nine</th>
               <th style="padding:6px; border:1px solid #000;">Players</th>
             </tr>
-`;
+      `;
 
       rows.forEach(r => {
         const players = [
@@ -705,13 +679,14 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
           r.first_name3 && `${r.first_name3} ${r.last_name3}`,
           r.first_name4 && `${r.first_name4} ${r.last_name4}`
         ].filter(Boolean).join(", ");
+
         html += `
             <tr>
               <td style="padding:6px; border:1px solid #000;">${r.tee_time}</td>
               <td style="padding:6px; border:1px solid #000;">${r.starting_nine}</td>
               <td style="padding:6px; border:1px solid #000;">${players}</td>
             </tr>
-          `;
+        `;
       });
 
       html += `
@@ -724,47 +699,48 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
 
     const htmlReport = buildHTML(teeSheet);
 
-    // Recipient logic
-    const { includePlayers, includeAdmins, includeStaff, includeSelf, playersInReport = [] } = req.body;
+    const {
+      includePlayers,
+      includeAdmins,
+      includeStaff,
+      includeSelf,
+      playersInReport = []
+    } = req.body;
 
     const recipients = new Set();
 
-    // Always include logged-in user if requested
     if (includeSelf && user.email) {
       recipients.add(user.email);
     }
 
-    // Players in report
     if (includePlayers && playersInReport.length > 0) {
       const placeholders = playersInReport.map(() => "?").join(",");
       const rows = db.prepare(`
         SELECT email
-        FROM users
-        WHERE id IN (${placeholders})
-          AND league_id = ?
+          FROM users
+         WHERE id IN (${placeholders})
+           AND league_id = ?
       `).all(...playersInReport, leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Admins
     if (includeAdmins) {
       const rows = db.prepare(`
         SELECT email
-        FROM users
-        WHERE league_id = ?
-          AND is_admin = 1
+          FROM users
+         WHERE league_id = ?
+           AND is_admin = 1
       `).all(leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Staff
     if (includeStaff) {
       const rows = db.prepare(`
         SELECT email
-        FROM club_staff
-        WHERE league_id = ?
+          FROM club_staff
+         WHERE league_id = ?
       `).all(leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
@@ -776,7 +752,6 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
-    // Send email
     console.log("EMAIL CONFIG:", {
       host: process.env.EMAIL_HOST,
       port: process.env.EMAIL_PORT,
@@ -784,6 +759,7 @@ router.post("/latest-tee-sheet/email", requireLogin, async (req, res) => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS ? "LOADED" : "MISSING"
     });
+
     await sendEmail({
       to: finalRecipients.join(", "),
       subject: `Latest Tee Sheet - ${leagueName}`,
@@ -806,29 +782,25 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
   try {
     const user = req.session.user;
     const leagueId = user.league_id;
-    console.log("HIT ADMIN-LATEST-TEE-SHEET/EMAIL POST ROUTE"); 
+
+    console.log("HIT ADMIN-LATEST-TEE-SHEET/EMAIL POST ROUTE");
     console.log("USER SESSION:", req.session.user);
     console.log("REQ BODY:", req.body);
 
-    // ---------------------------------------------------------
-    // Get league name
-    // ---------------------------------------------------------
     const league = db.prepare(`
       SELECT league_name
-      FROM leagues
-      WHERE id = ?
+        FROM leagues
+       WHERE id = ?
     `).get(leagueId);
 
     const leagueName = league?.league_name || "";
     console.log("League Name:", leagueName);
-    // ---------------------------------------------------------
-    // Get latest tee sheet date
-    // ---------------------------------------------------------
-    const row = await dbGet(`
+
+    const row = db.prepare(`
       SELECT MAX(tee_date) AS latest_date
-      FROM tee_sheet
-      WHERE league_id = ?
-    `, [leagueId]);
+        FROM tee_sheet
+       WHERE league_id = ?
+    `).get(leagueId);
 
     if (!row || !row.latest_date) {
       return res.status(400).json({ error: "No tee sheet available" });
@@ -836,20 +808,14 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
 
     const teeDate = row.latest_date;
 
-    // ---------------------------------------------------------
-    // Fetch tee sheet rows
-    // ---------------------------------------------------------
-    const teeSheet = await dbAll(`
+    const teeSheet = db.prepare(`
       SELECT *
-      FROM tee_sheet
-      WHERE league_id = ?
-        AND tee_date = ?
-      ORDER BY tee_time, starting_nine
-    `, [leagueId, teeDate]);
+        FROM tee_sheet
+       WHERE league_id = ?
+         AND tee_date = ?
+       ORDER BY tee_time, starting_nine
+    `).all(leagueId, teeDate);
 
-    // ---------------------------------------------------------
-    // Build HTML (same structure as user version)
-    // ---------------------------------------------------------
     const buildHTML = rows => {
       const [year, month, day] = teeDate.split("-");
       const localDate = new Date(year, month - 1, day);
@@ -909,9 +875,6 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
 
     const htmlReport = buildHTML(teeSheet);
 
-    // ---------------------------------------------------------
-    // Recipient logic (same pattern as admin-two-week/email)
-    // ---------------------------------------------------------
     const {
       includePlayers,
       includeAdmins,
@@ -931,43 +894,39 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
       playersInReport
     });
 
-    // Always include logged-in admin
     if (includeSelf && user.email) {
       recipients.add(user.email);
       console.log("Added logged-in admin to recipients:", user.email);
     }
 
-    // Players in report
     if (!selfOnly && includePlayers && playersInReport.length > 0) {
       const placeholders = playersInReport.map(() => "?").join(",");
       const rows = db.prepare(`
         SELECT email
-        FROM users
-        WHERE id IN (${placeholders})
-          AND league_id = ?
+          FROM users
+         WHERE id IN (${placeholders})
+           AND league_id = ?
       `).all(...playersInReport, leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Admins
     if (!selfOnly && includeAdmins) {
       const rows = db.prepare(`
         SELECT email
-        FROM users
-        WHERE league_id = ?
-          AND is_admin = 1
+          FROM users
+         WHERE league_id = ?
+           AND is_admin = 1
       `).all(leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
     }
 
-    // Staff
     if (!selfOnly && includeStaff) {
       const rows = db.prepare(`
         SELECT email
-        FROM club_staff
-        WHERE league_id = ?
+          FROM club_staff
+         WHERE league_id = ?
       `).all(leagueId);
 
       rows.forEach(r => r.email && recipients.add(r.email));
@@ -980,9 +939,6 @@ router.post("/admin-latest-tee-sheet/email", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "No recipients selected" });
     }
 
-    // ---------------------------------------------------------
-    // Send email to each recipient individually
-    // ---------------------------------------------------------
     for (const recipient of finalRecipients) {
       console.log(`Sending latest tee sheet email to: ${recipient}`);
       await sendEmail({

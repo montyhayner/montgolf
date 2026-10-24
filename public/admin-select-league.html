@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select League (Admin)</title>
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        .select-container {
+            max-width: 500px;
+            margin: 80px auto;
+            padding: 30px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.15);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 25px;
+            font-size: 16px;
+        }
+        .btn-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        .btn {
+            padding: 10px 18px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+        }
+        .btn-secondary {
+            background: #555;
+            color: white;
+            border: none;
+        }
+        #toast {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: #333;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 6px;
+            opacity: 0;
+            transition: opacity .3s;
+        }
+        #toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="select-container">
+        <h1>Select League (Admin)</h1>
+
+        <label for="leagueSelect">Choose a league:</label>
+        <select id="leagueSelect">
+            <option value="">Loading...</option>
+        </select>
+
+        <div class="btn-row">
+            <button id="createLeagueBtn" class="btn btn-secondary" onclick="createNewLeague()">
+                Create New League
+            </button>
+            <button class="btn btn-primary" onclick="selectLeague()">Continue</button>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        function showToast(msg) {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.classList.add("show");
+            setTimeout(() => t.classList.remove("show"), 2500);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAdminLeagues();
+        });
+
+        // Load leagues for admin or super admin
+        async function loadAdminLeagues() {
+            try {
+                const resUser = await fetch("/auth/me");
+                const user = await resUser.json();
+
+                // Hide Create League button for non-super admins
+                if (!user.is_super_admin) {
+                    document.getElementById("createLeagueBtn").style.display = "none";
+                }
+
+                let res;
+
+                if (user.is_super_admin) {
+                    res = await fetch("/auth/leagues");
+                } else {
+                    res = await fetch("/auth/leagues2");
+                }
+
+                const leagues = await res.json();
+                const sel = document.getElementById("leagueSelect");
+                sel.innerHTML = "";
+
+                if (leagues.length === 0) {
+                    sel.innerHTML = `<option value="">No leagues found</option>`;
+                    return;
+                }
+
+                leagues.forEach(l => {
+                    const opt = document.createElement("option");
+                    opt.value = l.id;
+                    opt.textContent = l.league_name;
+                    sel.appendChild(opt);
+                });
+                
+                if (sel.options.length === 1) {
+                    sel.value = sel.options[0].value;
+                }
+
+            } catch (err) {
+                console.error(err);
+                showToast("Error loading leagues");
+            }
+        }
+
+        async function selectLeague() {
+            try {
+                const leagueId = document.getElementById("leagueSelect").value;
+
+                if (!leagueId) {
+                    showToast("Please select a league");
+                    return;
+                }
+
+                await fetch("/auth/admin-select-league", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ league_id: leagueId }),
+                    credentials: "include"
+                });
+
+                window.location.href = "/admin-dashboard";
+
+            } catch (err) {
+                console.error(err);
+                showToast("Error selecting league");
+            }
+        }
+
+        function createNewLeague() {
+            window.location.href = "/admin/leagues";
+        }
+    </script>
+
+</body>
+</html>

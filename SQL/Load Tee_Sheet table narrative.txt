@@ -165,10 +165,10 @@ order by sponsor_id;
 --    subgroup > "" order by subgroup
 
 -- Q1 ------------------------------------------------------
--- const league-rows = await dbAll(`
- select league_id, count(*) as player_count
-   from work_tee_sheet
-  where play_date = "2026-04-29" --?` [date] 
+-- const league-rows = dbAll(`
+-- select league_id, count(*) as player_count
+--   from work_tee_sheet
+--  where play_date = "2026-04-29" --?` [date] 
 -- Q1-js ------------------------------------------------------
 -- Bump thru league-rows array one league at a time.
 --    If remainder is zero, then tee count = quotient else tee_count = quotient + 1.  If total players = 5,

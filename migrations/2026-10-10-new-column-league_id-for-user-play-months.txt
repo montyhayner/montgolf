@@ -1,0 +1,41 @@
+ALTER TABLE user_play_months RENAME TO user_play_months_old;
+
+CREATE TABLE user_play_months (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    league_id INTEGER NOT NULL,
+    month INTEGER NOT NULL CHECK(month BETWEEN 1 AND 12),
+    in_town INTEGER NOT NULL DEFAULT 0 CHECK(in_town IN (0,1)),
+    was_cleared INTEGER DEFAULT 0 CHECK(was_cleared IN (0,1)),
+    updated_at TEXT,
+    UNIQUE(user_id, league_id, month),
+    FOREIGN KEY (user_id)
+        REFERENCES logins(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    FOREIGN KEY (league_id)
+        REFERENCES leagues(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+INSERT INTO user_play_months (
+    user_id,
+    league_id,
+    month,
+    in_town,
+    was_cleared,
+    updated_at
+)
+SELECT
+    upm.user_id,
+    lu.league_id,
+    upm.month,
+    upm.in_town,
+    upm.was_cleared,
+    upm.updated_at
+FROM user_play_months_old AS upm
+JOIN league_users AS lu
+  ON lu.user_id = upm.user_id;
+
+DROP TABLE user_play_months_old;

@@ -6,35 +6,6 @@ const db = require("../db");
 const logger = require("../utils/logger");
 const { requireLogin, requireAdminOrSelf } = require("../middleware/auth");
 
-// --- DB helpers (async/await wrappers) ---
-
-function dbGet(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
-}
-
-function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-}
-
-function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
-}
-
 // -----------------------------------------------------------------------------
 // GET USER AVAILABILITY (play days + play months)
 // -----------------------------------------------------------------------------
@@ -45,15 +16,13 @@ router.get("/", requireLogin, async (req, res) => {
   try {
     const userId = req.session.user.id;
 
-    const playDaysRows = await dbAll(
-      "SELECT day_of_week, is_play_day FROM user_play_days WHERE user_id = ?",
-      [userId]
-    );
+    const playDaysRows = db.prepare(
+      `SELECT day_of_week, is_play_day FROM user_play_days WHERE user_id = ?`
+    ).all(userId);
 
-    const playMonthsRows = await dbAll(
-      "SELECT month, in_town FROM user_play_months WHERE user_id = ?",
-      [userId]
-    );
+    const playMonthsRows = db.prepare(
+      `SELECT month, in_town FROM user_play_months WHERE user_id = ?`
+    ).all(userId);
 
     const playDays = {};
     playDaysRows.forEach(r => {
@@ -89,10 +58,11 @@ router.put("/play-days/:userId", requireLogin, requireAdminOrSelf, async (req, r
 
   try {
     // Step 1: Get user's league
-    const userRow = await dbGet(
-      "SELECT league_id FROM users WHERE id = ?",
-      [userId]
-    );
+    const userRow = db.prepare(`
+      SELECT league_id
+      FROM users
+      WHERE id = ?
+    `).get(userId);
 
     if (!userRow) {
       return res.status(404).json({ error: "User not found" });
@@ -101,10 +71,12 @@ router.put("/play-days/:userId", requireLogin, requireAdminOrSelf, async (req, r
     const leagueId = userRow.league_id;
 
     // Step 2: Get league play days
-    const leagueRows = await dbAll(
-      `SELECT day_of_week FROM league_play_days WHERE league_id = ? AND is_play_day = 1`,
-      [leagueId]
-    );
+    const leagueRows = db.prepare(`
+      SELECT day_of_week
+      FROM league_play_days
+      WHERE league_id = ?
+        AND is_play_day = 1
+    `).all(leagueId);
 
     const allowedDays = leagueRows.map(r => r.day_of_week);
 
@@ -119,27 +91,39 @@ router.put("/play-days/:userId", requireLogin, requireAdminOrSelf, async (req, r
 
     // Step 4: Upsert rows
     const stmt = db.prepare(`
-      INSERT INTO user_play_days (user_id, day_of_week, is_play_day)
+      INSERT INTO user_play_days (
+        user_id,
+        day_of_week,
+        is_play_day
+      )
       VALUES (?, ?, ?)
       ON CONFLICT(user_id, day_of_week)
-      DO UPDATE SET is_play_day = excluded.is_play_day
+      DO UPDATE SET
+        is_play_day = excluded.is_play_day
     `);
 
-    await new Promise((resolve, reject) => {
-      db.serialize(() => {
-        days.forEach(d => {
-          stmt.run([userId, d.day_of_week, d.is_play_day]);
-        });
-        stmt.finalize(err => (err ? reject(err) : resolve()));
-      });
+    const upsertDays = db.transaction(days => {
+      for (const d of days) {
+        stmt.run(
+          userId,
+          d.day_of_week,
+          d.is_play_day
+        );
+      }
     });
 
+    upsertDays(days);
+
     logger.db("UPSERT user_play_days", { userId });
+
     res.json({ success: true });
 
   } catch (err) {
-    logger.error(err, "PUT /availability/play-days/:userId");
-    res.status(500).json({ error: err.message });
+    logger.error("Error updating user_play_days", err);
+
+    res.status(500).json({
+      error: "Failed to update play days"
+    });
   }
 });
 
@@ -165,13 +149,8 @@ router.put("/play-months/:userId", requireLogin, requireAdminOrSelf, async (req,
       DO UPDATE SET in_town = excluded.in_town
     `);
 
-    await new Promise((resolve, reject) => {
-      db.serialize(() => {
-        months.forEach(m => {
-          stmt.run([userId, m.month, m.in_town]);
-        });
-        stmt.finalize(err => (err ? reject(err) : resolve()));
-      });
+    months.forEach(m => {
+      stmt.run(userId, m.month, m.in_town);
     });
 
     logger.db("UPSERT user_play_months", { userId });
@@ -196,17 +175,9 @@ router.post("/default", requireLogin, async (req, res) => {
     // Default: all league play days ON, all months in-town
     const leagueId = req.session.user.league_id;
 
-    const leagueDays = await dbAll(
-      `SELECT day_of_week FROM league_play_days WHERE league_id = ? AND is_play_day = 1`,
-      [leagueId]
-    );
-
-    const stmtDays = db.prepare(`
-      INSERT INTO user_play_days (user_id, day_of_week, is_play_day)
-      VALUES (?, ?, 1)
-      ON CONFLICT(user_id, day_of_week)
-      DO UPDATE SET is_play_day = 1
-    `);
+    const leagueDays = db.prepare(
+      `SELECT day_of_week FROM league_play_days WHERE league_id = ? AND is_play_day = 1`
+    ).all(leagueId);
 
     const stmtMonths = db.prepare(`
       INSERT INTO user_play_months (user_id, month, in_town)
@@ -215,16 +186,24 @@ router.post("/default", requireLogin, async (req, res) => {
       DO UPDATE SET in_town = 1
     `);
 
-    await new Promise((resolve, reject) => {
-      db.serialize(() => {
-        leagueDays.forEach(d => stmtDays.run([userId, d.day_of_week]));
-        for (let m = 1; m <= 12; m++) {
-          stmtMonths.run([userId, m, 1]);
-        }
-        stmtDays.finalize();
-        stmtMonths.finalize(err => (err ? reject(err) : resolve()));
+    const stmtDays = db.prepare(`
+      INSERT INTO user_play_days (user_id, day_of_week)
+      VALUES (?, ?)
+      ON CONFLICT(user_id, day_of_week)
+      DO NOTHING
+    `);
+
+    const transaction = db.transaction(() => {
+      leagueDays.forEach(d => {
+        stmtDays.run(userId, d.day_of_week);
       });
+
+      for (let m = 1; m <= 12; m++) {
+        stmtMonths.run(userId, m);
+      }
     });
+
+    transaction();
 
     logger.db("DEFAULT availability set", { userId });
     res.json({ success: true });

@@ -2,86 +2,88 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const db = require("../db");
-const { requireLogin } = require("../middleware/auth");
+const path = require("path");
+const { requireLogin, requireAdmin, requireAdminOrSelf } = require("../middleware/auth");
 
 // ============================================================================
-// GET /auth/me  →  Return current session user
+// GET /auth/me  → Return full session user object
 // ============================================================================
-router.get("/me", requireLogin, (req, res) => {
-  const user = req.session.user;
-
-  if (!user) {
+router.get("/me", (req, res) => {
+  if (!req.session.user) {
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  res.json({
-    id: user.id,
-    email: user.email,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    league_id: user.league_id,
-    is_admin: user.is_admin === 1,
-    is_super_admin: user.is_super_admin === 1,
-    user_mode: user.user_mode || "user" 
+  return res.json(req.session.user);
+});
+
+// ============================================================================
+// GET /auth/debug-session  →  Dump full session for debugging
+// ============================================================================
+router.get("/debug-session", (req, res) => {
+  if (!req.session) {
+    return res.status(500).json({ error: "Session not initialized" });
+  }
+
+  return res.json({
+    session_user: req.session.user || null,
+    raw_session: req.session
   });
 });
 
 // ============================================================================
-// POST /auth/login
+// POST /auth/login  (USER SIDE)
 // ============================================================================
-router.post("/login", async (req, res) => {
+router.post("/login", (req, res) => {
   const { email, password } = req.body;
 
-  console.log("➡️ ENTERED /auth/login ROUTE");
+  const row = db.prepare(`
+      SELECT *
+        FROM logins
+       WHERE email = ?
+  `).get(email);
 
-  try {
-    const user = await db.getAsync(
-      "SELECT * FROM users WHERE email = ?",
-      [email]
-    );
-
-    if (!user) {
-      console.log("❌ LOGIN FAILED — no such email");
-      return res.redirect("/login?error=1&email=" + encodeURIComponent(email));
-    }
-
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) {
-      console.log("❌ LOGIN FAILED — bad password");
-      return res.redirect("/login?error=1&email=" + encodeURIComponent(email));
-    }
-
-    // Save session (FULL ROLE INFO)
-    // Fetch league name
-    const league = await db.getAsync(
-      "SELECT league_name FROM leagues WHERE id = ?",
-      [user.league_id]
-    );
-
-    req.session.user = {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      league_id: user.league_id,
-      league_name: league?.league_name || null,
-      is_admin: user.is_admin,
-      is_super_admin: user.is_super_admin,
-      user_mode: "user"
-    };
-
-
-    console.log("✅ LOGIN SUCCESS — SESSION SET:", req.session.user);
-
-    // ⭐ USER LOGIN ALWAYS GOES TO USER SCHEDULE PAGE
-    // Even if the user is an admin, logging in through the USER login page
-    // should treat them as a regular user.
-    return res.redirect("/schedule.html");
-
-  } catch (err) {
-    console.error("🔥 LOGIN ERROR:", err);
-    return res.redirect("/login?error=1");
+  if (!row) {
+    return res.redirect(`/login.html?error=Invalid%20email&email=${encodeURIComponent(email)}`);
   }
+
+  if (!bcrypt.compareSync(password, row.password_hash)) {
+    return res.redirect(`/login.html?error=Invalid%20password&email=${encodeURIComponent(email)}`);
+  }
+
+  // Load all leagues the user belongs to
+  const leagues = db.prepare(`
+      SELECT lu.league_id, lu.is_member, lu.is_admin, lu.subgroup, lu.subgroup_number,
+             l.league_name
+        FROM league_users lu
+        JOIN leagues l ON l.id = lu.league_id
+       WHERE lu.user_id = ?
+  `).all(row.id);
+
+  req.session.user = {
+    id: row.id,
+    email: row.email,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    user_mode: "user",
+    leagues,
+    league_id: null,
+    league_name: null
+  };
+
+  return req.session.save(() => {
+    // USER SIDE AUTO-SELECT LOGIC
+    if (leagues.length === 1) {
+      req.session.user.league_id = leagues[0].league_id;
+      req.session.user.league_name = leagues[0].league_name;
+
+      return req.session.save(() => {
+        res.redirect("/schedule");
+      });
+    }
+
+    // Multiple leagues → show user selector
+    res.redirect("/auth/user-select-league");
+  });
 });
 
 // ============================================================================
@@ -107,10 +109,9 @@ router.put("/change-password", requireLogin, async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const user = await db.getAsync(
-      "SELECT password_hash FROM users WHERE id = ?",
-      [userId]
-    );
+    const user = db.prepare(
+      "SELECT password_hash FROM logins WHERE id = ?"
+    ).get(userId);
 
     if (!user) {
       return res.status(400).json({ error: "User not found" });
@@ -123,10 +124,11 @@ router.put("/change-password", requireLogin, async (req, res) => {
 
     const newHash = await bcrypt.hash(new_password, 10);
 
-    await db.runAsync(
-      "UPDATE users SET password_hash = ? WHERE id = ?",
-      [newHash, userId]
-    );
+    db.prepare(`
+       UPDATE logins
+          SET password_hash = ? 
+        WHERE id = ?
+    `).run(newHash, userId);
 
     return res.json({ success: true });
 
@@ -136,6 +138,9 @@ router.put("/change-password", requireLogin, async (req, res) => {
   }
 });
 
+// ============================================================================
+// GET /auth/whoami
+// ============================================================================
 router.get("/whoami", (req, res) => {
   if (!req.session || !req.session.user) {
     return res.json({ user: null });
@@ -154,118 +159,226 @@ router.get("/logout", (req, res) => {
 });
 
 // ============================================================================
-// POST /auth/select-league
+// GET /auth/user-select-league
+// Users (including admins using the user side)
 // ============================================================================
-router.post("/select-league", (req, res) => {
+router.get("/user-select-league", requireLogin, (req, res) => {
+  const user = req.session.user;
+
+  // Must be logged in through USER side
+  if (user.user_mode !== "user") {
+    return res.status(403).send("Users only");
+  }
+
+  const leagues = user.leagues || [];
+
+  // USER AUTO-SELECT LOGIC
+  if (leagues.length === 1) {
+    req.session.user.league_id = leagues[0].league_id;
+    req.session.user.league_name = leagues[0].league_name;
+
+    return req.session.save(() => {
+      res.redirect("/schedule");
+    });
+  }
+
+  // Multiple leagues → show user selector
+  return res.sendFile(path.join(__dirname, "..", "public", "user-select-league.html"));
+});
+
+// ============================================================================
+// GET /auth/admin-select-league
+// Admins and Super Admins
+// ============================================================================
+router.get("/admin-select-league", requireAdmin, (req, res) => {
+  const user = req.session.user;
+
+  // SUPER ADMIN → ALWAYS show selector
+  if (user.is_super_admin) {
+    return res.sendFile(path.join(__dirname, "..", "public", "admin-select-league.html"));
+  }
+
+  // League admin → check how many leagues they administer
+  const adminLeagues = user.leagues.filter(l => l.is_admin === 1);
+
+  // League admin with exactly one league → auto-select
+  if (adminLeagues.length === 1) {
+    req.session.user.league_id = adminLeagues[0].league_id;
+    req.session.user.league_name = adminLeagues[0].league_name;
+
+    return req.session.save(() => {
+      res.redirect("/admin-dashboard");
+    });
+  }
+
+  // League admin with multiple leagues → show selector
+  return res.sendFile(path.join(__dirname, "..", "public", "admin-select-league.html"));
+});
+
+// ============================================================================
+// POST /auth/user-select-league
+// Regular users (including admins using the user side)
+// ============================================================================
+router.post("/user-select-league", (req, res) => {
   const { league_id } = req.body;
 
   if (!league_id) {
     return res.status(400).json({ error: "No league selected" });
   }
 
-  // Preserve existing session fields
+  const user = req.session.user;
+
+  // Must be logged in through the USER side
+  if (!user || user.user_mode !== "user") {
+    return res.status(403).json({ error: "Users only" });
+  }
+
+  // Validate that the user actually belongs to this league
+  const belongs = user.leagues.some(l => l.league_id == league_id);
+
+  if (!belongs) {
+    return res.status(403).json({ error: "Not a member of this league" });
+  }
+
+  // Lookup league name for convenience
+  const row = db.prepare(`
+      SELECT league_name
+        FROM leagues
+       WHERE id = ?
+  `).get(league_id);
+
+  const league_name = row ? row.league_name : null;
+
+  // Update session
   req.session.user = {
     ...req.session.user,
     league_id,
-    user_mode: req.session.user.user_mode,       // ⭐ preserve mode
-    is_admin: req.session.user.is_admin,
-    is_super_admin: req.session.user.is_super_admin
+    league_name
   };
 
-  return res.json({ success: true });
+  return req.session.save(() => {
+    res.json({ success: true });
+  });
 });
 
 // ============================================================================
-// POST /auth/admin-login  (ADMIN LOGIN)
+// POST /auth/admin-select-league
+// Admins and Super Admins only
 // ============================================================================
-router.post("/admin-login", async (req, res) => {
+router.post("/admin-select-league", (req, res) => {
+  const { league_id } = req.body;
+
+  if (!league_id) {
+    return res.status(400).json({ error: "No league selected" });
+  }
+
+  // Must already be logged in as admin or super admin
+  const user = req.session.user;
+  if (!user || user.user_mode !== "admin") {
+    return res.status(403).json({ error: "Admins only" });
+  }
+
+  // Validate that the admin actually belongs to this league
+  // Super admins bypass this check
+  if (!user.is_super_admin) {
+    const belongs = user.leagues.some(l => l.league_id == league_id && l.is_admin === 1);
+    if (!belongs) {
+      return res.status(403).json({ error: "Not an admin of this league" });
+    }
+  }
+
+  // Lookup league name for convenience
+  const row = db.prepare(`
+      SELECT league_name
+        FROM leagues
+       WHERE id = ?
+  `).get(league_id);
+
+  const league_name = row ? row.league_name : null;
+
+  // Update session
+  req.session.user = {
+    ...req.session.user,
+    league_id,
+    league_name
+  };
+
+  return req.session.save(() => {
+    res.json({ success: true });
+  });
+});
+
+// ============================================================================
+// POST /auth/admin-login  (ADMIN SIDE)
+// ============================================================================
+router.post("/admin-login", (req, res) => {
   const { email, password } = req.body;
 
-  try {
-    // ---------------------------------------------------------
-    // 1. CHECK SUPER ADMIN TABLE
-    // ---------------------------------------------------------
-    const superAdmin = await db.getAsync(
-      "SELECT * FROM super_admins WHERE email = ?",
-      [email]
-    );
+  const row = db.prepare(`
+      SELECT
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.password_hash,
+        u.is_admin,
+        CASE WHEN sa.email IS NOT NULL THEN 1 ELSE 0 END AS is_super_admin
+      FROM users u
+      LEFT JOIN super_admins sa
+        ON sa.email = u.email
+      WHERE u.email = ?
+  `).get(email);
 
-    let isSuper = false;
-    let superRecord = null;
-
-    if (superAdmin) {
-      const match = await bcrypt.compare(password, superAdmin.password_hash);
-      //if (!match) {
-      //  console.error("🔥 ADMIN LOGIN ERROR: Incorrect password for super admin");
-      //  return res.redirect("/admin-login?error=1");
-      //}
-      isSuper = true;
-      superRecord = superAdmin;
-    }
-
-    // ---------------------------------------------------------
-    // 2. CHECK USERS TABLE (LEAGUE ADMIN)
-    // ---------------------------------------------------------
-    const user = await db.getAsync(
-      "SELECT * FROM users WHERE email = ?",
-      [email]
-    );
-
-    let isLeagueAdmin = false;
-    let leagueRecord = null;
-
-    if (user) {
-      const match = await bcrypt.compare(password, user.password_hash);
-      if (!match) {
-        console.error("🔥 ADMIN LOGIN ERROR: Incorrect password for league admin");
-        return res.redirect("/admin-login?error=1");
-      }
-
-      if (user.is_admin === 1) {
-        isLeagueAdmin = true;
-        leagueRecord = user;
-      }
-    }
-
-    // ---------------------------------------------------------
-    // 3. IF NEITHER SUPER NOR LEAGUE ADMIN → reject
-    // ---------------------------------------------------------
-    if (!isSuper && !isLeagueAdmin) {
-      console.error("🔥 ADMIN LOGIN ERROR: User is not a super admin nor a league admin");
-      return res.redirect("/admin-login?error=1");
-    }
-
-    // ---------------------------------------------------------
-    // 4. BUILD SESSION OBJECT
-    // ---------------------------------------------------------
-    req.session.user = {
-      id: leagueRecord.id,
-      email: email,
-      first_name: leagueRecord.first_name,
-      last_name: leagueRecord.last_name,
-
-      // ⭐ BOTH FLAGS ARE SET CORRECTLY
-      is_super_admin: isSuper,
-      is_admin: isLeagueAdmin,
-
-      // ⭐ League admin starts with no league selected
-      league_id: null,
-
-      user_mode: "admin"
-    };
-
-    console.log("LOGIN — leagueRecord.id =", leagueRecord.id);
-    console.log("LOGIN — setting session.user.id =", req.session.user.id);
-
-    return req.session.save(() => {
-      console.log("🔥 ADMIN LOGIN SUCCESS: User logged in successfully.  Sent to select-league");
-      res.redirect("/auth/select-league");
-    });
-
-  } catch (err) {
-    console.error("🔥 ADMIN LOGIN ERROR:", err);
-    return res.redirect("/admin-login?error=1");
+  if (!row) {
+    return res.redirect(`/admin-login.html?error=Invalid%20email&email=${encodeURIComponent(email)}`);
   }
+
+  if (!bcrypt.compareSync(password, row.password_hash)) {
+    return res.redirect(`/admin-login.html?error=Invalid%20password&email=${encodeURIComponent(email)}`);
+  }
+
+  // Load all leagues the user belongs to
+  const leagues = db.prepare(`
+      SELECT lu.league_id, lu.is_member, lu.is_admin, lu.subgroup, lu.subgroup_number,
+             l.league_name
+        FROM league_users lu
+        JOIN leagues l ON l.id = lu.league_id
+       WHERE lu.user_id = ?
+  `).all(row.id);
+
+  const is_super_admin = row.is_super_admin === 1;
+
+  req.session.user = {
+    id: row.id,
+    email: row.email,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    user_mode: "admin",
+    leagues,
+    league_id: null,
+    league_name: null,
+    is_super_admin
+  };
+
+  return req.session.save(() => {
+
+    if (is_super_admin) {
+      return res.redirect("/auth/admin-select-league");
+    }
+
+    const adminLeagues = leagues.filter(l => l.is_admin === 1);
+
+    if (adminLeagues.length === 1) {
+      req.session.user.league_id = adminLeagues[0].league_id;
+      req.session.user.league_name = adminLeagues[0].league_name;
+
+      return req.session.save(() => {
+        res.redirect("/admin-dashboard");
+      });
+    }
+
+    res.redirect("/auth/admin-select-league");
+  });
 });
 
 module.exports = router;

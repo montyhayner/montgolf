@@ -1,12 +1,15 @@
 // db/maintenance.js
-const db = require("../db.js"); // your existing db.js wrapper
+const db = require("../db.js");
 
-async function optimizeDatabase() {
+// ---------------------------------------------------------
+// ANALYZE + PRAGMA optimize (synchronous better-sqlite3)
+// ---------------------------------------------------------
+function optimizeDatabase() {
   try {
     console.log("🔧 Running SQLite startup optimization...");
 
-    await db.runAsync("ANALYZE;");
-    await db.runAsync("PRAGMA optimize;");
+    db.prepare("ANALYZE").run();
+    db.prepare("PRAGMA optimize").run();
 
     console.log("✅ SQLite optimization complete.");
   } catch (err) {
@@ -14,16 +17,20 @@ async function optimizeDatabase() {
   }
 }
 
-async function vacuumDatabase() {
+// ---------------------------------------------------------
+// VACUUM (synchronous better-sqlite3)
+// ---------------------------------------------------------
+function vacuumDatabase() {
   try {
     console.log("🧹 Running monthly VACUUM...");
-    await db.runAsync("VACUUM;");
+    db.prepare("VACUUM").run();
     console.log("✨ VACUUM complete.");
   } catch (err) {
     console.error("⚠️ VACUUM error:", err);
   }
 }
 
-module.exports = { optimizeDatabase };
-
-
+module.exports = {
+  optimizeDatabase,
+  vacuumDatabase
+};

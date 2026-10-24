@@ -6,25 +6,6 @@ const { requireAdmin } = require("../../middleware/auth");
 
 const router = express.Router();
 
-// DB helpers
-function dbGet(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-  });
-}
-function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-  });
-}
-function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      err ? reject(err) : resolve(this);
-    });
-  });
-}
-
 // -----------------------------------------------------------------------------
 // CREATE LEAGUE
 // -----------------------------------------------------------------------------
@@ -33,10 +14,10 @@ router.post("/api", requireAdmin, async (req, res) => {
   const { league_name, coordinator_last_name, coordinator_first_name } = req.body;
 
   try {
-    const result = await dbRun(`
+    const result = db.prepare(`
       INSERT INTO leagues (league_name, coordinator_last_name, coordinator_first_name)
       VALUES (?, ?, ?)
-    `, [league_name, coordinator_last_name, coordinator_first_name]);
+    `).run(league_name, coordinator_last_name, coordinator_first_name);
 
     logger.db("INSERT leagues", { id: result.lastID });
     res.json({
@@ -60,11 +41,11 @@ router.put("/api/:id", requireAdmin, async (req, res) => {
   const { league_name, coordinator_last_name, coordinator_first_name } = req.body;
 
   try {
-    const result = await dbRun(`
+    const result = db.prepare(`
       UPDATE leagues
       SET league_name = ?, coordinator_last_name = ?, coordinator_first_name = ?
       WHERE id = ?
-    `, [league_name, coordinator_last_name, coordinator_first_name, id]);
+    `).run(league_name, coordinator_last_name, coordinator_first_name, id);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: "League not found" });
@@ -86,7 +67,7 @@ router.delete("/api/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await dbRun("DELETE FROM leagues WHERE id = ?", [id]);
+    const result = db.prepare(`DELETE FROM leagues WHERE id = ?`).run(id);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: "League not found" });
@@ -108,12 +89,12 @@ router.get("/:leagueId/play-days", requireAdmin, async (req, res) => {
   const { leagueId } = req.params;
 
   try {
-    const rows = await dbAll(`
+    const rows = db.prepare(`
       SELECT id, league_id, day_of_week, is_play_day
       FROM league_play_days
       WHERE league_id = ?
       ORDER BY day_of_week
-    `, [leagueId]);
+    `).all(leagueId);
 
     res.json({ playDays: rows });
   } catch (err) {

@@ -1,64 +1,87 @@
-// middleware/auth.js
 // ============================================================================
-// REQUIRE LOGIN
+// REQUIRE LOGIN (user or admin must be logged in)
 // ============================================================================
 function requireLogin(req, res, next) {
-  console.log("🔐 requireLogin CHECK:", req.session.user);
-
-  if (!req.session.user) {
-    console.log("🔐 BLOCKED — NO SESSION USER");
-
-    // API requests get JSON
-    if (req.originalUrl.includes("/api")) {
-      return res.status(401).json({ error: "Not logged in" });
-    }
-
-    // Page requests redirect
-    return res.redirect("/login?error=1");
-  }
-
-  req.user = req.session.user;
-  console.log("🔐 PASSED — USER:", req.user);
-  next();
-}
-
-// ============================================================================
-// REQUIRE ADMIN (admin OR super admin)
-// ============================================================================
-function requireAdmin(req, res, next) {
   const user = req.session.user;
-  console.log(">>> REQUIRE ADMIN CHECK:", user);
 
   if (!user) {
     if (req.originalUrl.includes("/api")) {
       return res.status(401).json({ error: "Not logged in" });
     }
-    return res.redirect("/admin-login");
+    return res.redirect("/login.html?error=1");
   }
 
-  // Normalize values (accept true/false OR 1/0)
-  const isAdmin = user.is_admin === true || user.is_admin === 1;
-  const isSuper = user.is_super_admin === true || user.is_super_admin === 1;
+  req.user = user;
+  next();
+}
 
-  // ⭐ SUPER ADMIN ALWAYS PASSES
-  if (isSuper) {
+// ============================================================================
+// REQUIRE ADMIN (league admin OR super admin)
+// ============================================================================
+function requireAdmin(req, res, next) {
+  const user = req.session.user;
+
+  if (!user) {
+    if (req.originalUrl.includes("/api")) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    return res.redirect("/admin-login.html");
+  }
+
+  // Must be logged in through admin-login
+  if (user.user_mode !== "admin") {
+    return res.status(403).send("Admins only");
+  }
+
+  // SUPER ADMIN ALWAYS PASSES
+  if (user.is_super_admin) {
     req.user = user;
     return next();
   }
 
-  // ⭐ REGULAR ADMIN ALWAYS PASSES (league_id NOT required for API routes)
-  if (isAdmin) {
+  // LEAGUE ADMIN: must administer at least one league
+  const isLeagueAdmin = user.leagues.some(l => l.is_admin === 1);
+
+  if (isLeagueAdmin) {
     req.user = user;
     return next();
   }
 
-  // ⭐ API REQUESTS GET JSON ERRORS
+  // API request → JSON error
   if (req.originalUrl.includes("/api")) {
     return res.status(403).json({ error: "Admin only" });
   }
 
-  // ⭐ NON-API REQUESTS GET REDIRECT
-  return res.redirect("/auth/select-league");
+  // Non-API → redirect to admin league selector
+  return res.redirect("/auth/admin-select-league");
+}
+
+function requireLeagueAdmin(req, res, next) {
+
+    const isApi = req.originalUrl.includes("/api");
+
+    // Super Admin WITH league
+    if (req.session.user?.is_super_admin && req.session.user?.league_id) {
+        console.log("  ✔ Super Admin WITH league allowed");
+        return next();
+    }
+
+    // League Admin WITH league
+    if (req.session.user?.is_admin && req.session.user?.league_id) {
+        console.log("  ✔ League Admin allowed");
+        return next();
+    }
+
+    // No league selected
+    console.log("  ✖ No league selected");
+
+    if (isApi) {
+        // API routes must return JSON, not redirect
+        return res.status(403).json({ error: "No league selected" });
+    }
+
+    // Page routes can redirect normally
+    return res.redirect("/auth/admin-select-league");
 }
 
 // ============================================================================
@@ -71,25 +94,52 @@ function requireAdminOrSelf(req, res, next) {
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  const isAdmin = user.is_admin === true || user.is_admin === 1;
-  const isSuper = user.is_super_admin === true || user.is_super_admin === 1;
   const targetUserId = parseInt(req.params.userId);
 
-  // ⭐ SUPER ADMIN ALWAYS ALLOWED
-  if (isSuper) {
+  // SUPER ADMIN ALWAYS ALLOWED
+  if (user.is_super_admin) {
     return next();
   }
 
-  // ⭐ ADMIN OR SELF
-  if (isAdmin || user.id === targetUserId) {
+  // LEAGUE ADMIN (must administer at least one league)
+  const isLeagueAdmin = user.leagues.some(l => l.is_admin === 1);
+
+  if (isLeagueAdmin || user.id === targetUserId) {
     return next();
   }
 
   return res.status(403).json({ error: "Forbidden" });
 }
 
+function requireSuperAdmin(req, res, next) {
+
+    if (req.session.user && req.session.user.is_super_admin) {
+        console.log("  ✔ Super Admin allowed");
+        return next();
+    }
+
+    console.log("  ✖ Super Admin denied");
+    return res.status(403).send("Super Admin only");
+}
+
+function requireAdminLoginOnly(req, res, next) {
+
+    if (!req.session.user) {
+        return res.redirect("/admin-login");
+    }
+
+    if (req.session.user.is_super_admin || req.session.user.is_admin) {
+        return next();
+    }
+
+    return res.status(403).send("Admins only");
+}
+
 module.exports = {
   requireLogin,
   requireAdmin,
-  requireAdminOrSelf
+  requireLeagueAdmin,
+  requireAdminOrSelf,
+  requireSuperAdmin,
+  requireAdminLoginOnly
 };

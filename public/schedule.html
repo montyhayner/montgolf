@@ -448,6 +448,7 @@ h1, h2, h3 {
 // global variables
 // ========================== 
 let targetUserId = null;
+let currLeagueId = null;
 let isAdminMode = false;
 let defaultJustRan = false;
 let origInTownStatus = 1;   //default to 1 (in town) until we fetch the real value from the server
@@ -715,6 +716,8 @@ function updateStatusBanner(status) {
   //   console.log(">>> DEBUG: Skipping updateStatusBanner because default just ran");
   //   return;
   // }
+  console.log(">>> DEBUG: updateStatusBanner() called with:", status);
+
 
   const banner = document.getElementById("statusBanner");
   const text = document.getElementById("statusText");
@@ -906,11 +909,9 @@ for (let d = 1; d <= totalDays; d++) {
 async function saveSchedule() {
   const { year, month } = getMonthParts();
   showBusy();
-  // ⭐ Force browser to repaint BEFORE fetch begins
   await new Promise(requestAnimationFrame);
   console.log("saveSchedule() fired");
 
-  // Build schedule object from calendar
   const schedule = {};
   document.querySelectorAll(".day-cell").forEach(cell => {
     if (!cell.dataset.date) return;
@@ -919,33 +920,22 @@ async function saveSchedule() {
     schedule[fullDate] = isPlaying;
   });
 
-
-
-  // ⭐ Determine correct URL + payload based on mode
   let url;
   let payload;
 
   if (isAdminMode) {
-    // ⭐ ADMIN OVERRIDE SAVE ROUTE
     url = `/admin/schedule/save/${origInTownStatus}/${sessionStartTS}`;
-    // returned res.json({ is ...
-    // status: "saved",
-    // schedule: scheduleObj
     payload = {
-      status,
       target_user_id: targetUserId,
       year,
       month,
       schedule
     };
-
   } else {
-    // ⭐ NORMAL USER SAVE ROUTE
     url = `/user/schedule/${year}/${month}`;
-
     payload = {
       schedule,
-      sessionStartTS   // sent in body, not URL
+      sessionStartTS
     };
   }
 
@@ -959,7 +949,10 @@ async function saveSchedule() {
 
   const data = await res.json();
 
-  // Update UI
+  //console.log(">>> DEBUG: saveSchedule() response:", data);
+  //console.log(">>> DEBUG: saveSchedule() response.status:", data.status);
+  //console.log(">>> DEBUG: saveSchedule() response.schedule:", data.schedule);
+
   currentSchedule = data.schedule || {};
   unsavedChanges = false;
 
@@ -1056,9 +1049,11 @@ function showOutOfTownPrompt(year, month) {
   };
 }
 
-// DEFAULT helper logic - clear the monthly schedule for user
+// clear the monthly schedule for user
 function clearMonthSchedule(year, month) {
   console.log(">>> DEBUG: clearMonthSchedule() called for", year, month);
+  console.log("saveSchedule() fired");
+
   let url;
   let headers = {};
   let body;
@@ -1081,6 +1076,10 @@ function clearMonthSchedule(year, month) {
   })
   .then(res => res.json())
   .then(data => {
+    console.log(">>> DEBUG: schedule object built - schedule:", schedule);
+    console.log(">>> DEBUG: schedule object built - data.schedule:", data.schedule);
+    console.log(">>> DEBUG: schedule keys:", Object.keys(schedule));
+
     currentSchedule = data.schedule || {};
     renderCalendar(currentSchedule);
     markUnsaved();
@@ -1115,6 +1114,7 @@ function regenerateDefaultScheduleForceInTown(year, month) {
   .then(res => res.json())
   .then(data => {
     currentSchedule = data.schedule || {};
+    console.log(">>> DEBUG: regenerateDefaultScheduleForceInTown - currentSchedule =", currentSchedule);
     renderCalendar(currentSchedule);
     markUnsaved();
     updateStatusBanner(data.status);
@@ -1225,6 +1225,7 @@ async function loadPageHeader() {
     const league = leagueInfo.league;
     const adminName = `${adminUser.first_name} ${adminUser.last_name}`;
     const leagueName = league.league_name;
+    currLeagueId = league.id;
 
     let pageHeaderText = "";
 
@@ -1312,6 +1313,8 @@ function applyScheduleToCalendar(scheduleObj, leaguePlayDays) {
 async function loadScheduleForCurrentMonth() {
   // ⭐ Prevent overwrite after Default runs
   console.log(">>> DEBUG: ENTER loadScheduleForCurrentMonth");
+  console.log(">>> DEBUG: loadScheduleForCurrentMonth() fired unexpectedly");
+
   // if (isAdminMode && defaultJustRan) {
   //     console.log(">>> DEBUG: Skipping reload because default just ran");
   //     return;   // ⭐ Do NOT reset here
@@ -1328,14 +1331,21 @@ async function loadScheduleForCurrentMonth() {
 
   // ⭐ Choose correct schedule load URL
   const url = isAdminMode
-    ? `/admin/schedule/${targetUserId}/${year}/${month}`
+    ? `/admin/schedule/${targetUserId}/${currLeagueId}/${year}/${month}`
     : `/user/schedule/${year}/${month}`;
 
+  console.log(">>> DEBUG: BEFORE fetch in loadScheduleForCurrentMonth");
+  
   const res = await fetch(url);
-  console.log(">>> DEBUG: schedule.html - url=", url, " - schedule load response status =", res.status);
-  const data = await res.json();
 
-  console.log(">>> DEBUG: schedule load response =", data);
+  console.log(">>> DEBUG: schedule.html - url=", url, " - schedule load response status =", res.status);
+  console.log(">>> DEBUG: loadScheduleForCurrentMonth() fetch returned");
+  console.log(">>> DEBUG: raw response:", res);
+  const data = await res.json();
+  console.log(">>> DEBUG: loadScheduleForCurrentMonth() data:", data);
+  console.log(">>> DEBUG: loadScheduleForCurrentMonth() data.status:", data.status);
+  console.log(">>> DEBUG: loadScheduleForCurrentMonth() data.schedule:", data.schedule);
+
 if (isAdminMode) {
     console.log(">>> DEBUG: ADMIN MODE — applying scheduleObj and leaguePlayDays");
 
@@ -1487,7 +1497,7 @@ function wireUpJumpToday() {
     picker.value = `${year}-${month}`;
     console.log(">>> DEBUG: monthPicker CHANGE triggered loadScheduleForCurrentMonth");
     // Reload schedule
-    await loadScheduleForCurrentMonth();
+    //await loadScheduleForCurrentMonth();
 
     // Focus today's cell
     focusDay(day);

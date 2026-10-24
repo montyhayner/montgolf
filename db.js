@@ -1,21 +1,10 @@
-const Database = require('better-sqlite3');
+const path = require("path");
+const Database = require("better-sqlite3");
 
-console.log("LOADING DB.JS FROM:", __filename);
+const dbPath = process.env.DB_PATH || path.resolve("./golf.db");
 
-// Open the database (synchronous, fast, stable)
-const db = new Database('./golf.db');
+console.log("Using DB:", dbPath);
 
-// Async-like wrappers to match your existing code style
-db.getAsync = (sql, params = []) => {
-  return Promise.resolve(db.prepare(sql).get(params));
-};
-
-db.allAsync = (sql, params = []) => {
-  return Promise.resolve(db.prepare(sql).all(params));
-};
-
-db.runAsync = (sql, params = []) => {
-  return Promise.resolve(db.prepare(sql).run(params));
-};
+const db = new Database(dbPath);
 
 module.exports = db;

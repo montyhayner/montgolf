@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const { dbAll, dbGet, dbRun } = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const logger = require("../utils/logger");
 
@@ -11,7 +10,7 @@ router.get("/api", requireAdmin, async (req, res) => {
   logger.route("GET", "/admin/leagues/api");
 
   try {
-    const rows = await dbAll(`
+    const rows = db.prepare(`
       SELECT id, league_name, coordinator_last_name, coordinator_first_name, description
       FROM leagues
       ORDER BY league_name ASC
@@ -31,11 +30,11 @@ router.get("/api/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const row = await dbGet(`
+    const row = db.prepare(`
       SELECT id, league_name, coordinator_last_name, coordinator_first_name, description
       FROM leagues
       WHERE id = ?
-    `, [id]);
+    `).get(id);
 
     if (!row) {
       return res.status(404).json({ error: "League not found" });
@@ -56,10 +55,10 @@ router.post("/api", requireAdmin, async (req, res) => {
   const { league_name, description } = req.body;
 
   try {
-    await dbRun(`
+    const insertStmt = db.prepare(`
       INSERT INTO leagues (league_name, description)
       VALUES (?, ?)
-    `, [league_name, description || null]);
+    `).run(league_name, description || null);
 
     res.json({ success: true });
   } catch (err) {
@@ -77,11 +76,11 @@ router.put("/api/:id", requireAdmin, async (req, res) => {
   const { league_name, description } = req.body;
 
   try {
-    await dbRun(`
+    const updtStmt = db.prepare(`
       UPDATE leagues
       SET league_name = ?, description = ?
       WHERE id = ?
-    `, [league_name, description || null, id]);
+    `).run(league_name, description || null, id);
 
     res.json({ success: true });
   } catch (err) {
@@ -98,7 +97,7 @@ router.delete("/api/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    await dbRun(`DELETE FROM leagues WHERE id = ?`, [id]);
+    const deleteStmt = db.prepare(`DELETE FROM leagues WHERE id = ?`).run(id);
     res.json({ success: true });
   } catch (err) {
     logger.error(err, "Admin DELETE /leagues/api/:id");
