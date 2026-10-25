@@ -83,9 +83,6 @@ app.use("/auth", require("./routes/auth"));
 // USER
 app.use("/user", require("./routes/user"));
 
-// SCHEDULE but for admin editing of another user's schedule
-//app.use("/schedule", require("./routes/schedule"));
-
 // GUESTS API
 const guestsRouter = require("./routes/guests");
 app.use("/api/guests", requireLogin, guestsRouter);

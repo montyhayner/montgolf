@@ -478,6 +478,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function detectAdminOverride() {
     const parts = window.location.pathname.split("/");
     console.log(">>> DEBUG: file=schedule.html - URL parts:", parts);
+    console.log(">>> detectAdminOverride result",
+      {
+          isAdminMode,
+          targetUserId,
+          pathname: window.location.pathname
+      }
+    );
     if (parts[1] === "admin" && parts[2] === "schedule") {
       targetUserId = parseInt(parts[3]);
       isAdminMode = true;
@@ -491,54 +498,75 @@ document.addEventListener("DOMContentLoaded", () => {
   detectAdminOverride();   // ⭐ REQUIRED ⭐
 
   // Wait a bit for nav-loader.js to finish inserting the nav
-  setTimeout(() => {
+  document.addEventListener("navLoaded", () => {
 
-    // ⭐ ADMIN MODE: Replace user nav bar with admin override nav bar
+    console.log(">>> DEBUG: navLoaded event received");
+    console.log(">>> isAdminMode =", isAdminMode);
+    console.log(">>> pathname =", window.location.pathname);
+
+    // ⭐ ADMIN MODE: Replace nav bar with admin override nav bar
     if (isAdminMode) {
-      const nav = document.getElementById("nav-container");
 
-      nav.innerHTML = `
-        <div class="nav-bar" style="display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#2b7cff; color:white;">
-          <div class="nav-left" style="font-size:20px; font-weight:bold;">
-            Golf Scheduler
+        console.log(">>> DEBUG: Injecting admin override navbar");
+
+        const nav = document.getElementById("nav-container");
+
+        nav.innerHTML = `
+          <div class="nav-bar"
+               style="display:flex;
+                      justify-content:space-between;
+                      align-items:center;
+                      padding:10px 20px;
+                      background:#2b7cff;
+                      color:white;">
+
+            <div class="nav-left"
+                 style="font-size:20px;
+                        font-weight:bold;">
+              Golf Scheduler
+            </div>
+
+            <div class="nav-right">
+              <a href="/admin/golfers"
+                 class="nav-link"
+                 style="color:white;
+                        font-size:16px;
+                        text-decoration:none;">
+                Return to Manage Golfers
+              </a>
+            </div>
+
           </div>
-          <div class="nav-right">
-            <a href="/admin/golfers" class="nav-link" style="color:white; font-size:16px; text-decoration:none;">
-              Return to Manage Golfers
-            </a>
-          </div>
-        </div>
-      `;
+        `;
     }
 
-    // ⭐ USER MODE: Keep existing nav-link modal protection
+    // ⭐ nav-link handlers
     document.querySelectorAll(".nav-link").forEach(link => {
-      link.addEventListener("click", (e) => {
-        // ⭐ Skip modal for Clear and Default buttons
-        if (link.id === "clearBtn" || link.id === "defaultBtn") {
-          return;
-        }
+        link.addEventListener("click", (e) => {
 
-        if (!unsavedChanges) return;
+            if (link.id === "clearBtn" ||
+                link.id === "defaultBtn") {
+                return;
+            }
 
-        e.preventDefault();
+            if (!unsavedChanges) return;
 
-        requireNoUnsavedChanges({
-          onSave: async () => {
-            console.log(">>> DEBUG: nav link clicked - onSave callback");
-            await saveSchedule();
-            window.location = link.href;
-          },
-          onContinue: () => {
-            console.log(">>> DEBUG: nav link clicked - onContinue callback");
-            window.location = link.href;
-          },
-          onCancel: () => {}
+            e.preventDefault();
+
+            requireNoUnsavedChanges({
+                onSave: async () => {
+                    await saveSchedule();
+                    window.location = link.href;
+                },
+                onContinue: () => {
+                    window.location = link.href;
+                },
+                onCancel: () => {}
+            });
         });
-      });
     });
 
-  }, 200);
+});
 
   // --- SAFE modal button bindings (unchanged) ---
   const unsavedSaveBtn = document.getElementById("unsavedSave");
@@ -788,7 +816,19 @@ if (status === "default") {
 }
 
 function getMonthParts() {
-  const [year, month] = document.getElementById("monthPicker").value.split("-");
+  const pickerValue =
+    document.getElementById("monthPicker").value;
+
+  if (!pickerValue) {
+    const now = easternNow();
+
+    return {
+      year: now.substring(0, 4),
+      month: now.substring(5, 7)
+    };
+  }
+
+  const [year, month] = pickerValue.split("-");
   return { year, month };
 }
 
@@ -1313,7 +1353,13 @@ function applyScheduleToCalendar(scheduleObj, leaguePlayDays) {
 async function loadScheduleForCurrentMonth() {
   // ⭐ Prevent overwrite after Default runs
   console.log(">>> DEBUG: ENTER loadScheduleForCurrentMonth");
-  console.log(">>> DEBUG: loadScheduleForCurrentMonth() fired unexpectedly");
+  console.trace(">>> loadScheduleForCurrentMonth() call stack");
+  console.log("=== PAGE STATE ===");
+  console.log("isAdminMode =", isAdminMode);
+  console.log("targetUserId =", targetUserId);
+  console.log("currLeagueId =", currLeagueId);
+  console.log("monthPicker.value =", document.getElementById("monthPicker")?.value);
+  console.log("==================");
 
   // if (isAdminMode && defaultJustRan) {
   //     console.log(">>> DEBUG: Skipping reload because default just ran");
