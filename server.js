@@ -1721,20 +1721,27 @@ app.post(
       // 1. Load tee sheet WITH golfer emails
       // ---------------------------------------------------------
       const teeRows = db.prepare(`
-        SELECT 
-          ts.*,
-          u1.email AS email1,
-          u2.email AS email2,
-          u3.email AS email3,
-          u4.email AS email4
-        FROM tee_sheet_working ts
-        LEFT JOIN users u1 ON ts.user_id1 = u1.id
-        LEFT JOIN users u2 ON ts.user_id2 = u2.id
-        LEFT JOIN users u3 ON ts.user_id3 = u3.id
-        LEFT JOIN users u4 ON ts.user_id4 = u4.id
-        WHERE ts.league_id = ?
-          AND ts.tee_date = ?
-        ORDER BY ts.tee_time, ts.starting_nine
+        SELECT ts.*
+             , u1.email AS email1
+             , u2.email AS email2
+             , u3.email AS email3
+             , u4.email AS email4
+          FROM tee_sheet_working ts
+     LEFT JOIN users u1 
+            ON ts.user_id1 = u1.id
+           AND ts.league_id = u1.league_id 
+     LEFT JOIN users u2 
+            ON ts.user_id2 = u2.id
+           AND ts.league_id = u2.league_id 
+     LEFT JOIN users u3 
+            ON ts.user_id3 = u3.id
+           AND ts.league_id = u3.league_id
+     LEFT JOIN users u4 
+            ON ts.user_id4 = u4.id
+           AND ts.league_id = u4.league_id
+         WHERE ts.league_id = ?
+           AND ts.tee_date = ?
+         ORDER BY ts.tee_time, ts.starting_nine
       `).all(leagueId, teeDate);
 
       // ---------------------------------------------------------

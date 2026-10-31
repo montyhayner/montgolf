@@ -1,0 +1,64 @@
+PRAGMA foreign_keys = OFF;
+
+--BEGIN TRANSACTION;
+
+-- Create new version of table
+CREATE TABLE guests_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    sponsor_user_id INTEGER NOT NULL,
+    guest_last_name TEXT NOT NULL,
+    guest_first_name TEXT NOT NULL,
+    guest_email TEXT,
+    date1 TEXT,
+    date2 TEXT,
+    date3 TEXT,
+    date4 TEXT,
+    date5 TEXT,
+    updated_at TEXT DEFAULT '2026-01-01 00:00:00',
+
+    FOREIGN KEY (league_id) REFERENCES leagues(id),
+    FOREIGN KEY (sponsor_user_id) REFERENCES logins(id)
+);
+
+-- Copy existing data
+-- Replace 1 with the appropriate league_id if all existing guests belong to one league
+INSERT INTO guests_new (
+    id,
+    league_id,
+    sponsor_user_id,
+    guest_last_name,
+    guest_first_name,
+    guest_email,
+    date1,
+    date2,
+    date3,
+    date4,
+    date5,
+    updated_at
+)
+SELECT
+    id,
+    1 AS league_id,
+    sponsor_user_id,
+    guest_last_name,
+    guest_first_name,
+    guest_email,
+    date1,
+    date2,
+    date3,
+    date4,
+    date5,
+    updated_at
+FROM guests;
+
+DROP TABLE guests;
+
+ALTER TABLE guests_new RENAME TO guests;
+
+CREATE INDEX idx_guests_sponsor_league
+    ON guests (sponsor_user_id, league_id);
+
+--COMMIT;
+
+PRAGMA foreign_keys = ON;
