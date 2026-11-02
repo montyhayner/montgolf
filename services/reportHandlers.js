@@ -48,21 +48,22 @@ function generateLatestTeeSheetHTML(teeSheet, playDate, leagueName) {
 // ------------------------------------------------------------
 function buildTwoWeekUserReportData(db, leagueId) {
   const rows = db.prepare(`
-    SELECT 
-      u.first_name,
-      u.last_name,
-      u.email,
-      s.date AS play_date,
-      s.tee_time,
-      s.subgroup,
-      s.subgroup_number
-    FROM schedule s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.is_playing = 1
-      AND u.league_id = ?
-      AND s.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
-      AND s.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-    ORDER BY s.date, s.tee_time, u.last_name, u.first_name
+    SELECT u.first_name,
+           u.last_name,
+           u.email,
+           s.date AS play_date,
+           s.tee_time,
+           s.subgroup,
+           s.subgroup_number
+      FROM schedule s
+      JOIN users u 
+        ON u.id = s.user_id
+       AND u.league_id = s.league_id 
+     WHERE s.is_playing = 1
+       AND u.league_id = ?
+       AND s.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
+       AND s.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+     ORDER BY s.date, s.tee_time, u.last_name, u.first_name
   `).all(leagueId);
 
   return rows;
@@ -74,13 +75,15 @@ function buildTwoWeekUserReportData(db, leagueId) {
 function buildTwoWeekReportData(db, leagueId) {
   const dateRows = db.prepare(`
     SELECT DISTINCT schedule.date AS play_date
-    FROM schedule
-    JOIN users ON users.id = schedule.user_id
-    WHERE schedule.is_playing = 1
-      AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
-      AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-    ORDER BY play_date
+      FROM schedule
+      JOIN users 
+        ON users.id = schedule.user_id
+       AND users.league_id = schedule.league_id 
+     WHERE schedule.is_playing = 1
+       AND users.league_id = ?
+       AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
+       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+     ORDER BY play_date
   `).all(leagueId);
 
   const dates = dateRows.map(r => r.play_date);
@@ -94,13 +97,15 @@ function buildTwoWeekReportData(db, leagueId) {
            users.first_name,
            users.last_name,
            users.is_member
-    FROM schedule
-    JOIN users ON users.id = schedule.user_id
-    WHERE schedule.is_playing = 1
-      AND users.league_id = ?
-      AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
-      AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
-    ORDER BY users.last_name, users.first_name
+      FROM schedule
+      JOIN users 
+        ON users.id = schedule.user_id
+       AND users.league_id = schedule.league_id
+     WHERE schedule.is_playing = 1
+       AND users.league_id = ?
+       AND schedule.date >= datetime(CURRENT_TIMESTAMP, '-4 hours')
+       AND schedule.date <= datetime(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
+     ORDER BY users.last_name, users.first_name
   `).all(leagueId);
 
   const guestRows = db.prepare(`
@@ -109,10 +114,12 @@ function buildTwoWeekReportData(db, leagueId) {
            guests.guest_last_name AS last_name,
            0 AS is_member,
            guests.date1, guests.date2, guests.date3, guests.date4, guests.date5
-    FROM guests
-    JOIN users ON users.id = guests.sponsor_user_id
-    WHERE users.league_id = ?
-      AND (
+      FROM guests
+      JOIN users 
+        ON users.id = guests.sponsor_user_id
+       AND users.league_id = guests.league_id
+     WHERE users.league_id = ?
+       AND (
            guests.date1 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
         OR guests.date2 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
         OR guests.date3 BETWEEN date(CURRENT_TIMESTAMP, '-4 hours') AND date(CURRENT_TIMESTAMP, '+14 days', '-4 hours')
@@ -424,10 +431,13 @@ async function getLatestTeeSheet(req, res) {
     const teeSheet = db.prepare(`
       SELECT ts.tee_time, ts.subgroup, ts.subgroup_number,
              u.first_name, u.last_name
-      FROM tee_sheet ts
-      JOIN users u ON u.id = ts.user_id
-      WHERE ts.league_id = ? AND ts.tee_date = ?
-      ORDER BY ts.tee_time, ts.subgroup, ts.subgroup_number
+        FROM tee_sheet ts
+        JOIN users u 
+          ON u.id = ts.user_id
+         AND u.league_id = ts.league_id
+       WHERE ts.league_id = ? 
+         AND ts.tee_date = ?
+       ORDER BY ts.tee_time, ts.subgroup, ts.subgroup_number
     `).all(leagueId, latestDate);
 
     res.json({ play_date: latestDate, teeSheet });
@@ -473,10 +483,13 @@ async function sendLatestTeeSheetEmail(req, res) {
     const teeSheet = db.prepare(`
       SELECT ts.tee_time, ts.subgroup, ts.subgroup_number,
              u.first_name, u.last_name
-      FROM tee_sheet ts
-      JOIN users u ON u.id = ts.user_id
-      WHERE ts.league_id = ? AND ts.tee_date = ?
-      ORDER BY ts.tee_time, ts.subgroup, ts.subgroup_number
+        FROM tee_sheet ts
+        JOIN users u 
+          ON u.id = ts.user_id
+         AND u.league_id = ts.league_id
+       WHERE ts.league_id = ? 
+         AND ts.tee_date = ?
+       ORDER BY ts.tee_time, ts.subgroup, ts.subgroup_number
     `).all(leagueId, latestDate);
 
     const textReport = generateLatestTeeSheetText(teeSheet, latestDate, leagueName);

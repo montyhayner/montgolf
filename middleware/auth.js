@@ -59,28 +59,36 @@ function requireAdmin(req, res, next) {
 function requireLeagueAdmin(req, res, next) {
 
     const isApi = req.originalUrl.includes("/api");
+    const user = req.session.user;
 
-    // Super Admin WITH league
-    if (req.session.user?.is_super_admin && req.session.user?.league_id) {
+    // Super Admin WITH selected league
+    if (user?.is_super_admin && user?.league_id) {
         console.log("  ✔ Super Admin WITH league allowed");
         return next();
     }
 
-    // League Admin WITH league
-    if (req.session.user?.is_admin && req.session.user?.league_id) {
+    // League Admin WITH selected league
+    const isLeagueAdmin =
+        user?.league_id &&
+        user?.leagues?.some(
+            l =>
+                Number(l.league_id) === Number(user.league_id) &&
+                Number(l.is_admin) === 1
+        );
+
+    if (isLeagueAdmin) {
         console.log("  ✔ League Admin allowed");
         return next();
     }
 
-    // No league selected
-    console.log("  ✖ No league selected");
+    console.log("  ✖ No league selected or user is not admin of selected league");
 
     if (isApi) {
-        // API routes must return JSON, not redirect
-        return res.status(403).json({ error: "No league selected" });
+        return res.status(403).json({
+            error: "No league selected"
+        });
     }
 
-    // Page routes can redirect normally
     return res.redirect("/auth/admin-select-league");
 }
 
@@ -123,6 +131,13 @@ function requireSuperAdmin(req, res, next) {
 }
 
 function requireAdminLoginOnly(req, res, next) {
+
+    console.log("ADMIN CHECK", {
+        url: req.originalUrl,
+        is_super_admin: req.session.user?.is_super_admin,
+        is_admin: req.session.user?.is_admin,
+        user: req.session.user
+    });
 
     if (!req.session.user) {
         return res.redirect("/admin-login");

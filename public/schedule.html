@@ -478,13 +478,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function detectAdminOverride() {
     const parts = window.location.pathname.split("/");
     console.log(">>> DEBUG: file=schedule.html - URL parts:", parts);
-    console.log(">>> detectAdminOverride result",
-      {
-          isAdminMode,
-          targetUserId,
-          pathname: window.location.pathname
-      }
-    );
     if (parts[1] === "admin" && parts[2] === "schedule") {
       targetUserId = parseInt(parts[3]);
       isAdminMode = true;
@@ -493,6 +486,13 @@ document.addEventListener("DOMContentLoaded", () => {
       isAdminMode = false;
       console.log("Normal user schedule page");
     }
+    console.log(">>> detectAdminOverride result",
+      {
+          isAdminMode,
+          targetUserId,
+          pathname: window.location.pathname
+      }
+    );
   }
   
   detectAdminOverride();   // ⭐ REQUIRED ⭐
