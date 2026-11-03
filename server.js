@@ -143,7 +143,14 @@ async function requireTeeSheetEditor(req, res, next) {
     }
 
     // 4. If coordinator allows admins → allow league admins
-    if (league.coordinator_controls_editing === 0 && user.is_admin) {
+    const isLeagueAdmin =
+      user?.leagues?.some(
+        l =>
+          Number(l.league_id) === Number(leagueId) &&
+          Number(l.is_admin) === 1
+      );
+
+    if (league.coordinator_controls_editing === 0 && isLeagueAdmin) {
       return next();
     }
 
@@ -486,19 +493,19 @@ app.get("/admin/api/tee-sheet/:leagueId/:teeDate/changes",
                       AND tee_date = ?
                       AND user_id1 <> ''
                     UNION
-                    SELECT user_id2, first_name2, last_name2
+                    SELECT user_id2 as user_id, first_name2 as first_name, last_name2 as last_name
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
                       AND user_id2 <> ''
                     UNION
-                    SELECT user_id3, first_name3, last_name3
+                    SELECT user_id3 as user_id, first_name3 as first_name, last_name3 as last_name
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
                       AND user_id3 <> ''
                     UNION
-                    SELECT user_id4, first_name4, last_name4
+                    SELECT user_id4 as user_id, first_name4 as first_name, last_name4 as last_name
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
@@ -541,25 +548,25 @@ app.get("/admin/api/tee-sheet/:leagueId/:teeDate/changes",
             FROM (
                 SELECT user_id, first_name, last_name, edited_at
                 FROM (
-                    SELECT user_id1 as user_id, first_name1, last_name1, edited_at
+                    SELECT user_id1 as user_id, first_name1 as first_name, last_name1 as last_name, edited_at
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
                       AND user_id1 <> ''
                     UNION
-                    SELECT user_id2, first_name2, last_name2, edited_at
+                    SELECT user_id2 as user_id, first_name2 as first_name, last_name2 as last_name, edited_at
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
                       AND user_id2 <> ''
                     UNION
-                    SELECT user_id3, first_name3, last_name3, edited_at
+                    SELECT user_id3 as user_id, first_name3 as first_name, last_name3 as last_name, edited_at
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
                       AND user_id3 <> ''
                     UNION
-                    SELECT user_id4, first_name4, last_name4, edited_at
+                    SELECT user_id4 as user_id, first_name4 as first_name, last_name4 as last_name, edited_at
                     FROM tee_sheet_working
                     WHERE league_id = ?
                       AND tee_date = ?
@@ -578,7 +585,7 @@ app.get("/admin/api/tee-sheet/:leagueId/:teeDate/changes",
                        AND is_playing = 1
                        AND schedule.league_id = ?
                     UNION
-                    SELECT DISTINCT guests.id, guest_first_name, guest_last_name
+                    SELECT DISTINCT guests.id as user_id, guest_first_name as first_name, guest_last_name as last_name
                       FROM guests
                       JOIN users
                         ON guests.sponsor_user_id = users.id
@@ -3077,10 +3084,10 @@ cron.schedule("0 20 * * *", async () => {
 // generateTeeSheet(leagueId, teeDate, emailid)
 // COMMENT below code OUT AFTER RUNNING!!!
 //
-//    cron.schedule("59 15 * * *", async () => {
+//    cron.schedule("00 15 * * *", async () => {
 //    console.log("⏰ tee sheet rebuild cron job to run based on editing");
 //    const uid = 1;  // leagueId
-//    const teeDate = "2026-09-11";  // date to rebuild
+//    const teeDate = "2026-11-04";  // date to rebuild
 //    const emailId = "rlhayner@verizon.net"; 
 //    await generateTeeSheet({
 //          leagueId: Number(uid),

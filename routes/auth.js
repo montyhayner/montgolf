@@ -339,25 +339,33 @@ router.post("/admin-login", (req, res) => {
 
   // Load all leagues the user belongs to
   const leagues = db.prepare(`
-      SELECT lu.league_id, lu.is_member, lu.is_admin, lu.subgroup, lu.subgroup_number,
-             l.league_name
+      SELECT lu.league_id
+           , lu.is_member
+           , lu.is_admin
+           , lu.subgroup
+           , lu.subgroup_number
+           , l.league_name
         FROM league_users lu
-        JOIN leagues l ON l.id = lu.league_id
+        JOIN leagues l 
+          ON l.id = lu.league_id
        WHERE lu.user_id = ?
   `).all(row.id);
 
   const is_super_admin = row.is_super_admin === 1;
 
+  const adminLeagues = leagues.filter(l => l.is_admin === 1);
+
   req.session.user = {
-    id: row.id,
-    email: row.email,
-    first_name: row.first_name,
-    last_name: row.last_name,
-    user_mode: "admin",
-    leagues,
-    league_id: null,
-    league_name: null,
-    is_super_admin
+      id: row.id,
+      email: row.email,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      user_mode: "admin",
+      leagues,
+      league_id: null,
+      league_name: null,
+      is_super_admin,
+      is_admin: adminLeagues.length > 0
   };
 
   return req.session.save(() => {
