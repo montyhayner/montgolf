@@ -464,10 +464,20 @@ router.get("/schedule/:year/:month", requireLogin, async (req, res) => {
 // ============================================================================
 router.get("/session-info", requireLogin, (req, res) => {
   const user = req.session.user;
+   
+  console.log("SESSION INFO:", JSON.stringify(user, null, 2));
+   
   res.json({
-    first_name: user.first_name,
-    last_name: user.last_name,
-    email: user.email
+  first_name: user.first_name,
+  last_name: user.last_name,
+  email: user.email,
+   
+  user_mode: user.user_mode,
+  league_id: user.league_id,
+  league_name: user.league_name,
+  is_admin: user.is_admin,
+  is_super_admin: user.is_super_admin,
+  leagues_count: user.leagues?.length || 0
   });
 });
 

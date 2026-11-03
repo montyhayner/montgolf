@@ -712,10 +712,21 @@ function closeResetPasswordModal() {
 }
 async function initPage() {
     try {
-        await loadNav();                     // now exists
+        console.log("STEP 1A");
+        await loadNav();
+        console.log("STEP 1B");
+
+        console.log("STEP 2");
         const session = await loadSession();
+
+        console.log("STEP 3", session);
         await loadAdminIdentity(session);
+
+        console.log("STEP 4");
         await loadGolfers();
+
+        console.log("STEP 5 COMPLETE");
+
     } catch (err) {
         console.error("Page initialization error:", err);
     }

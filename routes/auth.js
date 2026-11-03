@@ -142,6 +142,7 @@ router.put("/change-password", requireLogin, async (req, res) => {
 // GET /auth/whoami
 // ============================================================================
 router.get("/whoami", (req, res) => {
+  console.log("WHOAMI:", JSON.stringify(req.session.user, null, 2));
   if (!req.session || !req.session.user) {
     return res.json({ user: null });
   }

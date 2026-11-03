@@ -33,16 +33,18 @@ async function loadNav() {
 
     navCss.href = cssFile;
 
-    await new Promise(resolve => {
-      navCss.onload = resolve;
-      navCss.onerror = resolve;
-    });
+    // await new Promise(resolve => {
+    //  navCss.onload = resolve;
+    //  navCss.onerror = resolve;
+    // });
 
     console.log("NAV LOADER: fetching", navFile);
     const navHtml = await fetch(navFile).then(r => r.text());
     navContainer.innerHTML = navHtml;
 
     console.log("NAV LOADER: navHtml loaded");
+    console.log("NAV RETURNING");
+    return true;
 
     document.dispatchEvent(new Event("navLoaded"));
     return true;
