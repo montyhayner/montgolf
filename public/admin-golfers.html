@@ -21,8 +21,11 @@
 
         .create-golfer-container {
             text-align: center;
-            margin: 20px 0;   /* optional but looks cleaner */
-         }
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
 
         .container {
             max-width: 1100px;
@@ -170,6 +173,18 @@ h1 {
             margin-right: 0;
         }
 
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            background: #3498db;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
         .sort-arrow {
             font-size: 12px;
             margin-left: 4px;
@@ -301,10 +316,16 @@ h1 {
             + Add Golfer
         </button>
 
-        <button id="btnEmailClipboard" class="btn">
-            📧 Email IDs to Clipboard
+        <button
+            id="btnEmailClipboard"
+            class="btn"
+            title="Creates a list of golfer email recipients and copies it to the clipboard. You may copy Email IDs Only or Names + Email IDs. Paste the result into Outlook, Gmail, AOL, Yahoo, or another email application. Montgolf does not send the email."
+        >
+            Email IDs to Clipboard
         </button>
+</span>
     </div>
+
 
         <table id="golfer-table">
             <thead>
@@ -431,6 +452,7 @@ h1 {
 </div>
 
 <script>
+//             📧 Email IDs to Clipboard    
 let emailClipboardGolfers = [];
 let emailModal = null;
 // -------------------------------------------------------
