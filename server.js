@@ -2038,6 +2038,32 @@ app.get("/admin/session-info", requireLogin, (req, res) => {
   }
 });
 
+app.get("/admin/email-clipboard-golfers",requireAdminLoginOnly,(req, res) => {
+  const leagueId = req.session.user.league_id;
+  const easternTS = easternNow();
+  const currentMonth = parseInt(easternTS.substring(5, 7), 10); 
+
+  const rows = db.prepare(`
+    SELECT u.id
+         , u.first_name
+         , u.last_name
+         , u.email
+         , COALESCE(upm.in_town, 0) AS in_town
+      FROM users u
+      LEFT JOIN user_play_months upm
+        ON upm.user_id = u.id
+       AND upm.league_id = u.league_id
+       AND upm.month = ?
+     WHERE u.league_id = ?
+       AND u.email IS NOT NULL
+       AND trim(u.email) <> ''
+     ORDER BY u.last_name
+            , u.first_name
+    `).all(currentMonth, leagueId);
+    
+  res.json(rows);
+  }
+);
 
 // ------------------------------
 // LEAGUE APIs

@@ -116,7 +116,7 @@ h1 {
             width: 400px;
         }
 
-        .modal input {
+        .modal input:not([type="checkbox"]) {
             width: 100%;
             padding: 10px;
             margin-top: 8px;
@@ -189,6 +189,100 @@ h1 {
             color: #2c3e50;
         }
 
+        .email-modal {
+            width: 700px;
+            max-width: 95%;
+            max-height: 85vh;
+            overflow: hidden;
+        }
+
+        .golfer-checkbox-container {
+            max-height: 350px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .golfer-checkbox-row {
+            padding: 2px 0;
+            line-height: 1.2;
+        }
+
+        .golfer-checkbox-row label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .golfer-checkbox-row input[type="checkbox"] {
+            margin: 0;
+            padding: 0;
+            width: auto;
+        }
+
+        .selected-count {
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .email-filter-section {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        #golferEmailCheckboxes {
+            max-height: 45vh;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close {
+            cursor: pointer;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .close:hover {
+            color: red;
+        }
+
+        #emailClipboardMessage,
+        .selected-count {
+            text-align: center;
+            padding: 6px 0;
+        }
+
+        #emailClipboardMessage {
+            color: #555;
+            font-size: 14px;
+        }
+
+        .selected-count {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .modal-footer {
+            margin-top: 10px;
+        }
+
+        .modal-footer .btn {
+            margin-right: 8px;
+        }
+
+        .modal-footer .btn:last-child {
+            margin-right: 0;
+        }
+
     </style>
 </head>
 
@@ -202,9 +296,15 @@ h1 {
     <div class="container">
         <h1>Manage Golfers</h1>
 
-        <div class="create-golfer-container">
-            <button class="btn" onclick="openCreateModal()">+ Add Golfer</button>
-        </div>
+    <div class="create-golfer-container">
+        <button class="btn" onclick="openCreateModal()">
+            + Add Golfer
+        </button>
+
+        <button id="btnEmailClipboard" class="btn">
+            📧 Email IDs to Clipboard
+        </button>
+    </div>
 
         <table id="golfer-table">
             <thead>
@@ -302,8 +402,37 @@ h1 {
     </div>
 </div>
 
-<script>
+<div id="emailClipboardModal" class="modal-bg">
+    <div class="modal email-modal">
+        <div class="modal-header">
+            <h3>Email IDs to Clipboard</h3>
+            <span id="closeEmailClipboardModal"
+                class="close">&times;</span>
+        </div>
 
+        <div class="modal-body">
+            <label><input type="checkbox" id="chkAllGolfers">All Golfers</label>
+            <hr>
+            <label><input type="checkbox" id="chkInTown">In-Town Golfers</label>
+            <label><input type="checkbox" id="chkOutOfTown">Out-of-Town Golfers</label>
+            <hr>
+            <div id="golferEmailCheckboxes"></div>
+            <hr>
+            <div id="emailClipboardMessage"></div>
+            <hr>
+            Selected: <span id="selectedGolferCount">0</span> golfers
+        </div>
+        <div class="modal-footer">
+            <button id="btnCopyEmailsOnly" class="btn">Copy Email IDs Only</button>
+            <button id="btnCopyNamesEmails" class="btn">Copy Names + Email IDs</button>
+            <button id="btnCancelClipboardModal" class="btn">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let emailClipboardGolfers = [];
+let emailModal = null;
 // -------------------------------------------------------
 // Load Admin Nav Bar
 //--------------------------------------------------------
@@ -727,12 +856,176 @@ async function initPage() {
 
         console.log("STEP 5 COMPLETE");
 
+        initializeEmailClipboard();
+
     } catch (err) {
         console.error("Page initialization error:", err);
     }
 }
 
 document.addEventListener("DOMContentLoaded", initPage);
+
+function initializeEmailClipboard() {
+
+    emailModal = document.getElementById("emailClipboardModal");
+
+    document
+        .getElementById("btnEmailClipboard")
+        .addEventListener("click", loadClipboardGolfers);
+
+    document
+        .getElementById("chkAllGolfers")
+        .addEventListener("change", e => {
+            document.querySelectorAll(".golfer-email-checkbox")
+                .forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+             updateSelectedCount();
+    });
+
+    document
+        .getElementById("chkInTown")
+        .addEventListener("change", e => {
+
+        document
+            .querySelectorAll(".golfer-email-checkbox")
+            .forEach(cb => {
+                if (cb.dataset.intown === "1") {
+                cb.checked = e.target.checked;
+                }
+            });
+            updateSelectedCount();
+    });
+
+    document
+        .getElementById("chkOutOfTown")
+        .addEventListener("change", e => {
+
+        document
+            .querySelectorAll(".golfer-email-checkbox")
+            .forEach(cb => {
+                if (cb.dataset.intown !== "1") {
+                cb.checked = e.target.checked;
+                }
+            });
+            updateSelectedCount();
+    });
+
+    document
+        .getElementById("btnCopyEmailsOnly")
+        .addEventListener("click", async () => {
+            const list = [];
+            document
+                .querySelectorAll(".golfer-email-checkbox:checked")
+                .forEach(cb => {
+                    const golfer = emailClipboardGolfers.find(
+                        g => g.id == cb.dataset.id
+                    );
+
+                    if (golfer) {
+                        list.push(golfer.email);
+                    }
+                });
+
+            await navigator.clipboard.writeText(list.join("; "));
+            alert(`${list.length} email IDs copied`);
+        });
+
+    document
+        .getElementById("btnCopyNamesEmails")
+        .addEventListener("click", async () => {
+            const list = [];
+            document
+                .querySelectorAll(".golfer-email-checkbox:checked")
+                .forEach(cb => {
+                    const golfer = emailClipboardGolfers.find(
+                        g => g.id == cb.dataset.id
+                    );
+
+                    if (golfer) {
+                      list.push(
+                        `${golfer.first_name} ${golfer.last_name} <${golfer.email}>`);
+                    }
+                });
+                    await navigator.clipboard.writeText(list.join("; "));
+                    alert(`${list.length} golfers copied`);
+        });
+
+    document
+        .getElementById("closeEmailClipboardModal")
+        ?.addEventListener("click", () => {
+            emailModal.style.display = "none";
+        });
+
+    document
+        .getElementById("btnCancelClipboardModal")
+        ?.addEventListener("click", () => {
+            emailModal.style.display = "none";
+        });
+}
+
+async function loadClipboardGolfers() {
+
+  const response =
+    await fetch(
+      "/admin/email-clipboard-golfers"
+    );
+
+  emailClipboardGolfers =
+    await response.json();
+
+  renderClipboardGolfers();
+
+  emailModal.style.display = "flex";
+}
+
+function renderClipboardGolfers() {
+
+  const container = document.getElementById("golferEmailCheckboxes");
+  document.getElementById("emailClipboardMessage").textContent =
+        `${emailClipboardGolfers.length} golfers loaded`;
+  container.innerHTML = "";
+
+  emailClipboardGolfers.forEach(golfer => {
+    const row = document.createElement("div");
+    row.className = "golfer-checkbox-row";
+    row.innerHTML = `
+      <label>
+        <input
+          type="checkbox"
+          class="golfer-email-checkbox"
+          data-id="${golfer.id}"
+          data-intown="${golfer.in_town}"
+        >
+
+        ${golfer.first_name}
+        ${golfer.last_name}
+        (${golfer.email})
+      </label>
+    `;
+
+    container.appendChild(row);
+
+  });
+
+  wireCheckboxHandlers();
+}
+
+function wireCheckboxHandlers() {
+
+  document.querySelectorAll(".golfer-email-checkbox")
+    .forEach(cb => {cb.addEventListener("change", updateSelectedCount);
+    });
+
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+
+  const count = document.querySelectorAll(".golfer-email-checkbox:checked").length;
+
+  document.getElementById("selectedGolferCount").textContent = count;
+}
 
 </script>
 
